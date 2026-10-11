@@ -64,7 +64,8 @@ jobs:
           Get-Content $log -ErrorAction SilentlyContinue
           $status = Invoke-RestMethod http://localhost:8777/__status -TimeoutSec 10
           $status | ConvertTo-Json
-          $spiele = @(Invoke-RestMethod http://localhost:8777/__spiele -TimeoutSec 10)
+          $antwort = Invoke-RestMethod http://localhost:8777/__spiele -TimeoutSec 10
+          $spiele = @($antwort)
           "Spiele: $($spiele.Count)"
           $launcher = (Invoke-WebRequest http://localhost:8777/Launcher.html -UseBasicParsing -TimeoutSec 10).Content
           $zeigen = (Invoke-WebRequest http://localhost:8777/__zeigen -UseBasicParsing -TimeoutSec 10).Content
