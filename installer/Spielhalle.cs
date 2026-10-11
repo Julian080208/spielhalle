@@ -24,6 +24,7 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 [assembly: System.Reflection.AssemblyTitle("Spielhalle")]
 
@@ -131,6 +132,9 @@ static class App
     }
 
     // ---------------------------------------------------------------- Fenster
+    // Browser mit App-Modus (--app): eigenes Fenster ohne Adressleiste und Tabs
+    static readonly string[] AppBrowsers = { "msedge.exe", "chrome.exe", "brave.exe", "vivaldi.exe" };
+
     static string BrowserPath()
     {
         string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
@@ -143,15 +147,30 @@ static class App
             Path.Combine(pf, @"Google\Chrome\Application\chrome.exe"),
             Path.Combine(pf86, @"Google\Chrome\Application\chrome.exe"),
             Path.Combine(la, @"Google\Chrome\Application\chrome.exe"),
+            Path.Combine(pf, @"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            Path.Combine(la, @"BraveSoftware\Brave-Browser\Application\brave.exe"),
+            Path.Combine(la, @"Vivaldi\Application\vivaldi.exe"),
         };
         foreach (string p in c) if (File.Exists(p)) return p;
+        // woanders installiert? Windows merkt sich den Ort unter „App Paths“
+        foreach (string exe in AppBrowsers)
+            foreach (RegistryKey root in new[] { Registry.CurrentUser, Registry.LocalMachine })
+                try
+                {
+                    using (var k = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + exe))
+                    {
+                        string p = k == null ? null : ((k.GetValue("") as string) ?? "").Trim().Trim('"');
+                        if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                    }
+                }
+                catch { }
         return null;
     }
 
     static bool OpenWindow()
     {
         string b = BrowserPath();
-        if (b == null) { try { Process.Start(Url + "Launcher.html"); } catch { } return false; }
+        if (b == null) { Log("Kein Edge/Chrome gefunden, öffne Standardbrowser"); try { Process.Start(Url + "Launcher.html"); } catch { } return false; }
         string a = "--app=" + Url + "Launcher.html" +
                    " --user-data-dir=\"" + DataDir + "\"" +
                    " --no-first-run --no-default-browser-check --disable-sync --hide-crash-restore-bubble" +
@@ -168,7 +187,7 @@ static class App
         var ids = new List<int>();
         try
         {
-            using (var s = new ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name='msedge.exe' OR Name='chrome.exe'"))
+            using (var s = new ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name='" + string.Join("' OR Name='", AppBrowsers) + "'"))
                 foreach (ManagementObject o in s.Get())
                 {
                     string cl = o["CommandLine"] as string;

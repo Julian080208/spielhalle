@@ -131,7 +131,7 @@ static class Setup
         int self = Process.GetCurrentProcess().Id;
         try
         {
-            using (var s = new ManagementObjectSearcher("SELECT ProcessId, CommandLine, ExecutablePath FROM Win32_Process WHERE Name='msedge.exe' OR Name='chrome.exe' OR Name='Spielhalle.exe'"))
+            using (var s = new ManagementObjectSearcher("SELECT ProcessId, CommandLine, ExecutablePath FROM Win32_Process WHERE Name='msedge.exe' OR Name='chrome.exe' OR Name='brave.exe' OR Name='vivaldi.exe' OR Name='Spielhalle.exe'"))
                 foreach (ManagementObject o in s.Get())
                 {
                     int id = Convert.ToInt32(o["ProcessId"]);
