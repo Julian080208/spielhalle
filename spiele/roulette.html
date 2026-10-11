@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roulette</title>
+<meta name="spielhalle-beschreibung" content="Rien ne va plus – setz auf deine Glückszahl.">
+<meta name="spielhalle-genre" content="Casino, Party">
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+  body { background:radial-gradient(1400px 800px at 50% 20%, #12402b, #06140e 70%); min-height:100vh; }
+  .rt { display:grid; grid-template-columns:minmax(300px, 40%) 1fr; gap:28px; align-items:center; padding:20px 28px 28px; max-width:1700px; margin:0 auto; }
+  .wheel { position:relative; aspect-ratio:1; width:100%; max-height:76vh; margin:0 auto; }
+  .wheel canvas { width:100%; height:100%; display:block; filter:drop-shadow(0 30px 50px rgba(0,0,0,.6)); }
+  .result { position:absolute; left:50%; top:50%; transform:translate(-50%, -50%) scale(.6); opacity:0; width:34%; aspect-ratio:1; border-radius:50%;
+            display:grid; place-items:center; font:900 clamp(40px, 7vw, 96px)/1 var(--font); color:#fff; border:6px solid #ffd76a;
+            box-shadow:0 0 60px rgba(255,215,106,.6); transition:.35s cubic-bezier(.2,1.4,.4,1); pointer-events:none; }
+  .result.on { transform:translate(-50%, -50%) scale(1); opacity:1; }
+  .result.r { background:radial-gradient(#e2283b, #8e0d1b); } .result.b { background:radial-gradient(#2b2f3a, #08090c); } .result.g { background:radial-gradient(#1ea95b, #0b5a2e); }
+  .side { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .hist { display:flex; gap:6px; align-items:center; min-height:40px; flex-wrap:wrap; }
+  .hist small { color:#9fd2b5; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-right:6px; }
+  .hn { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; font-weight:800; color:#fff; border:2px solid rgba(255,255,255,.25); }
+  .hn.r { background:#c81d30; } .hn.b { background:#1b1d24; } .hn.g { background:#13874a; }
+  .hn:first-of-type { width:46px; height:46px; font-size:18px; border-color:#ffd76a; box-shadow:0 0 16px rgba(255,215,106,.5); }
+  /* Spieltisch */
+  .table { display:grid; grid-template-columns:repeat(14, minmax(0, 1fr)); grid-auto-rows:minmax(44px, 7vh); gap:3px; padding:14px; border-radius:22px;
+           background:#0d5a37; border:6px solid #6b3f1d; box-shadow:inset 0 0 40px rgba(0,0,0,.45), 0 20px 50px rgba(0,0,0,.5); user-select:none; }
+  .f { position:relative; display:grid; place-items:center; border:2px solid rgba(255,255,255,.55); border-radius:6px; color:#fff; font-weight:800;
+       font-size:clamp(13px, 1.25vw, 20px); cursor:pointer; transition:filter .12s, box-shadow .12s; }
+  .f:hover { filter:brightness(1.25); box-shadow:0 0 0 3px rgba(255,255,255,.35) inset; }
+  .f.r { background:#c81d30; } .f.b { background:#16181e; } .f.g { background:#13874a; } .f.o { background:transparent; font-size:clamp(12px, 1vw, 17px); }
+  .f.win { animation:win .55s ease-in-out 6 alternate; }
+  @keyframes win { to { box-shadow:0 0 0 4px #ffd76a inset, 0 0 26px #ffd76a; filter:brightness(1.6); } }
+  .f .ch { position:absolute; right:-6px; top:-8px; min-width:30px; height:30px; padding:0 5px; border-radius:999px; display:grid; place-items:center;
+           font-size:11px; font-weight:900; color:#fff; border:3px dashed rgba(255,255,255,.85); box-shadow:0 3px 8px rgba(0,0,0,.6); z-index:2; pointer-events:none; }
+  .ctrl { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px 16px; border-radius:18px; background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08); }
+  .chip { width:58px; height:58px; border-radius:50%; border:5px dashed rgba(255,255,255,.85); color:#fff; font-weight:900; font-size:14px; cursor:pointer;
+          box-shadow:0 4px 0 rgba(0,0,0,.35); transition:transform .12s; }
+  .chip.on { transform:translateY(-6px) scale(1.08); box-shadow:0 0 0 3px #ffd76a, 0 10px 20px rgba(0,0,0,.5); }
+  .sum { margin-left:auto; text-align:right; }
+  .sum small { display:block; color:#9fd2b5; font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
+  .sum b { font-size:26px; }
+  .spin { height:58px; padding:0 34px; border-radius:999px; border:0; font:900 20px var(--font); color:#3b2400; cursor:pointer; letter-spacing:1px;
+          background:linear-gradient(180deg, #ffe7a0, #ffb42e); box-shadow:0 6px 0 #a86a00, 0 12px 30px rgba(255,180,46,.4); }
+  .spin:disabled { filter:grayscale(.8) brightness(.7); cursor:default; }
+  .players { display:flex; flex-wrap:wrap; gap:8px; }
+  .pl { display:flex; align-items:center; gap:8px; padding:6px 14px 6px 6px; border-radius:999px; border:2px solid var(--pc); background:rgba(0,0,0,.35); color:#fff; cursor:pointer; font:700 15px var(--font); }
+  .pl span { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--pc); }
+  .pl small { color:#ffd76a; font-weight:800; }
+  .pl.on { background:var(--pc); box-shadow:0 0 20px var(--pc); }
+  .mode { display:flex; gap:8px; }
+  @media (max-width:1000px) { .rt { grid-template-columns:1fr; } .wheel { max-width:420px; } }
+</style>
+</head>
+<body>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<div class="rt">
+  <div class="wheel"><canvas id="cv"></canvas><div class="result" id="res"></div></div>
+  <div class="side">
+    <div class="mode" id="mode"></div>
+    <div class="players" id="players" hidden></div>
+    <div class="hist" id="hist"></div>
+    <div class="table" id="table"></div>
+    <div class="ctrl">
+      <div id="chips" style="display:flex;gap:10px"></div>
+      <button class="h-btn" id="undo" title="Letzten Chip zurücknehmen">↶ Zurück</button>
+      <button class="h-btn" id="clear">Löschen</button>
+      <button class="h-btn" id="again" title="Einsätze der letzten Runde">Wie zuvor</button>
+      <button class="h-btn" id="dbl">×2</button>
+      <div class="sum"><small>Einsatz</small><b id="total">0</b></div>
+      <button class="spin" id="spin">DREHEN</button>
+    </div>
+  </div>
+</div>
+<script>
+Hub.init('roulette'); Hub.casinoInit();
+const bar = Hub.bar({id:'roulette', title:'Roulette', stats:[['chips', 'Chips'], ['last', 'Letzte Zahl'], ['won', 'Größter Gewinn']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Roulette', html:`<p>Setze Chips auf Zahlen oder Felder und drück <b>Drehen</b> (oder <kbd>Leertaste</kbd>). Die Kugel entscheidet.</p>
+  <p><b>Eine Zahl</b> zahlt 35 zu 1 · <b>Dutzend</b> oder <b>Kolonne (2:1)</b> zahlt 2 zu 1 · <b>Rot/Schwarz, Gerade/Ungerade, 1–18/19–36</b> zahlen 1 zu 1.
+  Bei der <b>0</b> verlieren alle Wetten außer auf die 0.</p>
+  <p>Linksklick setzt, Rechtsklick nimmt einen Chip weg. <b>Partyrunde:</b> Jeder aus dem Partyraum bekommt 1.000 Partychips und setzt mit seiner Farbe – dann dreht die Kugel für alle.</p><p><i>Nur Spielgeld.</i></p>`}));
+
+const $ = id => document.getElementById(id);
+const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const col = n => n === 0 ? 'g' : RED.has(n) ? 'r' : 'b';
+const CHIPS = [[10, '#2f6bff'], [50, '#d32f3a'], [100, '#2a2d36'], [500, '#8a3fd1'], [1000, '#d89a12']];
+const fmt = n => Hub.chips.fmt(n);
+
+// Wetten: Schlüssel → welche Zahlen gewinnen und wie viel gezahlt wird (Gewinn zusätzlich zum Einsatz)
+function betInfo(k){
+  const [t, v] = k.split(':'), n = +v;
+  switch (t){
+    case 'n': return {win:x => x === n, pay:35, label:String(n)};
+    case 'dz': return {win:x => x >= (n - 1) * 12 + 1 && x <= n * 12, pay:2, label:n + '. Dutzend'};
+    case 'col': return {win:x => x > 0 && (x - 1) % 3 === 3 - n, pay:2, label:'Kolonne ' + n};
+    case 'red': return {win:x => RED.has(x), pay:1, label:'Rot'};
+    case 'black': return {win:x => x > 0 && !RED.has(x), pay:1, label:'Schwarz'};
+    case 'even': return {win:x => x > 0 && x % 2 === 0, pay:1, label:'Gerade'};
+    case 'odd': return {win:x => x % 2 === 1, pay:1, label:'Ungerade'};
+    case 'low': return {win:x => x >= 1 && x <= 18, pay:1, label:'1–18'};
+    case 'high': return {win:x => x >= 19, pay:1, label:'19–36'};
+  }
+}
+
+// ---------------------------------------------------------------- Spieler (Solo = Spielhallen-Chips, Party = Partychips)
+let MODE = 'solo', players = [], cur = 0, chipVal = 50, bets = [], lastBets = [], spinning = false;
+const st = Hub.read('roulette_v1', {big:0, hist:[]});
+function setupSolo(){ MODE = 'solo'; players = [{name:Hub.settings.name || 'Du', av:'😎', color:'#ffd76a', stack:null}]; cur = 0; bets = []; lastBets = []; }
+function setupParty(){
+  const act = Hub.party.active();
+  if (act.length < 2){ Hub.toast('Zu wenig Leute', 'Lege im Launcher unter „Wer spielt mit?“ mindestens zwei Leute fest.', 'user'); return setupSolo(); }
+  MODE = 'party'; players = act.map(p => ({name:p.name, av:p.avatar, color:p.color, stack:1000})); cur = 0; bets = []; lastBets = [];
+  Hub.achieve('roulette', 'party', 'Casinoabend', 'Spiele Roulette mit der Partyrunde');
+}
+const stack = i => MODE === 'solo' ? Hub.chips.get() : players[i].stack;
+const staked = i => bets.filter(b => b.p === i).reduce((a, b) => a + b.amt, 0);
+
+// ---------------------------------------------------------------- Tisch aufbauen
+function buildTable(){
+  const cells = [];
+  cells.push(`<div class="f g" data-k="n:0" style="grid-row:1/4;grid-column:1">0</div>`);
+  for (let c = 0; c < 12; c++) for (let r = 0; r < 3; r++){
+    const n = c * 3 + (3 - r);
+    cells.push(`<div class="f ${col(n)}" data-k="n:${n}" style="grid-row:${r + 1};grid-column:${c + 2}">${n}</div>`);
+  }
+  for (let r = 0; r < 3; r++) cells.push(`<div class="f o" data-k="col:${r + 1}" style="grid-row:${r + 1};grid-column:14">2:1</div>`);
+  for (let d = 0; d < 3; d++) cells.push(`<div class="f o" data-k="dz:${d + 1}" style="grid-row:4;grid-column:${d * 4 + 2}/span 4">${['1–12', '13–24', '25–36'][d]}</div>`);
+  [['low', '1–18', ''], ['even', 'Gerade', ''], ['red', '◆', 'r'], ['black', '◆', 'b'], ['odd', 'Ungerade', ''], ['high', '19–36', '']].forEach(([k, l, c], i) =>
+    cells.push(`<div class="f ${c || 'o'}" data-k="${k}" style="grid-row:5;grid-column:${i * 2 + 2}/span 2">${l}</div>`));
+  $('table').innerHTML = cells.join('');
+  $('table').querySelectorAll('.f').forEach(f => {
+    f.onclick = () => place(f.dataset.k, 1);
+    f.oncontextmenu = e => { e.preventDefault(); place(f.dataset.k, -1); };
+  });
+}
+function place(k, dir){
+  if (spinning) return;
+  if (dir < 0){
+    const i = bets.map(b => b.k === k && b.p === cur).lastIndexOf(true);
+    if (i >= 0){ bets.splice(i, 1); Hub.sfx('click'); render(); }
+    return;
+  }
+  if (staked(cur) + chipVal > stack(cur)){ Hub.toast('Nicht genug Chips', `${players[cur].name} hat noch ${fmt(stack(cur) - staked(cur))} Chips frei.`, 'coins'); Hub.sfx('bad'); return; }
+  bets.push({k, p:cur, amt:chipVal});
+  Hub.tone(1200 + Math.random() * 300, .05, 'square', .03);
+  render();
+}
+
+// ---------------------------------------------------------------- Anzeige
+function render(){
+  // Chips auf dem Tisch: je Feld die Summe, gefärbt nach Spieler
+  $('table').querySelectorAll('.ch').forEach(e => e.remove());
+  const by = {};
+  bets.forEach(b => { const key = b.k + '|' + b.p; by[key] = (by[key] || 0) + b.amt; });
+  const perField = {};
+  Object.entries(by).forEach(([key, amt]) => { const [k, p] = key.split('|'); (perField[k] = perField[k] || []).push([+p, amt]); });
+  Object.entries(perField).forEach(([k, list]) => {
+    const f = $('table').querySelector(`[data-k="${k}"]`);
+    list.forEach(([p, amt], j) => {
+      const c = document.createElement('span'); c.className = 'ch';
+      c.style.background = MODE === 'party' ? players[p].color : CHIPS.slice().reverse().find(([v]) => amt >= v)[1];
+      c.style.transform = `translate(${-j * 12}px, ${j * 8}px)`;
+      c.textContent = amt >= 1000 ? (amt / 1000).toLocaleString('de-DE') + 'K' : amt;
+      f.appendChild(c);
+    });
+  });
+  $('chips').innerHTML = CHIPS.map(([v, c]) => `<button class="chip ${v === chipVal ? 'on' : ''}" data-v="${v}" style="background:${c}">${v >= 1000 ? '1K' : v}</button>`).join('');
+  $('chips').querySelectorAll('.chip').forEach(b => b.onclick = () => { chipVal = +b.dataset.v; Hub.sfx('click'); render(); });
+  $('total').textContent = fmt(MODE === 'solo' ? staked(0) : bets.reduce((a, b) => a + b.amt, 0));
+  $('spin').disabled = spinning || !bets.length;
+  ['undo', 'clear', 'dbl'].forEach(id => $(id).disabled = spinning || !bets.length);
+  $('again').disabled = spinning || !lastBets.length;
+  $('mode').innerHTML = `<button class="h-btn ${MODE === 'solo' ? 'primary' : ''}" data-m="solo">👤 Solo (Konto-Chips)</button><button class="h-btn ${MODE === 'party' ? 'primary' : ''}" data-m="party">👥 Partyrunde</button>`;
+  $('mode').querySelectorAll('button').forEach(b => b.onclick = () => { if (spinning || b.dataset.m === MODE) return; b.dataset.m === 'party' ? setupParty() : setupSolo(); render(); });
+  $('players').hidden = MODE !== 'party';
+  if (MODE === 'party'){
+    $('players').innerHTML = players.map((p, i) => `<button class="pl ${i === cur ? 'on' : ''}" data-i="${i}" style="--pc:${p.color}"><span>${p.av}</span>${p.name}<small>${fmt(p.stack - staked(i))}</small></button>`).join('');
+    $('players').querySelectorAll('.pl').forEach(b => b.onclick = () => { cur = +b.dataset.i; Hub.sfx('click'); render(); });
+  }
+  bar.set('chips', fmt(MODE === 'solo' ? Hub.chips.get() : players.reduce((a, p) => a + p.stack, 0)));
+  bar.set('last', st.hist.length ? st.hist[0] : '–');
+  bar.set('won', st.big ? fmt(st.big) : '–');
+  $('hist').innerHTML = '<small>Zuletzt</small>' + st.hist.slice(0, 14).map(n => `<span class="hn ${col(n)}">${n}</span>`).join('');
+}
+$('undo').onclick = () => { const i = bets.map(b => b.p === cur).lastIndexOf(true); if (i >= 0) bets.splice(i, 1); else bets.pop(); render(); };
+$('clear').onclick = () => { bets = MODE === 'solo' ? [] : bets.filter(b => b.p !== cur); render(); };
+$('again').onclick = () => {
+  const need = {}; lastBets.forEach(b => need[b.p] = (need[b.p] || 0) + b.amt);
+  if (Object.entries(need).some(([p, a]) => a > stack(+p))){ Hub.toast('Nicht genug Chips', 'Die Einsätze der letzten Runde sind zu hoch.', 'coins'); return; }
+  bets = lastBets.map(b => ({...b})); Hub.sfx('click'); render();
+};
+$('dbl').onclick = () => {
+  const need = {}; bets.forEach(b => need[b.p] = (need[b.p] || 0) + b.amt * 2);
+  if (Object.entries(need).some(([p, a]) => a > stack(+p))){ Hub.toast('Nicht genug Chips', 'Zum Verdoppeln fehlen Chips.', 'coins'); return; }
+  bets.forEach(b => b.amt *= 2); Hub.sfx('click'); render();
+};
+
+// ---------------------------------------------------------------- Kessel zeichnen
+const cv = $('cv'), cx = cv.getContext('2d');
+let W = 600, wheelA = 0, ballA = 0, ballR = 1, ballOn = false;
+const SEG = Math.PI * 2 / 37;
+function size(){ const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); W = Math.round(r.width * d); cv.width = cv.height = W; draw(); }
+function draw(){
+  const c = cx, R = W / 2;
+  c.clearRect(0, 0, W, W);
+  c.save(); c.translate(R, R);
+  // Holzrand
+  let g = c.createRadialGradient(0, 0, R * .78, 0, 0, R);
+  g.addColorStop(0, '#5a3214'); g.addColorStop(.5, '#8b5426'); g.addColorStop(1, '#3a1d08');
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, R * .99, 0, Math.PI * 2); c.fill();
+  // Kugelbahn
+  c.fillStyle = '#1c1008'; c.beginPath(); c.arc(0, 0, R * .86, 0, Math.PI * 2); c.fill();
+  g = c.createRadialGradient(0, 0, R * .7, 0, 0, R * .85); g.addColorStop(0, '#3b2a1c'); g.addColorStop(1, '#6d4a2c');
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, R * .84, 0, Math.PI * 2); c.fill();
+  // Fächer
+  c.save(); c.rotate(wheelA);
+  for (let i = 0; i < 37; i++){
+    const n = ORDER[i], a0 = i * SEG - SEG / 2 - Math.PI / 2;
+    c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R * .74, a0, a0 + SEG); c.closePath();
+    c.fillStyle = n === 0 ? '#13874a' : RED.has(n) ? '#b81a2c' : '#15161b'; c.fill();
+    c.strokeStyle = '#d9b36a'; c.lineWidth = Math.max(1, R * .006); c.stroke();
+    c.save(); c.rotate(i * SEG); c.fillStyle = '#fff'; c.font = `800 ${Math.round(R * .065)}px system-ui, Segoe UI, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(n, 0, -R * .66); c.restore();
+  }
+  // Fächer-Innenring und Kegel
+  c.fillStyle = '#2a1608'; c.beginPath(); c.arc(0, 0, R * .58, 0, Math.PI * 2); c.fill();
+  for (let i = 0; i < 37; i++){ c.save(); c.rotate(i * SEG - SEG / 2); c.fillStyle = '#d9b36a'; c.fillRect(-R * .004, -R * .58, R * .008, -R * .02); c.restore(); }
+  g = c.createRadialGradient(-R * .12, -R * .12, R * .02, 0, 0, R * .55); g.addColorStop(0, '#a87a44'); g.addColorStop(.6, '#6b4220'); g.addColorStop(1, '#3a210c');
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, R * .55, 0, Math.PI * 2); c.fill();
+  // Kreuz in der Mitte
+  for (let k = 0; k < 4; k++){
+    c.save(); c.rotate(k * Math.PI / 2);
+    g = c.createLinearGradient(0, 0, 0, -R * .34); g.addColorStop(0, '#fff3c4'); g.addColorStop(1, '#b8892e');
+    c.fillStyle = g; c.beginPath(); c.moveTo(-R * .025, 0); c.lineTo(-R * .012, -R * .32); c.arc(0, -R * .33, R * .028, Math.PI, 0); c.lineTo(R * .025, 0); c.fill();
+    c.restore();
+  }
+  g = c.createRadialGradient(-R * .02, -R * .02, 0, 0, 0, R * .07); g.addColorStop(0, '#fff8dc'); g.addColorStop(1, '#a8781e');
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, R * .065, 0, Math.PI * 2); c.fill();
+  c.restore();
+  // Kugel
+  if (ballOn){
+    const br = R * (.62 + .17 * ballR), x = Math.cos(ballA - Math.PI / 2) * br, y = Math.sin(ballA - Math.PI / 2) * br;
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.arc(x + R * .01, y + R * .012, R * .026, 0, Math.PI * 2); c.fill();
+    g = c.createRadialGradient(x - R * .008, y - R * .01, 0, x, y, R * .028); g.addColorStop(0, '#fff'); g.addColorStop(1, '#b9bcc7');
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, R * .025, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+addEventListener('resize', size);
+
+// ---------------------------------------------------------------- Drehen
+function spin(){
+  if (spinning || !bets.length) return;
+  spinning = true; lastBets = bets.map(b => ({...b}));
+  // Einsätze abbuchen
+  if (MODE === 'solo') Hub.chips.add(-staked(0)); else players.forEach((p, i) => p.stack -= staked(i));
+  $('res').className = 'result'; $('table').querySelectorAll('.win').forEach(e => e.classList.remove('win'));
+  render();
+  const result = crypto.getRandomValues(new Uint32Array(1))[0] % 37, idx = ORDER.indexOf(result);
+  const T = 6200, w0 = wheelA, wTurn = Math.PI * 2 * (2.2 + Math.random() * .6);
+  const wEnd = w0 + wTurn;
+  // Kugel läuft gegen den Kessel und landet im Fach der Ergebniszahl
+  let bEnd = wEnd + idx * SEG, b0 = ballOn ? ballA : Math.random() * Math.PI * 2;
+  while (b0 - bEnd < Math.PI * 2 * 6) bEnd -= Math.PI * 2;
+  ballOn = true;
+  const t0 = performance.now(); let lastTick = 0;
+  Hub.tone(500, 1.2, 'sine', .015, 0, 300);
+  (function frame(now){
+    const t = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - t, 3);
+    wheelA = w0 + wTurn * e;
+    ballA = b0 + (bEnd - b0) * (1 - Math.pow(1 - t, 2.4));
+    // erst außen auf der Bahn, dann fällt sie mit kleinen Sprüngen ins Fach
+    ballR = t < .62 ? 1 : t < .9 ? 1 - (t - .62) / .28 + Math.abs(Math.sin((t - .62) * 40)) * .12 * (1 - t) : 0;
+    if (t > .62 && now - lastTick > 90 + t * 160 && t < .95){ lastTick = now; Hub.tone(2400 + Math.random() * 600, .02, 'square', .02); }
+    draw();
+    if (t < 1) requestAnimationFrame(frame); else settle(result);
+  })(t0);
+}
+function settle(n){
+  // Auszahlung
+  let paid = {}, any = false;
+  bets.forEach(b => { if (betInfo(b.k).win(n)){ const p = b.amt * (betInfo(b.k).pay + 1); paid[b.p] = (paid[b.p] || 0) + p; any = true; } });
+  Object.entries(paid).forEach(([p, v]) => MODE === 'solo' ? Hub.chips.add(v) : players[+p].stack += v);
+  st.hist.unshift(n); st.hist = st.hist.slice(0, 30);
+  const myWin = MODE === 'solo' ? (paid[0] || 0) - lastBets.reduce((a, b) => a + b.amt, 0) : 0;
+  if (myWin > st.big) st.big = myWin;
+  Hub.write('roulette_v1', st);
+  $('res').textContent = n; $('res').className = 'result on ' + col(n);
+  $('table').querySelectorAll('.f').forEach(f => { if (betInfo(f.dataset.k).win(n)) f.classList.add('win'); });
+  const name = `${n} ${n === 0 ? 'Grün' : RED.has(n) ? 'Rot' : 'Schwarz'}`;
+  if (MODE === 'solo'){
+    const back = paid[0] || 0;
+    if (back > 0){ Hub.sfx('ach'); Hub.toast(`${name} – gewonnen!`, `+${fmt(back)} Chips zurück (${myWin >= 0 ? '+' : ''}${fmt(myWin)})`, 'coins', 'ach'); }
+    else { Hub.sfx('bad'); Hub.toast(name, 'Diesmal nichts. Nächste Runde!', 'coins'); }
+    if (lastBets.some(b => b.k === 'n:' + n)) Hub.achieve('roulette', 'plein', 'Volltreffer', 'Gewinne mit einer einzelnen Zahl');
+    if (n === 0 && back > 0) Hub.achieve('roulette', 'zero', 'Null-Held', 'Gewinne auf die 0');
+    if (myWin >= 5000) Hub.achieve('roulette', 'big', 'Bank gesprengt', 'Gewinne 5.000 Chips in einer Runde');
+    Hub.score('roulette', st.big, {label:'Größter Gewinn', silent:true});
+  } else {
+    const lines = players.map((p, i) => [p, (paid[i] || 0) - lastBets.filter(b => b.p === i).reduce((a, b) => a + b.amt, 0)]);
+    Hub.sfx(any ? 'ach' : 'bad');
+    Hub.toast(name, lines.filter(([, d]) => d).map(([p, d]) => `${p.av} ${p.name} ${d > 0 ? '+' : ''}${fmt(d)}`).join(' · ') || 'Niemand hatte gesetzt.', 'coins', any ? 'ach' : '');
+  }
+  bets = [];
+  setTimeout(() => { spinning = false; render(); if (MODE === 'solo' && Hub.chips.get() <= 0) broke(); }, 1200);
+  setTimeout(() => $('res').classList.remove('on'), 4200);
+}
+function broke(){
+  const r = Hub.chips.rescue();
+  if (r > 0) Hub.dialog({title:'Pleite!', center:true, html:`<p>Keine Chips mehr – die Spielhalle schenkt dir <b>${r} Chips</b> Nachschub.</p>`}).then(render);
+  else Hub.dialog({title:'Pleite!', center:true, html:`<p>Nachschub gibt es wieder in ${-r} Sekunden. Kurze Pause?</p>`});
+}
+$('spin').onclick = spin;
+addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'INPUT'){ e.preventDefault(); spin(); } });
+document.addEventListener('hubchips', () => { if (!spinning) render(); });
+
+setupSolo(); buildTable(); render(); size();
+if (Hub.party.wantsParty && Hub.party.wantsParty('roulette')){ setupParty(); render(); }
+</script>
+</body>
+</html>
