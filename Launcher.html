@@ -157,6 +157,7 @@
   .btn.danger { color:#ff8a95; border-color:#5a2630; }
   @media (max-width:760px) { .srow { flex-wrap:wrap; } .srow input[type=text], .srow input[type=range] { width:100%; } }
   @media (max-width:1100px) { .duo { grid-template-columns:1fr; } .hero .txt { left:24px; bottom:24px; max-width:80%; } }
+  #beenden:hover, #beenden:focus-visible { border-color:#ff5a6e; color:#ff8a95; }
   @media (max-width:760px) { .hero { height:420px; } .hero .art { inset:0; -webkit-mask-image:none; mask-image:none; opacity:.45; } .banner span { display:none; } header { flex-wrap:wrap; padding:14px 16px; } .clock { display:none; } main { padding:0 16px 30px; } }
 </style>
 </head>
@@ -168,6 +169,7 @@
   <button class="btn" id="zufall" title="Ein zufälliges Spiel starten">🎲 Zufall</button>
   <button class="btn" id="voll" title="Vollbild (F11)">⛶</button>
   <button class="btn" id="setBtn" title="Einstellungen">⚙️ Einstellungen</button>
+  <button class="btn" id="beenden" title="Spielhalle beenden" hidden>⏻ Beenden</button>
   <div class="clock"><span id="uhr"></span><small id="datum"></small></div>
 </header>
 <main>
@@ -197,6 +199,12 @@
     <span class="hint" id="fHinweis"></span>
   </footer>
 </main>
+
+<dialog id="aus" style="width:min(440px, 92vw);text-align:center">
+  <h3 style="margin:4px 0 10px;font-size:24px">Spielhalle beenden?</h3>
+  <p style="margin:0 0 20px;color:var(--muted)">Deine Spielstände bleiben gespeichert.</p>
+  <div class="drow" style="justify-content:center"><button class="btn" id="ausNein">Weiterspielen</button><button class="btn primary" id="ausJa" autofocus>⏻ Beenden</button></div>
+</dialog>
 
 <dialog id="rad">
   <h3 style="margin:0 0 4px;font-size:24px">🎡 Tägliches Glücksrad</h3>
@@ -639,6 +647,18 @@ $('radGo').onclick = () => {
   requestAnimationFrame(frame);
 })();
 document.addEventListener('hubchips', () => renderCasino());
+
+// ---------------------------------------------------------------- Beenden (auch im Vollbild, wo das Fenster keinen Schließen-Knopf hat)
+if (APP){
+  $('beenden').hidden = false;
+  $('beenden').onclick = () => $('aus').showModal();
+  $('ausNein').onclick = () => $('aus').close();
+  $('ausJa').onclick = () => {
+    $('aus').close();
+    document.body.innerHTML = '<div style="position:fixed;inset:0;display:grid;place-items:center;background:#0c0d14;color:#f2f3fa;font:800 34px Segoe UI,system-ui,sans-serif">Bis bald! 👋</div>';
+    fetch('/__beenden', {cache:'no-store'}).catch(() => {});
+  };
+}
 
 renderPlayers();
 loadGames();
