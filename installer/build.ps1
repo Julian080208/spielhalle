@@ -59,7 +59,7 @@ Copy-Item "$tmp\Spielhalle.exe" $stage
 Copy-Item "$root\Launcher.html" "$stage\app\"
 Copy-Item "$root\spiele" "$stage\app\" -Recurse
 Get-ChildItem "$stage\app\spiele" -Recurse -Include '*.ps1' | Remove-Item -Force
-[IO.File]::WriteAllText("$stage\update-url.txt", $updateUrl, $utf8)
+[IO.File]::WriteAllText("$stage\update-repo.txt", $repo, $utf8)
 [IO.File]::WriteAllText("$stage\neu.txt", $notes, $utf8)
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = Join-Path $tmp 'payload.zip'
@@ -77,4 +77,4 @@ $json = [ordered]@{ version = $version; notes = $notes; setup = 'Spielhalle-Setu
 [IO.File]::WriteAllText("$dist\version.json", $json, $utf8)
 
 Remove-Item -LiteralPath $tmp -Recurse -Force
-"Spielhalle $version gebaut: {0:N0} KB  (Updates: {1})" -f ((Get-Item $setup).Length / 1KB), $(if ($updateUrl) { $updateUrl } else { 'noch kein GitHub-Repo eingetragen' })
+"Spielhalle $version gebaut: {0:N0} KB  (Updates: {1})" -f ((Get-Item $setup).Length / 1KB), $(if ($repo) { 'GitHub-Projekt ' + $repo } else { 'noch kein GitHub-Repo eingetragen' })

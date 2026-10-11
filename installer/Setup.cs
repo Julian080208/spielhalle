@@ -242,7 +242,7 @@ static class Setup
         progress(45, "Programmdateien werden entfernt …");
         string app = Path.Combine(dir, "app");
         if (Directory.Exists(app)) Retry(delegate { Directory.Delete(app, true); });
-        foreach (string f in new[] { "Spielhalle.exe", "Spielhalle.old.exe", "Deinstallieren.exe", "update-url.txt", "neu.txt", "einstellungen.txt", "umzug.json", "umzug.erledigt", "protokoll.txt" })
+        foreach (string f in new[] { "Spielhalle.exe", "Spielhalle.old.exe", "Deinstallieren.exe", "update-url.txt", "update-repo.txt", "neu.txt", "einstellungen.txt", "umzug.json", "umzug.erledigt", "protokoll.txt" })
         {
             string p = Path.Combine(dir, f);
             try { if (File.Exists(p)) Retry(delegate { File.Delete(p); }); } catch { }

@@ -1,1 +1,1 @@
-Die Spielhalle gibt es jetzt als richtige App mit Installer und Online-Updates.
+Updates funktionieren jetzt auch, wenn das Projekt privat ist: einmal pro PC bei GitHub anmelden (Knopf links unten in der Spielhalle).

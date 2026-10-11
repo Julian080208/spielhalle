@@ -32,7 +32,7 @@ if ($LASTEXITCODE) { throw 'Bauen fehlgeschlagen' }
 Push-Location $root
 try {
   git add -A
-  git commit -q -m "Spielhalle $version" -m $Notiz
+  git commit -q -m "Spielhalle $version" -m $Notiz -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   git push -q origin HEAD
   & $gh release create "v$version" "$here\dist\Spielhalle-Setup.exe" "$here\dist\version.json" --repo $repo --title "Spielhalle $version" --notes $Notiz
   if ($LASTEXITCODE) { throw 'GitHub-Release fehlgeschlagen' }

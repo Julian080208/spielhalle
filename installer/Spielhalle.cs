@@ -91,7 +91,7 @@ static class App
                 {
                     splash.SetStatus("Suche nach Updates …");
                     UpdateInfo u = null;
-                    try { u = CheckUpdate(4000); Log("Update-Prüfung: " + (u == null ? "aktuell" : "neu " + u.version)); }
+                    try { u = CheckUpdate(6000); Log("Update-Prüfung: " + (u == null ? "aktuell" : "neu " + u.version)); }
                     catch (Exception e) { updateNote = "Update-Prüfung fehlgeschlagen: " + e.Message; Log(updateNote); }
                     if (u != null)
                     {
@@ -100,9 +100,7 @@ static class App
                             splash.SetStatus("Neue Version " + u.version + " wird geladen …");
                             string setup = Download(u, delegate (int p) { splash.SetStatus("Neue Version " + u.version + " wird geladen … " + p + " %", p); });
                             splash.SetStatus("Version " + u.version + " wird installiert …");
-                            listener.Stop();
-                            RunSetup(setup);
-                            return;
+                            if (RunSetup(setup)) return;
                         }
                         catch (Exception e) { updateNote = "Update fehlgeschlagen: " + e.Message; Log(updateNote); lock (updLock) pending = u; }
                     }
@@ -237,7 +235,7 @@ static class App
         try { notes = File.ReadAllText(Path.Combine(Dir, "neu.txt"), Encoding.UTF8).Trim(); } catch { }
         return new Dictionary<string, object> {
             { "app", true }, { "version", Version }, { "notes", notes }, { "note", updateNote },
-            { "auto", AutoUpdate() }, { "online", UpdateBase() != "" },
+            { "auto", AutoUpdate() }, { "online", UpdatesConfigured() }, { "login", login }, { "loginText", LoginText() },
             { "update", u == null ? null : new Dictionary<string, object> { { "version", u.version }, { "notes", u.notes ?? "" } } },
             { "progress", dlProgress },
         };
@@ -261,8 +259,13 @@ static class App
                 case "__ping": Text(ctx, "{\"ok\":true,\"app\":true}", "application/json"); return;
                 case "__info": Json(ctx, Info()); return;
                 case "__check":
-                    try { var u = CheckUpdate(10000); lock (updLock) pending = u; updateNote = u == null ? "Aktuell" : ""; }
-                    catch (Exception e) { updateNote = "Keine Verbindung zum Update-Server (" + e.Message + ")"; }
+                    try { Token(true); var u = CheckUpdate(10000); lock (updLock) pending = u; updateNote = u == null ? "Aktuell" : ""; }
+                    catch (Exception e) { updateNote = LoginText() != "" ? LoginText() : "Keine Verbindung zum Update-Server (" + e.Message + ")"; Log("Prüfen: " + updateNote); }
+                    Json(ctx, Info());
+                    return;
+                case "__login":
+                    if (ctx.Request.HttpMethod != "POST") { Text(ctx, "POST", "text/plain", 405); return; }
+                    OpenLogin();
                     Json(ctx, Info());
                     return;
                 case "__update":
@@ -325,19 +328,75 @@ static class App
     }
 
     // ---------------------------------------------------------------- Online-Updates
-    public class UpdateInfo { public string version, notes, setup, sha256, date; }
+    // Die Updates liegen als Release im (privaten) GitHub-Projekt aus update-repo.txt.
+    // Zugriff mit der GitHub-Anmeldung dieses PCs (GitHub CLI: „gh auth token“) –
+    // der Schlüssel wird nur im Speicher gehalten und nie gespeichert oder protokolliert.
+    public class UpdateInfo { public string version, notes, setup, sha256, date, setupUrl; }
 
-    static string UpdateBase()
+    static string login = "";   // "", "ok", "public", "nogh", "nologin", "noaccess"
+    static string token; static DateTime tokenAt = DateTime.MinValue;
+
+    static string TestUrl()
     {
         string env = Environment.GetEnvironmentVariable("SPIELHALLE_UPDATE_URL");
-        if (!string.IsNullOrEmpty(env)) return env.TrimEnd('/') + "/";
+        return string.IsNullOrEmpty(env) ? "" : env.TrimEnd('/') + "/";
+    }
+    static string Repo()
+    {
+        try { return File.ReadAllText(Path.Combine(Dir, "update-repo.txt")).Trim(); } catch { return ""; }
+    }
+    static bool UpdatesConfigured() { return TestUrl() != "" || Repo() != ""; }
+    static string CurrentVersion()
+    {
+        string t = Environment.GetEnvironmentVariable("SPIELHALLE_TEST_VERSION");
+        return string.IsNullOrEmpty(t) ? Version : t;
+    }
+
+    static string GhPath()
+    {
+        if (Environment.GetEnvironmentVariable("SPIELHALLE_TEST_NOGH") == "1") return null;
+        string[] c = {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"GitHub CLI\gh.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\GitHub CLI\gh.exe"),
+        };
+        foreach (string p in c) if (File.Exists(p)) return p;
+        foreach (string d in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
+        {
+            try { string p = Path.Combine(d.Trim(), "gh.exe"); if (d.Trim() != "" && File.Exists(p)) return p; } catch { }
+        }
+        return null;
+    }
+
+    static string Token(bool fresh)
+    {
+        if (!fresh && tokenAt > DateTime.Now.AddMinutes(-30)) return token;
+        token = null; tokenAt = DateTime.Now;
+        string gh = GhPath();
+        if (gh == null) return null;
         try
         {
-            string s = File.ReadAllText(Path.Combine(Dir, "update-url.txt")).Trim();
-            if (s.StartsWith("https://") || s.StartsWith("http://localhost")) return s.TrimEnd('/') + "/";
+            var psi = new ProcessStartInfo(gh, "auth token --hostname github.com");
+            psi.UseShellExecute = false; psi.RedirectStandardOutput = true; psi.RedirectStandardError = true; psi.CreateNoWindow = true;
+            using (var p = Process.Start(psi))
+            {
+                string o = p.StandardOutput.ReadToEnd().Trim();
+                p.WaitForExit(8000);
+                if (p.ExitCode == 0 && o.Length > 10 && o.IndexOf(' ') < 0) token = o;
+            }
         }
-        catch { }
-        return "";
+        catch (Exception e) { Log("GitHub-Anmeldung nicht lesbar: " + e.Message); }
+        return token;
+    }
+
+    static string LoginText()
+    {
+        switch (login)
+        {
+            case "nogh": return "Für Updates einmal bei GitHub anmelden (GitHub CLI fehlt noch).";
+            case "nologin": return "Für Updates einmal bei GitHub anmelden.";
+            case "noaccess": return "Das angemeldete GitHub-Konto hat keinen Zugriff auf die Spielhalle.";
+            default: return "";
+        }
     }
 
     static bool AutoUpdate()
@@ -349,29 +408,92 @@ static class App
         try { File.WriteAllText(Path.Combine(Dir, "einstellungen.txt"), "autoupdate=" + (on ? 1 : 0)); } catch { }
     }
 
-    static HttpWebRequest Req(string url, int timeout)
+    static HttpWebRequest Req(string url, int timeout, string tok, string accept)
     {
         var r = (HttpWebRequest)WebRequest.Create(url);
         r.Timeout = timeout; r.ReadWriteTimeout = Math.Max(timeout, 30000);
         r.UserAgent = "Spielhalle/" + Version;
         r.AllowAutoRedirect = true;
         r.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);
+        if (tok != null) r.Headers["Authorization"] = "Bearer " + tok;
+        if (accept != null) r.Accept = accept;
         return r;
+    }
+
+    // Anfrage mit Anmeldung; bei einer Weiterleitung (Dateien liegen bei GitHub auf einem
+    // Speicherserver) geht es ohne Anmeldung weiter – der Schlüssel bleibt bei GitHub
+    static HttpWebResponse Open(string url, int timeout, string tok, string accept)
+    {
+        var r = Req(url, timeout, tok, accept);
+        r.AllowAutoRedirect = false;
+        var resp = (HttpWebResponse)r.GetResponse();
+        int code = (int)resp.StatusCode;
+        if (code >= 300 && code < 400)
+        {
+            string loc = resp.Headers["Location"];
+            resp.Close();
+            return (HttpWebResponse)Req(loc, timeout, null, null).GetResponse();
+        }
+        return resp;
+    }
+    static string ReadAll(HttpWebResponse r)
+    {
+        using (r) using (var sr = new StreamReader(r.GetResponseStream(), Encoding.UTF8)) return sr.ReadToEnd();
     }
 
     // liefert die neuere Version oder null
     static UpdateInfo CheckUpdate(int timeout)
     {
-        string b = UpdateBase();
-        if (b == "") return null;
-        string json;
-        using (var resp = Req(b + "version.json?t=" + DateTime.UtcNow.Ticks, timeout).GetResponse())
-        using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-            json = sr.ReadToEnd();
-        var u = new JavaScriptSerializer().Deserialize<UpdateInfo>(json);
+        var ser = new JavaScriptSerializer();
+        UpdateInfo u;
+        string test = TestUrl();
+        if (test != "")
+        {
+            u = ser.Deserialize<UpdateInfo>(ReadAll(Open(test + "version.json?t=" + DateTime.UtcNow.Ticks, timeout, null, null)));
+            if (u != null) u.setupUrl = test + (string.IsNullOrEmpty(u.setup) ? "Spielhalle-Setup.exe" : u.setup);
+        }
+        else
+        {
+            string repo = Repo();
+            if (repo == "") return null;
+            string tok = Token(false);
+            Dictionary<string, object> rel;
+            try
+            {
+                rel = ser.Deserialize<Dictionary<string, object>>(ReadAll(Open("https://api.github.com/repos/" + repo + "/releases/latest", timeout, tok, "application/vnd.github+json")));
+            }
+            catch (WebException e)
+            {
+                var hr = e.Response as HttpWebResponse;
+                int code = hr == null ? 0 : (int)hr.StatusCode;
+                if (code == 401 || code == 403 || code == 404)
+                {
+                    if (tok == null) login = GhPath() == null ? "nogh" : "nologin";
+                    else if (code == 401) { login = "nologin"; token = null; tokenAt = DateTime.MinValue; }
+                    else login = "noaccess";
+                    throw new Exception(LoginText());
+                }
+                throw;
+            }
+            login = tok != null ? "ok" : "public";
+            string vUrl = null, sUrl = null;
+            object assets;
+            if (rel.TryGetValue("assets", out assets) && assets is System.Collections.IEnumerable)
+                foreach (object a in (System.Collections.IEnumerable)assets)
+                {
+                    var d = a as Dictionary<string, object>;
+                    if (d == null) continue;
+                    string n = d["name"] as string, url = d["url"] as string;
+                    if (n == "version.json") vUrl = url;
+                    else if (n == "Spielhalle-Setup.exe") sUrl = url;
+                }
+            if (vUrl == null || sUrl == null) return null;
+            u = ser.Deserialize<UpdateInfo>(ReadAll(Open(vUrl, timeout, tok, "application/octet-stream")));
+            if (u != null) u.setupUrl = sUrl;
+        }
         if (u == null || string.IsNullOrEmpty(u.version)) return null;
         Version have, got;
-        if (!System.Version.TryParse(Version, out have) || !System.Version.TryParse(u.version, out got)) return null;
+        if (!System.Version.TryParse(CurrentVersion(), out have) || !System.Version.TryParse(u.version, out got)) return null;
         return got > have ? u : null;
     }
 
@@ -380,8 +502,8 @@ static class App
         string dir = Path.Combine(Path.GetTempPath(), "Spielhalle-Update");
         Directory.CreateDirectory(dir);
         string file = Path.Combine(dir, "Spielhalle-Setup-" + u.version + ".exe");
-        string url = UpdateBase() + (string.IsNullOrEmpty(u.setup) ? "Spielhalle-Setup.exe" : u.setup);
-        using (var resp = Req(url, 15000).GetResponse())
+        bool gh = TestUrl() == "";
+        using (var resp = Open(u.setupUrl, 15000, gh ? Token(false) : null, gh ? "application/octet-stream" : null))
         using (var src = resp.GetResponseStream())
         using (var dst = File.Create(file))
         {
@@ -408,14 +530,56 @@ static class App
         return file;
     }
 
-    // Setup still ausführen: es beendet die Spielhalle, installiert und startet sie neu
-    static void RunSetup(string setup)
+    // Setup still ausführen: es beendet die Spielhalle, installiert und startet sie neu.
+    // Liefert false nur im Testmodus (SPIELHALLE_TEST_NOSETUP), dann läuft die App normal weiter.
+    static bool RunSetup(string setup)
     {
+        if (Environment.GetEnvironmentVariable("SPIELHALLE_TEST_NOSETUP") == "1")
+        {
+            Log("Test: Setup geladen und geprüft (" + new FileInfo(setup).Length / 1024 + " KB), wird nicht gestartet");
+            dlProgress = -1;
+            return false;
+        }
         Log("Starte Setup: " + setup);
         var psi = new ProcessStartInfo(setup, "--still --neustart --ziel \"" + Dir + "\"");
         psi.UseShellExecute = false;
         Process.Start(psi);
         Environment.Exit(0);
+        return true;
+    }
+
+    // Anmeldung bei GitHub in einem eigenen Fenster (installiert vorher bei Bedarf die GitHub CLI)
+    static void OpenLogin()
+    {
+        string cmd = Path.Combine(Path.GetTempPath(), "Spielhalle-GitHub-Anmeldung.cmd");
+        string[] lines = {
+            "@echo off",
+            "title Spielhalle - Anmeldung bei GitHub",
+            "set \"GH=%ProgramFiles%\\GitHub CLI\\gh.exe\"",
+            "if exist \"%GH%\" goto login",
+            "echo Fuer die Updates wird die GitHub CLI gebraucht. Sie wird jetzt installiert ...",
+            "echo.",
+            "winget install --id GitHub.cli -e --source winget",
+            "if not exist \"%GH%\" goto fehler",
+            ":login",
+            "echo.",
+            "echo  Anmeldung fuer die Spielhallen-Updates:",
+            "echo   1. Frage \"Authenticate Git ... (Y/n)\": einfach Enter druecken.",
+            "echo   2. Es erscheint ein Code (z.B. ABCD-1234). Enter druecken, der Browser geht auf.",
+            "echo   3. Bei GitHub anmelden, Code eingeben, \"Authorize GitHub CLI\" klicken.",
+            "echo.",
+            "\"%GH%\" auth login --hostname github.com --git-protocol https --web",
+            "echo.",
+            "echo Fertig! Dieses Fenster kann zu. Die Spielhalle sucht gleich nach Updates.",
+            "pause",
+            "exit /b",
+            ":fehler",
+            "echo Die Installation hat nicht geklappt. Bitte \"winget install GitHub.cli\" von Hand ausfuehren.",
+            "pause",
+        };
+        File.WriteAllText(cmd, string.Join("\r\n", lines) + "\r\n", Encoding.ASCII);
+        Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + cmd + "\"") { UseShellExecute = true });
+        token = null; tokenAt = DateTime.MinValue;
     }
 
     static void StartUpdateNow()

@@ -4,11 +4,12 @@
 
 ## Installieren
 
-**[⬇️ Spielhalle-Setup.exe herunterladen](https://github.com/Julian080208/spielhalle/releases/latest/download/Spielhalle-Setup.exe)**
+Das Projekt ist privat. Den Installer gibt es deshalb nur für angemeldete Konten mit Zugriff:
 
-1. Setup starten und dem Assistenten folgen. Admin-Rechte braucht man nicht.
-2. Die Spielhalle öffnet sich in einem eigenen Fenster.
-3. Updates kommen automatisch: Beim Start und während des Spielens schaut die App nach einer neuen Version.
+1. Im Browser bei GitHub anmelden und unter **Releases** die neueste `Spielhalle-Setup.exe` laden.
+2. Setup starten und dem Assistenten folgen. Admin-Rechte braucht man nicht.
+3. Einmal bei GitHub anmelden, damit Updates kommen. In der Spielhalle steht dafür links unten **🔑 Bei GitHub anmelden**. Ein Fenster installiert die GitHub CLI (falls nötig) und startet die Anmeldung im Browser.
+4. Ab dann kommen Updates automatisch: beim Start und während des Spielens.
 
 > Windows meldet vielleicht „Der Computer wurde durch Windows geschützt“, weil das Setup nicht signiert ist.
 > Dann auf **Weitere Informationen → Trotzdem ausführen** klicken.
