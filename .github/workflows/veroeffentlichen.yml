@@ -1,0 +1,27 @@
+# Baut die Spielhalle auf einem Windows-Rechner von GitHub und legt das Release an,
+# sobald ein Versions-Tag (z. B. v1.0.1) hochgeladen wird. Die Version muss in
+# installer/version.txt stehen, die Neuigkeiten in installer/neu.txt.
+name: Veröffentlichen
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bauen
+        shell: powershell
+        run: .\installer\build.ps1
+      - name: Release anlegen
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $v = ([IO.File]::ReadAllText("installer\version.txt")).Trim()
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "Tag ${{ github.ref_name }} passt nicht zu installer\version.txt ($v)" }
+          gh release create "v$v" installer\dist\Spielhalle-Setup.exe installer\dist\version.json --title "Spielhalle $v" --notes-file installer\neu.txt
+          if ($LASTEXITCODE) { throw 'GitHub-Release fehlgeschlagen' }
