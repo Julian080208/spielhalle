@@ -25,6 +25,7 @@ jobs:
       - name: Release anlegen
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Continue'   # gh schreibt "release not found" nach stderr
           $v = ([IO.File]::ReadAllText("installer\version.txt")).Trim()
           gh release view "v$v" 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) { "Spielhalle $v ist schon veröffentlicht"; exit 0 }
