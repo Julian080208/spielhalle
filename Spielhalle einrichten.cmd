@@ -2,7 +2,7 @@
 @echo off
 title Spielhalle einrichten
 set "SPIELHALLE_CMD=%~f0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ((Get-Content -LiteralPath $env:SPIELHALLE_CMD -Raw) -replace '^[\s\S]*?#>', '')"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (Get-Content -LiteralPath $env:SPIELHALLE_CMD -Raw)"
 echo.
 pause
 exit /b
