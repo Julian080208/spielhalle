@@ -1,1 +1,0 @@
-Neu: Die Spielhalle hat jetzt ein eigenes Programmfenster und geht nicht mehr im Browser auf (F11 = Vollbild). Neue Spiele erscheinen automatisch in der Liste.

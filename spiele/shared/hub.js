@@ -3,20 +3,6 @@
    Profil (XP/Level), Spielzeit, Rekorde, Erfolge, Einstellungen,
    Icons, Toasts, Dialoge, Sound und die Standard-Spielleiste.
    ===================================================================== */
-// Umzug in die App: Spielstände der alten Datei-Version einmalig übernehmen
-(function(){
-  if (location.protocol !== 'http:' || location.port !== '8777') return;
-  try {
-    if (localStorage.getItem('hub_umzug_v1')) return;
-    const x = new XMLHttpRequest();
-    x.open('GET', '/__import', false);
-    x.send();
-    if (x.status !== 200) return;
-    const d = JSON.parse(x.responseText || '{}');
-    for (const k in d) if (localStorage.getItem(k) === null) localStorage.setItem(k, d[k]);
-    localStorage.setItem('hub_umzug_v1', String(Object.keys(d).length));
-  } catch(e){}
-})();
 (function(){
   const PKEY = 'hub_profile_v1', SKEY = 'hub_settings_v1';
   const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch(e){ return d; } };
