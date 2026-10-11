@@ -187,6 +187,14 @@ main{position:relative;z-index:1;overflow:auto;min-width:0}
 .swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .15s;box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
 .swatch:hover{transform:scale(1.12)}
 .swatch.on{border-color:#fff}
+.set-row .upd-ver{font-variant-numeric:tabular-nums;color:var(--text-2);font-size:14px;font-weight:600}
+.set .upd-new{margin:2px 0 12px;padding:12px 14px;border-radius:12px;background:rgba(var(--accent-rgb),.12);border:1px solid rgba(var(--accent-rgb),.35);font-size:13.5px;line-height:1.5}
+.set .upd-new b{display:block;font-size:14.5px;margin-bottom:2px}
+.set .upd-new p{margin:0 0 10px;color:var(--text-2)}
+.set .upd-new .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:6px 0 2px}
+.set .upd-new .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent));transition:width .3s}
+.set .upd-hint{margin:2px 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,210,63,.08);border:1px solid rgba(255,210,63,.25);color:var(--text-2);font-size:13px;line-height:1.45}
+.set .upd-hint.err{background:rgba(255,90,90,.12);border-color:rgba(255,90,90,.35);color:#ffb3b3}
 
 /* ---------- Detail-Ansicht ---------- */
 .detail{width:min(900px,100%);max-height:92vh;overflow:auto;border-radius:26px;background:var(--surface);border:1px solid var(--border-2);box-shadow:var(--sh-2);transform:translateY(16px) scale(.98);transition:transform .3s var(--ease)}
@@ -449,6 +457,9 @@ html.tv .yt-frame{height:calc(100vh / var(--tvz,1.3) - 96px)}
       <div class="set"><h3>Als App starten</h3><p>Ohne Browser-Leiste, wie ein echtes Programm.</p>
         <div class="set-row"><label>Doppelklick auf <b>„Spielhalle starten.bat“</b> im Spielordner öffnet die Spielhalle als eigenes Fenster. Mit <b>„Desktop-Verknüpfung erstellen.bat“</b> bekommst du ein Symbol auf den Desktop.</label></div>
         <div class="set-row"><label>Tastenkürzel<small><kbd>Strg</kbd> <kbd>K</kbd> Suche · <kbd>F11</kbd> Vollbild · <kbd>Esc</kbd> Schließen</small></label></div>
+      </div>
+      <div class="set"><h3>Updates</h3><p>Neue Spiele und Verbesserungen holen.</p>
+        <div id="setUpd"><div class="set-row"><label>Updates gibt es in der installierten App.<small>Einmal <b>„Spielhalle einrichten.cmd“</b> ausführen, dann aktualisiert sich die Spielhalle von selbst.</small></label></div></div>
       </div>
     </div>
   </section>
@@ -912,16 +923,45 @@ if (location.port === '8777'){
         }).catch(() => {});
       }, 5000);
     };
-    $('updCheck').onclick = () => {
-      renderApp(i, true);
-      fetch('/__check', {cache:'no-store'}).then(r => r.json()).then(n => {
-        renderApp(n); updHidden = false; renderUpd(n);
-        if (!n.update){
-          const fail = n.note && n.note !== 'Aktuell';
-          Hub.toast(fail ? 'Update-Prüfung' : 'Alles aktuell', fail ? n.note : 'Du hast die neueste Version ' + n.version + '.', 'sparkles');
-        }
-      }).catch(() => renderApp(i));
-    };
+    $('updCheck').onclick = () => check(i);
+    renderSetUpd(i, checking);
+  }
+  function check(i){
+    renderApp(i, true);
+    fetch('/__check', {cache:'no-store'}).then(r => r.json()).then(n => {
+      renderApp(n); updHidden = false; renderUpd(n);
+      if (!n.update){
+        const fail = n.note && n.note !== 'Aktuell';
+        Hub.toast(fail ? 'Update-Prüfung' : 'Alles aktuell', fail ? n.note : 'Du hast die neueste Version ' + n.version + '.', 'sparkles');
+      }
+    }).catch(() => renderApp(i));
+  }
+  function install(){
+    fetch('/__update', {method:'POST'}).then(r => r.json()).then(n => { n.progress = Math.max(0, n.progress); updHidden = false; renderUpd(n); renderSetUpd(n); });
+  }
+  // Karte „Updates“ in den Einstellungen
+  function renderSetUpd(i, checking){
+    const box = $('setUpd');
+    const needLogin = ['nogh', 'nologin', 'noaccess'].includes(i.login);
+    const fail = (i.note || '').startsWith('Update fehlgeschlagen');
+    let html = `<div class="set-row"><label>Installierte Version</label><span class="upd-ver">${esc(i.version)}</span></div>`;
+    if (i.update){
+      const busy = i.progress >= 0;
+      html += `<div class="upd-new"><b>🚀 Neue Version ${esc(i.update.version)}</b><p>${esc(i.update.notes || 'Neue Spiele und Verbesserungen.')}</p>` +
+        (busy ? `<div>${i.progress >= 100 ? 'Wird installiert – die Spielhalle startet gleich neu …' : 'Wird geladen … ' + Math.max(0, i.progress) + ' %'}</div><div class="bar"><i style="width:${Math.max(3, i.progress)}%"></i></div>`
+              : `<button class="h-btn sm primary" id="setUpdNow">${I('download')}Jetzt installieren</button>`) + `</div>`;
+    } else if (!needLogin && i.online){
+      html += `<div class="set-row"><label>Status<small>${checking ? 'Suche nach Updates …' : i.note && i.note !== 'Aktuell' ? esc(i.note) : 'Du hast die neueste Version.'}</small></label></div>`;
+    }
+    if (fail) html += `<div class="upd-hint err">${esc(i.note)}</div>`;
+    if (needLogin) html += `<div class="upd-hint">${esc(i.loginText)}<div style="margin-top:8px"><button class="h-btn sm" id="setUpdLogin">🔑 Bei GitHub anmelden</button></div></div>`;
+    html += `<div class="set-row"><label>Nach Updates suchen<small>Passiert sonst auch beim Start und alle 20 Minuten</small></label><button class="h-btn sm" id="setUpdCheck" ${checking ? 'disabled' : ''}>${I('refresh')}${checking ? 'Suche …' : 'Suchen'}</button></div>
+      <div class="set-row"><label>Automatisch aktualisieren<small>Neue Versionen gleich beim Start installieren</small></label><div class="h-switch ${i.auto ? 'on' : ''}" id="setUpdAuto"></div></div>`;
+    box.innerHTML = html;
+    if ($('setUpdNow')) $('setUpdNow').onclick = install;
+    if ($('setUpdLogin')) $('setUpdLogin').onclick = () => $('ghLogin') && $('ghLogin').click();
+    $('setUpdCheck').onclick = () => check(i);
+    $('setUpdAuto').onclick = () => fetch('/__auto?an=' + (i.auto ? 0 : 1), {cache:'no-store'}).then(r => r.json()).then(n => renderSetUpd(n)).catch(() => {});
   }
   function renderUpd(i){
     const box = $('updBox');
@@ -930,7 +970,7 @@ if (location.port === '8777'){
     if (i.progress >= 0){
       box.innerHTML = `<h3>⬇️ Update auf ${esc(i.update.version)}</h3>
         <p>${i.progress >= 100 ? 'Wird installiert – die Spielhalle startet gleich neu …' : 'Wird geladen …'}</p><div class="bar"><i style="width:${Math.max(3, i.progress)}%"></i></div>`;
-      clearTimeout(updTimer); updTimer = setTimeout(() => info().then(renderUpd).catch(() => {}), 500);
+      clearTimeout(updTimer); updTimer = setTimeout(() => info().then(n => { renderUpd(n); renderSetUpd(n); }).catch(() => {}), 500);
       return;
     }
     box.innerHTML = `<button class="x" title="Später">×</button><h3>🚀 Neue Version ${esc(i.update.version)}</h3>
@@ -938,7 +978,7 @@ if (location.port === '8777'){
       ${(i.note || '').startsWith('Update fehlgeschlagen') ? `<p class="err">${esc(i.note)}</p>` : ''}
       <div class="row"><button class="h-btn" id="updLater">Später</button><button class="h-btn primary" id="updNow">Jetzt aktualisieren</button></div>`;
     box.querySelector('.x').onclick = $('updLater').onclick = () => { updHidden = true; box.hidden = true; };
-    $('updNow').onclick = () => fetch('/__update', {method:'POST'}).then(r => r.json()).then(n => { n.progress = Math.max(0, n.progress); renderUpd(n); });
+    $('updNow').onclick = install;
   }
   info().then(i => {
     if (!i.app) return;
