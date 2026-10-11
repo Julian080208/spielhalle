@@ -131,7 +131,7 @@ static class Setup
         int self = Process.GetCurrentProcess().Id;
         try
         {
-            using (var s = new ManagementObjectSearcher("SELECT ProcessId, CommandLine, ExecutablePath FROM Win32_Process WHERE Name='msedge.exe' OR Name='chrome.exe' OR Name='brave.exe' OR Name='vivaldi.exe' OR Name='Spielhalle.exe'"))
+            using (var s = new ManagementObjectSearcher("SELECT ProcessId, CommandLine, ExecutablePath FROM Win32_Process WHERE Name='msedge.exe' OR Name='chrome.exe' OR Name='brave.exe' OR Name='vivaldi.exe' OR Name='msedgewebview2.exe' OR Name='Spielhalle.exe'"))
                 foreach (ManagementObject o in s.Get())
                 {
                     int id = Convert.ToInt32(o["ProcessId"]);
@@ -242,7 +242,10 @@ static class Setup
         progress(45, "Programmdateien werden entfernt …");
         string app = Path.Combine(dir, "app");
         if (Directory.Exists(app)) Retry(delegate { Directory.Delete(app, true); });
-        foreach (string f in new[] { "Spielhalle.exe", "Spielhalle.old.exe", "Deinstallieren.exe", "update-url.txt", "update-repo.txt", "neu.txt", "einstellungen.txt", "umzug.json", "umzug.erledigt", "protokoll.txt" })
+        string rt = Path.Combine(dir, "runtimes");
+        if (Directory.Exists(rt)) try { Retry(delegate { Directory.Delete(rt, true); }); } catch { }
+        foreach (string f in new[] { "Spielhalle.exe", "Spielhalle.old.exe", "Deinstallieren.exe", "update-url.txt", "update-repo.txt", "neu.txt", "einstellungen.txt", "umzug.json", "umzug.erledigt", "protokoll.txt",
+                                     "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll" })
         {
             string p = Path.Combine(dir, f);
             try { if (File.Exists(p)) Retry(delegate { File.Delete(p); }); } catch { }

@@ -71,6 +71,38 @@ jobs:
         if: steps.v.outputs.skip != '1'
         shell: powershell
         run: .\installer\build.ps1
+      - name: Testen (installieren, starten, eigenes Fenster da?)
+        if: steps.v.outputs.skip != '1'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $d = "$env:RUNNER_TEMP\spielhalle-test"
+          $p = Start-Process installer\dist\Spielhalle-Setup.exe -ArgumentList '--still', '--test', '--ziel', "`"$d`"" -PassThru -Wait
+          if ($p.ExitCode) { throw "Setup endete mit Code $($p.ExitCode)" }
+          foreach ($f in 'Spielhalle.exe', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll', 'runtimes\win-x64\native\WebView2Loader.dll', 'app\Launcher.html') {
+            if (-not (Test-Path "$d\$f")) { throw "$f fehlt nach der Installation" }
+          }
+          $env:SPIELHALLE_TEST_NOSETUP = '1'
+          $app = Start-Process "$d\Spielhalle.exe" -WorkingDirectory $d -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 45 -and -not $ok; $i++) {
+            Start-Sleep 2
+            $ok = (Test-Path "$d\protokoll.txt") -and (Select-String -Path "$d\protokoll.txt" -Pattern 'Eigenes Fenster offen|Eigenes Fenster ging nicht|WebView2 nicht da' -Quiet)
+          }
+          Start-Sleep 3
+          Get-Content "$d\protokoll.txt" -ErrorAction SilentlyContinue
+          $wv = @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like "*$d*" }).Count
+          $titel = (Get-Process -Id $app.Id -ErrorAction SilentlyContinue).MainWindowTitle
+          "Fenstertitel: '$titel', WebView2-Prozesse: $wv"
+          $spiele = Invoke-RestMethod http://localhost:8777/__spiele -TimeoutSec 10
+          "Spiele gefunden: $(@($spiele).Count)"
+          $zeigen = (Invoke-WebRequest http://localhost:8777/__zeigen -UseBasicParsing -TimeoutSec 10).Content
+          "Fenster nach vorne holen: $zeigen"
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          if (-not (Select-String -Path "$d\protokoll.txt" -Pattern 'Eigenes Fenster offen' -Quiet)) { throw 'Die Spielhalle hat kein eigenes Fenster geöffnet' }
+          if ($wv -lt 1 -or $zeigen -ne 'ok') { throw 'Eigenes Fenster läuft nicht richtig' }
+          if (@($spiele).Count -lt 40) { throw 'Spieleliste unvollständig' }
+          'Test bestanden: eigenes Fenster läuft.'
       - name: Release anlegen
         if: steps.v.outputs.skip != '1' && github.ref == 'refs/heads/main'
         shell: powershell
