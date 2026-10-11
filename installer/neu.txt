@@ -1,1 +1,1 @@
-Die Spielhalle geht jetzt im eigenen Fenster auf statt im normalen Browser, auch wenn Edge oder Chrome woanders installiert ist. Brave und Vivaldi gehen jetzt auch.
+Neu: In den Einstellungen gibt es jetzt den Bereich „Updates“. Dort siehst du deine Version, kannst nach Updates suchen, sie mit einem Klick installieren und das automatische Aktualisieren an- oder ausschalten.
