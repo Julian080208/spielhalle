@@ -586,7 +586,7 @@ static class App
     {
         UpdateInfo u; lock (updLock) u = pending;
         if (u == null || dlProgress >= 0) return;
-        dlProgress = 0;
+        dlProgress = 0; updateNote = "";
         new Thread(delegate ()
         {
             try
