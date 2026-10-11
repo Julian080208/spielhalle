@@ -1,1 +1,1 @@
-Neu: In den Einstellungen gibt es jetzt den Bereich „Updates“. Dort siehst du deine Version, kannst nach Updates suchen, sie mit einem Klick installieren und das automatische Aktualisieren an- oder ausschalten.
+Neu: Die Spielhalle hat jetzt ein eigenes Programmfenster und geht nicht mehr im Browser auf (F11 = Vollbild). Neue Spiele erscheinen automatisch in der Liste.
