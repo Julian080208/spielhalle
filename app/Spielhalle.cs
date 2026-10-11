@@ -20,6 +20,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.IO.Compression;
+using System.Management;
 using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -115,19 +116,29 @@ static class App
         try { File.Delete(Path.Combine(Home, "Spielhalle.alt.exe")); } catch { }
 
         // Läuft die Spielhalle schon? Dann ihr Fenster nach vorne holen.
+        // Belegt eine alte Spielhalle den Anschluss, wird sie beendet.
         listener = new HttpListener();
         listener.Prefixes.Add(Url);
-        bool afterUpdate = Array.IndexOf(args, "--neustart") >= 0;
+        bool afterUpdate = Array.IndexOf(args, "--neustart") >= 0, killed = false;
         for (int i = 0; ; i++)
         {
             try { listener.Start(); break; }
             catch (Exception e)
             {
-                if (afterUpdate && i < 20) { Thread.Sleep(500); listener = new HttpListener(); listener.Prefixes.Add(Url); continue; }
-                Log("Läuft schon: " + e.Message);
-                try { using (var wc = new WebClient()) if (wc.DownloadString(Url + "__zeigen") == "ok") return 0; } catch { }
-                try { Process.Start(Url); } catch { }
-                return 0;
+                listener = new HttpListener(); listener.Prefixes.Add(Url);
+                if (afterUpdate && i < 20) { Thread.Sleep(500); continue; }
+                Log("Anschluss belegt: " + e.Message);
+                if (RunningIsNew())
+                {
+                    try { using (var wc = new WebClient()) if (wc.DownloadString(Url + "__zeigen") == "ok") return 0; } catch { }
+                    try { Process.Start(Url); } catch { }
+                    return 0;
+                }
+                if (!killed) { killed = true; KillOld(); Thread.Sleep(1500); continue; }
+                if (i < 10) { Thread.Sleep(1000); continue; }
+                MessageBox.Show("Ein anderes Programm benutzt den Anschluss der Spielhalle (localhost:8777).\n\nBitte den PC neu starten und die Spielhalle nochmal öffnen.",
+                    "Spielhalle", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return 1;
             }
         }
         new Thread(Serve) { IsBackground = true }.Start();
@@ -177,7 +188,7 @@ static class App
     static void Install()
     {
         Log("Einrichten nach " + Home + " (von " + Application.ExecutablePath + ")");
-        if (!Test) RemoveOldVersion();
+        if (!Test) { RemoveOldVersion(); KillOld(); }
         // läuft die Spielhalle gerade? Die laufende Datei darf umbenannt, aber nicht überschrieben werden.
         if (File.Exists(Exe))
         {
@@ -216,6 +227,36 @@ static class App
             Log("Alte Version entfernt");
         }
         catch (Exception e) { Log("Alte Version entfernen: " + e.Message); }
+    }
+
+    // Antwortet auf localhost:8777 diese (neue) Spielhalle? Die alte kennt __status mit "stand" nicht.
+    static bool RunningIsNew()
+    {
+        try { using (var wc = new WebClient()) return wc.DownloadString(Url + "__status").IndexOf("\"stand\"") >= 0; }
+        catch { return false; }
+    }
+
+    // Reste früherer Versionen beenden: die alte App (andere Spielhalle.exe) und der unsichtbare
+    // PowerShell-Helfer aus „Spielhalle starten.bat“, die sonst die alte Spielhalle anzeigen
+    static void KillOld()
+    {
+        int self = Process.GetCurrentProcess().Id;
+        try
+        {
+            using (var s = new ManagementObjectSearcher("SELECT ProcessId, Name, CommandLine, ExecutablePath FROM Win32_Process WHERE Name='Spielhalle.exe' OR Name='powershell.exe' OR Name='pwsh.exe'"))
+                foreach (ManagementObject o in s.Get())
+                {
+                    int id = Convert.ToInt32(o["ProcessId"]);
+                    if (id == self) continue;
+                    string name = (o["Name"] as string) ?? "", cl = (o["CommandLine"] as string) ?? "", ep = (o["ExecutablePath"] as string) ?? "";
+                    bool old = name.Equals("Spielhalle.exe", StringComparison.OrdinalIgnoreCase)
+                        ? ep != "" && !ep.Equals(Exe, StringComparison.OrdinalIgnoreCase)
+                        : cl.IndexOf("spielhalle-server.ps1", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!old) continue;
+                    try { Process.GetProcessById(id).Kill(); Log("Alte Spielhalle beendet: " + (ep != "" ? ep : cl)); } catch { }
+                }
+        }
+        catch (Exception e) { Log("Alte Spielhalle beenden: " + e.Message); }
     }
 
     static void Shortcut(string lnk)

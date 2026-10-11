@@ -44,7 +44,7 @@ $v4 = ($Version.Split('.') + @('0', '0', '0'))[0..3] -join '.'
 $res = @("/resource:$core,wv2/Microsoft.Web.WebView2.Core.dll", "/resource:$winforms,wv2/Microsoft.Web.WebView2.WinForms.dll")
 foreach ($arch in 'x86', 'x64', 'arm64') { $res += "/resource:$wv\runtimes\win-$arch\native\WebView2Loader.dll,wv2/runtimes/win-$arch/native/WebView2Loader.dll" }
 
-$refs = @('System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Web.Extensions.dll',
+$refs = @('System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Web.Extensions.dll', 'System.Management.dll',
           "$fw\System.IO.Compression.dll", "$fw\System.IO.Compression.FileSystem.dll", $core, $winforms) | ForEach-Object { "/r:$_" }
 $exe = Join-Path $dist 'Spielhalle.exe'
 $a = @('/nologo', '/optimize+', '/codepage:65001', '/target:winexe', "/win32icon:$here\spielhalle.ico", "/out:$exe") + $refs + $res + @("$here\Spielhalle.cs", "$tmp\Version.cs")

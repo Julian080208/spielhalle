@@ -54,6 +54,12 @@ jobs:
           $ErrorActionPreference = 'Continue'
           $d = "$env:RUNNER_TEMP\spielhalle"
           $env:SPIELHALLE_ORDNER = $d
+          # wie bei manchem PC: der alte Helfer aus „Spielhalle starten.bat“ belegt noch localhost:8777
+          $alt = "$env:RUNNER_TEMP\spielhalle-server.ps1"
+          Set-Content $alt '$l = New-Object System.Net.HttpListener; $l.Prefixes.Add("http://localhost:8777/"); $l.Start(); while ($true) { $c = $l.GetContext(); $b = [Text.Encoding]::UTF8.GetBytes("alte Spielhalle"); $c.Response.OutputStream.Write($b, 0, $b.Length); $c.Response.Close() }'
+          $altP = Start-Process powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $alt -PassThru
+          Start-Sleep 4
+          "Alter Helfer antwortet: $((Invoke-WebRequest http://localhost:8777/ -UseBasicParsing -TimeoutSec 5).Content)"
           Start-Process app\dist\Spielhalle.exe
           $log = "$d\protokoll.txt"
           for ($i = 0; $i -lt 60; $i++) {
@@ -73,6 +79,7 @@ jobs:
           "Fenster: $zeigen, WebView2-Prozesse: $wv"
           try { Invoke-WebRequest http://localhost:8777/__beenden -UseBasicParsing -TimeoutSec 5 | Out-Null } catch {}
           if (-not (Test-Path "$d\Spielhalle.exe")) { throw 'Nicht eingerichtet' }
+          if (-not $altP.HasExited) { throw 'Alter Helfer wurde nicht beendet' }
           if ($status.stand -ne '${{ github.sha }}'.Substring(0, 7)) { throw 'Spiele nicht vom richtigen Stand geladen' }
           if ($spiele.Count -lt 40) { throw 'Spieleliste unvollständig' }
           if ($launcher -notmatch 'id="spielhalle-launcher"') { throw 'Neuer Launcher nicht geladen' }
@@ -84,6 +91,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $v = '${{ steps.v.outputs.version }}'
-          gh release create "v$v" app\dist\Spielhalle.exe app\dist\Spielhalle.exe.sha256 --target "$env:GITHUB_SHA" --title "Spielhalle $v" --notes "Neue Version der Spielhalle-App. Herunterladen: Spielhalle.exe" --latest
+          # Für ältere Spielhallen (1.x mit Setup): die suchen nach Spielhalle-Setup.exe und version.json.
+          # Die neue exe richtet sich beim Start selbst ein und entfernt die alte Version.
+          Copy-Item app\dist\Spielhalle.exe app\dist\Spielhalle-Setup.exe
+          $sha = (Get-FileHash app\dist\Spielhalle-Setup.exe -Algorithm SHA256).Hash
+          $json = [ordered]@{ version = $v; notes = 'Die neue Spielhalle: eigenes Fenster, Spiele kommen automatisch von GitHub.'; setup = 'Spielhalle-Setup.exe'; sha256 = $sha; date = (Get-Date -Format 'yyyy-MM-dd') } | ConvertTo-Json
+          [IO.File]::WriteAllText("$pwd\app\dist\version.json", $json, (New-Object Text.UTF8Encoding $false))
+          gh release create "v$v" app\dist\Spielhalle.exe app\dist\Spielhalle.exe.sha256 app\dist\Spielhalle-Setup.exe app\dist\version.json --target "$env:GITHUB_SHA" --title "Spielhalle $v" --notes "Neue Version der Spielhalle-App. Herunterladen: Spielhalle.exe" --latest
           if ($LASTEXITCODE) { throw 'Veröffentlichen fehlgeschlagen' }
           "Veröffentlicht: Spielhalle $v"
