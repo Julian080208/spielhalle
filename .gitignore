@@ -4,3 +4,4 @@ installer/dist/
 *.exe
 *.old.exe
 _*.html
+installer/webview2-*.zip

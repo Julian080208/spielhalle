@@ -49,29 +49,47 @@ function Compile($out, $sources, $extra) {
 Compile "$tmp\mkicon.exe" @("$here\mkicon.cs", "$here\Logo.cs") @('/target:exe')
 & "$tmp\mkicon.exe" "$here\spielhalle.ico" | Out-Null
 
-# 2) App
-Compile "$tmp\Spielhalle.exe" @("$here\Spielhalle.cs", "$here\Logo.cs", "$tmp\Version.cs") @('/target:winexe', "/win32icon:$here\spielhalle.ico")
+# 2) WebView2-Baustein von Microsoft (NuGet, feste Version mit Prüfsumme) für das eigene App-Fenster
+$wvVersion = '1.0.2903.40'
+$wvSha = 'EF128016DD1E51C59178C827ED5B8AA3322C57AFA8675D930F8109505542AD74'
+$wvZip = Join-Path $here "webview2-$wvVersion.zip"
+if (-not (Test-Path $wvZip) -or (Get-FileHash $wvZip -Algorithm SHA256).Hash -ne $wvSha) {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  Invoke-WebRequest "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/$wvVersion" -OutFile $wvZip -UseBasicParsing
+  if ((Get-FileHash $wvZip -Algorithm SHA256).Hash -ne $wvSha) { Remove-Item $wvZip; throw 'WebView2-Paket: Prüfsumme stimmt nicht' }
+}
+$wv = Join-Path $tmp 'wv2'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::ExtractToDirectory($wvZip, $wv)
+$wvDlls = @("$wv\lib\net462\Microsoft.Web.WebView2.Core.dll", "$wv\lib\net462\Microsoft.Web.WebView2.WinForms.dll")
 
-# 3) Paket = genau so, wie es im Installationsordner liegen soll
+# 3) App
+Compile "$tmp\Spielhalle.exe" @("$here\Spielhalle.cs", "$here\Logo.cs", "$tmp\Version.cs") (@('/target:winexe', "/win32icon:$here\spielhalle.ico") + ($wvDlls | ForEach-Object { "/r:$_" }))
+
+# 4) Paket = genau so, wie es im Installationsordner liegen soll
 $stage = Join-Path $tmp 'paket'
 New-Item -ItemType Directory "$stage\app" | Out-Null
 Copy-Item "$tmp\Spielhalle.exe" $stage
+Copy-Item $wvDlls $stage
+foreach ($arch in 'x86', 'x64', 'arm64') {
+  New-Item -ItemType Directory "$stage\runtimes\win-$arch\native" | Out-Null
+  Copy-Item "$wv\runtimes\win-$arch\native\WebView2Loader.dll" "$stage\runtimes\win-$arch\native\"
+}
 Copy-Item "$root\Launcher.html" "$stage\app\"
 Copy-Item "$root\spiele" "$stage\app\" -Recurse
 Get-ChildItem "$stage\app\spiele" -Recurse -Include '*.ps1' | Remove-Item -Force
 [IO.File]::WriteAllText("$stage\update-repo.txt", $repo, $utf8)
 [IO.File]::WriteAllText("$stage\neu.txt", $notes, $utf8)
-Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = Join-Path $tmp 'payload.zip'
 [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [IO.Compression.CompressionLevel]::Optimal, $false)
 [IO.File]::WriteAllText("$tmp\homepage.txt", $homeUrl, $utf8)
 
-# 4) Setup mit eingebautem Paket
+# 5) Setup mit eingebautem Paket
 $setup = Join-Path $dist 'Spielhalle-Setup.exe'
 Compile $setup @("$here\Setup.cs", "$here\Logo.cs", "$tmp\Version.cs") @('/target:winexe', "/win32icon:$here\spielhalle.ico", "/resource:$zip,payload.zip", "/resource:$tmp\homepage.txt,homepage.txt")
 Copy-Item $setup "$root\Spielhalle-Setup.exe" -Force
 
-# 5) version.json für die Online-Updates
+# 6) version.json für die Online-Updates
 $sha = (Get-FileHash $setup -Algorithm SHA256).Hash
 $json = [ordered]@{ version = $version; notes = $notes; setup = 'Spielhalle-Setup.exe'; sha256 = $sha; date = (Get-Date -Format 'yyyy-MM-dd') } | ConvertTo-Json
 [IO.File]::WriteAllText("$dist\version.json", $json, $utf8)

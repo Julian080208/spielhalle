@@ -2,9 +2,9 @@
 //  Spielhalle.exe – die Spielhalle als eigene Windows-App
 //  * startet einen kleinen Webserver nur für diesen PC (localhost:8777),
 //    damit u. a. das YouTube-Kino funktioniert
-//  * öffnet die Spielhalle in einem eigenen Fenster ohne Browserleiste
-//    (Edge im App-Modus mit eigenem Profil) und beendet sich, sobald
-//    das Fenster geschlossen wird
+//  * zeigt die Spielhalle in einem eigenen Programmfenster (WebView2, in
+//    Windows eingebaut; fehlt es, wird es von Microsoft nachinstalliert).
+//    Geht das nicht, als Notlösung Edge/Chrome im App-Modus
 //  * Online-Updates: prüft beim Start und alle 20 Minuten die neueste
 //    Version auf GitHub (Adresse in update-url.txt), lädt das neue
 //    Setup herunter, prüft es (SHA-256) und installiert es still
@@ -18,13 +18,18 @@ using System.IO;
 using System.Management;
 using System.Net;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("Spielhalle")]
 
@@ -75,14 +80,20 @@ static class App
         Application.EnableVisualStyles();
         ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2
 
-        // Läuft die Spielhalle schon? Dann nur ein weiteres Fenster öffnen.
+        // Läuft die Spielhalle schon? Dann ihr Fenster nach vorne holen.
         var listener = new HttpListener();
         listener.Prefixes.Add(Url);
         try { listener.Start(); }
-        catch (Exception e) { Log("Läuft schon (Port belegt): " + e.Message); OpenWindow(); return; }
+        catch (Exception e)
+        {
+            Log("Läuft schon (Port belegt): " + e.Message);
+            try { using (var wc = new WebClient()) if (wc.DownloadString(Url + "__zeigen") == "ok") return; } catch { }
+            OpenWindow();
+            return;
+        }
 
         var splash = new Splash();
-        bool windowOpened = false;
+        bool windowOpened = false, ownWindow = false;
         splash.Shown += delegate
         {
             new Thread(delegate ()
@@ -115,16 +126,27 @@ static class App
                 new Thread(delegate () { Serve(listener); }) { IsBackground = true }.Start();
                 new Thread(UpdateLoop) { IsBackground = true }.Start();
                 try { Migrate(splash); } catch { }
+                ownWindow = Environment.GetEnvironmentVariable("SPIELHALLE_FENSTER") != "browser" && WebView2Ready(splash);
                 splash.SetStatus("Spielhalle wird geöffnet …");
-                windowOpened = OpenWindow();
-                Thread.Sleep(1200);
+                if (ownWindow) { try { TakeOverProfile(); } catch (Exception e) { Log("Profil-Übernahme: " + e.Message); } }
+                else { windowOpened = OpenWindow(); Thread.Sleep(1200); }
                 splash.CloseSafe();
             }) { IsBackground = true }.Start();
         };
         Application.Run(splash);
         if (!splash.Ok) { try { listener.Stop(); } catch { } return; }
 
-        // Server laufen lassen, bis das Spielhallen-Fenster geschlossen ist
+        // eigenes Programmfenster; die App endet, wenn es geschlossen wird
+        if (ownWindow)
+        {
+            string err = null;
+            try { err = RunOwnWindow(); } catch (Exception e) { err = e.ToString(); }
+            if (err == null) { try { listener.Stop(); } catch { } return; }
+            Log("Eigenes Fenster ging nicht, nehme Browser: " + err);
+            windowOpened = OpenWindow();
+        }
+
+        // Notlösung Browser: Server laufen lassen, bis das Spielhallen-Fenster geschlossen ist
         Thread.Sleep(10000);
         if (windowOpened) { while (EdgeRunning()) Thread.Sleep(4000); }
         else { while ((DateTime.Now - lastHit).TotalHours < 3) Thread.Sleep(30000); }
@@ -132,6 +154,77 @@ static class App
     }
 
     // ---------------------------------------------------------------- Fenster
+    // Eigenes Fenster mit WebView2. Alles, was WebView2-Typen benutzt, steht in eigenen
+    // Methoden: fehlen die DLLs, schlägt nur dieser Aufruf fehl und es geht mit dem Browser weiter.
+    static Form window;   // das offene Spielhallen-Fenster (für __zeigen)
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static string WebView2VersionRaw() { return CoreWebView2Environment.GetAvailableBrowserVersionString(); }
+    static string WebView2Version()
+    {
+        try { return WebView2VersionRaw(); }
+        catch (Exception e) { Log("WebView2 nicht da: " + e.GetType().Name + " " + e.Message); return null; }
+    }
+
+    // WebView2 ist auf Windows 11 und fast jedem Windows 10 schon drauf. Sonst den
+    // offiziellen Installer von Microsoft laden (Signatur wird geprüft) und still installieren.
+    static bool WebView2Ready(Splash ui)
+    {
+        string v = WebView2Version();
+        if (v != null) { Log("WebView2 " + v); return true; }
+        try
+        {
+            ui.SetStatus("Fenster-Baustein von Microsoft wird installiert …");
+            string f = Path.Combine(Path.GetTempPath(), "MicrosoftEdgeWebview2Setup.exe");
+            using (var wc = new WebClient()) wc.DownloadFile("https://go.microsoft.com/fwlink/p/?LinkId=2124703", f);
+            string signer = new X509Certificate2(X509Certificate.CreateFromSignedFile(f)).Subject;
+            if (signer.IndexOf("O=Microsoft Corporation", StringComparison.OrdinalIgnoreCase) < 0) throw new Exception("falsche Signatur: " + signer);
+            using (var p = Process.Start(new ProcessStartInfo(f, "/silent /install") { UseShellExecute = false, CreateNoWindow = true }))
+                p.WaitForExit(5 * 60 * 1000);
+            v = WebView2Version();
+            Log("WebView2 nachinstalliert: " + (v ?? "hat nicht geklappt"));
+        }
+        catch (Exception e) { Log("WebView2-Installation: " + e.Message); }
+        return v != null;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static string RunOwnWindow()
+    {
+        var f = new AppWindow(Url + "Launcher.html", DataDir);
+        window = f;
+        Application.Run(f);
+        window = null;
+        return f.Error == null ? null : f.Error.ToString();
+    }
+
+    static void ShowWindow()
+    {
+        Form f = window;
+        if (f == null || !f.IsHandleCreated) return;
+        f.BeginInvoke((MethodInvoker)delegate
+        {
+            if (f.WindowState == FormWindowState.Minimized) f.WindowState = FormWindowState.Maximized;
+            f.TopMost = true; f.TopMost = false; f.Activate();
+        });
+    }
+
+    // Spielstände aus dem Edge-Profil früherer Versionen ins WebView2-Profil übernehmen (einmalig)
+    static void TakeOverProfile()
+    {
+        string from = Path.Combine(DataDir, "Default"), to = Path.Combine(DataDir, @"EBWebView\Default");
+        if (!Directory.Exists(from) || Directory.Exists(Path.Combine(DataDir, "EBWebView"))) return;
+        foreach (string sub in new[] { "Local Storage", "IndexedDB" })
+            if (Directory.Exists(Path.Combine(from, sub))) CopyDir(Path.Combine(from, sub), Path.Combine(to, sub));
+        Log("Spielstände aus dem Edge-Profil übernommen");
+    }
+    static void CopyDir(string from, string to)
+    {
+        Directory.CreateDirectory(to);
+        foreach (string f in Directory.GetFiles(from)) { try { File.Copy(f, Path.Combine(to, Path.GetFileName(f)), true); } catch { } }
+        foreach (string d in Directory.GetDirectories(from)) CopyDir(d, Path.Combine(to, Path.GetFileName(d)));
+    }
+
     // Browser mit App-Modus (--app): eigenes Fenster ohne Adressleiste und Tabs
     static readonly string[] AppBrowsers = { "msedge.exe", "chrome.exe", "brave.exe", "vivaldi.exe" };
 
@@ -277,6 +370,7 @@ static class App
             {
                 case "__ping": Text(ctx, "{\"ok\":true,\"app\":true}", "application/json"); return;
                 case "__info": Json(ctx, Info()); return;
+                case "__zeigen": ShowWindow(); Text(ctx, window != null ? "ok" : "kein Fenster", "text/plain"); return;
                 case "__check":
                     try { Token(true); var u = CheckUpdate(10000); lock (updLock) pending = u; updateNote = u == null ? "Aktuell" : ""; }
                     catch (Exception e) { updateNote = LoginText() != "" ? LoginText() : "Keine Verbindung zum Update-Server (" + e.Message + ")"; Log("Prüfen: " + updateNote); }
@@ -296,13 +390,14 @@ static class App
                     SetAutoUpdate(ctx.Request.QueryString["an"] != "0");
                     Json(ctx, Info());
                     return;
+                case "__spiele": Json(ctx, Spiele()); return;
                 case "__yt": YouTube(ctx); return;
                 case "__import": Import(ctx); return;
             }
             if (path == "") path = "Launcher.html";
             string full = Path.GetFullPath(Path.Combine(AppDir, path.Replace('/', '\\')));
             if (full.StartsWith(AppDir + "\\", StringComparison.OrdinalIgnoreCase) && File.Exists(full))
-                Send(ctx, File.ReadAllBytes(full), Mime(full));
+                Send(ctx, WithBackButton(path, File.ReadAllBytes(full)), Mime(full));
             else
                 Text(ctx, "Nicht gefunden", "text/plain; charset=utf-8", 404);
         }
@@ -310,6 +405,57 @@ static class App
         {
             try { Text(ctx, "Fehler: " + e.Message, "text/plain; charset=utf-8", 500); } catch { }
         }
+    }
+
+    // ---------------------------------------------------------------- Neue Spiele
+    // Jede HTML-Datei direkt in spiele/ ist ein Spiel. Spiele ohne Katalog-Eintrag zeigt der
+    // Launcher trotzdem an – mit Titel und den Angaben aus <meta name="spielhalle-…" content="…">.
+    static List<object> Spiele()
+    {
+        var list = new List<object>();
+        string d = Path.Combine(AppDir, "spiele");
+        if (!Directory.Exists(d)) return list;
+        foreach (string f in Directory.GetFiles(d, "*.html"))
+        {
+            try
+            {
+                string html = Regex.Replace(File.ReadAllText(f, Encoding.UTF8), @"<!--.*?-->", "", RegexOptions.Singleline);
+                var t = Regex.Match(html, @"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                var meta = new Dictionary<string, object>();
+                foreach (Match m in Regex.Matches(html, @"<meta\b[^>]*>", RegexOptions.IgnoreCase))
+                {
+                    var n = Regex.Match(m.Value, @"\bname\s*=\s*[""']spielhalle-([a-z]+)[""']", RegexOptions.IgnoreCase);
+                    var c = Regex.Match(m.Value, @"\bcontent\s*=\s*(""[^""]*""|'[^']*')", RegexOptions.IgnoreCase);
+                    if (n.Success && c.Success)
+                        meta[n.Groups[1].Value.ToLowerInvariant()] = WebUtility.HtmlDecode(c.Groups[1].Value.Substring(1, c.Groups[1].Value.Length - 2)).Trim();
+                }
+                list.Add(new Dictionary<string, object> {
+                    { "file", "spiele/" + Path.GetFileName(f) },
+                    { "title", t.Success ? WebUtility.HtmlDecode(t.Groups[1].Value).Trim() : Path.GetFileNameWithoutExtension(f) },
+                    { "meta", meta },
+                });
+            }
+            catch (Exception e) { Log("Spiel nicht lesbar: " + f + " – " + e.Message); }
+        }
+        return list;
+    }
+
+    // Spiele ohne die gemeinsame Spielleiste (hub.js) bekommen einen Knopf zurück zur Spielhalle –
+    // das App-Fenster hat ja keine Zurück-Taste. Abschalten: <meta name="spielhalle-zurueck" content="nein">
+    const string BackButton = "<a id=\"spielhalle-zurueck\" href=\"/Launcher.html\" title=\"Zur Spielhalle\" style=\"position:fixed;left:12px;bottom:12px;z-index:2147483647;" +
+        "padding:8px 14px;border-radius:999px;background:rgba(14,15,22,.8);color:#fff;font:600 14px 'Segoe UI',system-ui,sans-serif;text-decoration:none;" +
+        "box-shadow:0 4px 14px rgba(0,0,0,.45);opacity:.6\" onmouseover=\"this.style.opacity=1\" onmouseout=\"this.style.opacity=.6\">&#8592; Spielhalle</a>" +
+        "<script>if(window.top!==window){var z=document.getElementById('spielhalle-zurueck');if(z)z.remove();}</script>";
+    static byte[] WithBackButton(string path, byte[] data)
+    {
+        if (!path.StartsWith("spiele/", StringComparison.OrdinalIgnoreCase) || path.IndexOf('/', 7) >= 0 ||
+            !path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) return data;
+        string html = Encoding.UTF8.GetString(data);
+        if (html.IndexOf("shared/hub.js", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            Regex.IsMatch(html, @"name\s*=\s*[""']spielhalle-zurueck[""']\s+content\s*=\s*[""']nein", RegexOptions.IgnoreCase)) return data;
+        int i = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+        html = i >= 0 ? html.Insert(i, BackButton) : html + BackButton;
+        return new UTF8Encoding(false).GetBytes(html);
     }
 
     // YouTube-Suche: Ergebnisseite laden und die eingebetteten Daten zurückgeben
@@ -646,6 +792,79 @@ static class App
             for (int i = 0; i < 40 && !File.Exists(json); i++) Thread.Sleep(250);
         }
         File.WriteAllText(flag, DateTime.Now.ToString("s"));
+    }
+}
+
+// ==================================================================== Programmfenster
+// Die Spielhalle in einem eigenen Fenster (WebView2 = die Edge-Technik als Baustein, ohne Browser drumherum).
+// F11 schaltet Vollbild an/aus, auch über Seitenwechsel hinweg. Links zu fremden Seiten gehen im Standardbrowser auf.
+class AppWindow : Form
+{
+    readonly WebView2 web = new WebView2();
+    readonly string start, dataDir;
+    public Exception Error;
+    bool fullWindow, fullElement;
+    FormWindowState before = FormWindowState.Maximized;
+
+    public AppWindow(string url, string data)
+    {
+        start = url; dataDir = data;
+        Text = "Spielhalle";
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+        BackColor = Logo.Dunkel;
+        StartPosition = FormStartPosition.CenterScreen;
+        Size = new Size(1280, 800);
+        WindowState = FormWindowState.Maximized;
+        web.Dock = DockStyle.Fill;
+        web.DefaultBackgroundColor = Logo.Dunkel;
+        Controls.Add(web);
+        Load += async delegate
+        {
+            try
+            {
+                var opt = new CoreWebView2EnvironmentOptions();
+                opt.AdditionalBrowserArguments = "--autoplay-policy=no-user-gesture-required --disable-features=Translate";
+                string extra = Environment.GetEnvironmentVariable("SPIELHALLE_BROWSER_ARGS");
+                if (!string.IsNullOrEmpty(extra)) opt.AdditionalBrowserArguments += " " + extra;
+                var env = await CoreWebView2Environment.CreateAsync(null, dataDir, opt);
+                await web.EnsureCoreWebView2Async(env);
+                var c = web.CoreWebView2;
+                c.Settings.IsStatusBarEnabled = false;
+                c.Settings.IsPasswordAutosaveEnabled = false;
+                c.Settings.IsGeneralAutofillEnabled = false;
+                c.ContainsFullScreenElementChanged += delegate { fullElement = c.ContainsFullScreenElement; ApplyFull(); };
+                c.WebMessageReceived += (s, e) => { if (e.TryGetWebMessageAsString() == "vollbild") { fullWindow = !fullWindow; ApplyFull(); } };
+                c.NewWindowRequested += (s, e) =>
+                {
+                    if (e.Uri.StartsWith(App.Url, StringComparison.OrdinalIgnoreCase)) return;
+                    e.Handled = true;
+                    try { Process.Start(e.Uri); } catch { }
+                };
+                await c.AddScriptToExecuteOnDocumentCreatedAsync(
+                    "addEventListener('keydown',function(e){if(e.key==='F11'){e.preventDefault();window.chrome.webview.postMessage('vollbild');}},true);");
+                c.Navigate(start);
+                App.Log("Eigenes Fenster offen (WebView2 " + env.BrowserVersionString + ")");
+            }
+            catch (Exception ex) { Error = ex; Close(); }
+        };
+    }
+
+    void ApplyFull()
+    {
+        bool on = fullWindow || fullElement;
+        if (on == (FormBorderStyle == FormBorderStyle.None)) return;
+        if (on)
+        {
+            before = WindowState == FormWindowState.Minimized ? FormWindowState.Maximized : WindowState;
+            FormBorderStyle = FormBorderStyle.None;
+            WindowState = FormWindowState.Normal;   // erst Normal, sonst bleibt die Taskleiste sichtbar
+            WindowState = FormWindowState.Maximized;
+        }
+        else
+        {
+            FormBorderStyle = FormBorderStyle.Sizable;
+            WindowState = before;
+        }
     }
 }
 

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!--
+  Vorlage für ein neues Spiel in der Spielhalle
+  ==============================================
+  1. Diese Datei kopieren nach  spiele/<name>.html  (z. B. spiele/reaktion.html)
+  2. Titel und die <meta name="spielhalle-…"> Angaben unten anpassen (alle freiwillig)
+  3. Auf main bringen – fertig. Die Spielhalle erscheint automatisch als neue Version,
+     alle installierten Spielhallen holen sie sich selbst, und das Spiel steht mit Cover
+     in der Liste. Einen Knopf „← Spielhalle“ zum Zurückgehen fügt die App selbst ein.
+
+  Angaben (alle freiwillig):
+    spielhalle-titel         Name in der Spielhalle (sonst der <title>)
+    spielhalle-beschreibung  ein kurzer Satz unter dem Namen
+    spielhalle-text          längere Beschreibung in den Details
+    spielhalle-genre         Kategorien, mit Komma getrennt (z. B. "Party, Geschick")
+    spielhalle-symbol        Emoji fürs Cover (z. B. "⚡")
+    spielhalle-farbe         Farbe fürs Cover (z. B. "#ff8a3d")
+    spielhalle-steuerung     Tasten, z. B. "Leertaste = Drücken; Klick = Drücken"
+    spielhalle-zurueck       "nein", wenn das Spiel selbst einen Zurück-Knopf hat
+
+  Die Datei muss als UTF-8 gespeichert sein. Bilder, Töne usw. können neben der
+  Datei in spiele/ liegen und mit relativem Pfad geladen werden.
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reaktionstest</title>
+<meta name="spielhalle-beschreibung" content="Wer drückt am schnellsten, wenn es grün wird?">
+<meta name="spielhalle-text" content="Warte, bis der Bildschirm grün wird, und drück dann so schnell du kannst. Wer zu früh drückt, fliegt raus. Reihum spielen – die schnellste Zeit gewinnt.">
+<meta name="spielhalle-genre" content="Party, Geschick">
+<meta name="spielhalle-symbol" content="⚡">
+<meta name="spielhalle-farbe" content="#2fbf71">
+<meta name="spielhalle-steuerung" content="Leertaste = Drücken; Klick = Drücken">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+         font-family: 'Segoe UI', system-ui, sans-serif; color: #fff; background: #1b1f2e; cursor: pointer;
+         user-select: none; transition: background .1s; text-align: center; }
+  body.warten { background: #b3263a; }
+  body.jetzt { background: #1f9d55; }
+  h1 { font-size: clamp(36px, 7vw, 96px); margin: 0; }
+  p { font-size: clamp(18px, 2.4vw, 30px); margin: 0; opacity: .85; }
+</style>
+</head>
+<body>
+<h1 id="gross">Reaktionstest</h1>
+<p id="klein">Klicken oder Leertaste zum Starten</p>
+<p id="rekord"></p>
+<script>
+  const gross = document.getElementById('gross'), klein = document.getElementById('klein'), rekord = document.getElementById('rekord');
+  let zustand = 'bereit', start = 0, timer = 0;
+  let best = +localStorage.getItem('reaktion_rekord') || 0;
+  const zeigeRekord = () => rekord.textContent = best ? 'Rekord: ' + best + ' ms' : '';
+  zeigeRekord();
+
+  function druecken() {
+    if (zustand === 'bereit' || zustand === 'fertig') {
+      zustand = 'warten'; document.body.className = 'warten';
+      gross.textContent = 'Warten …'; klein.textContent = 'Erst drücken, wenn es grün wird!';
+      timer = setTimeout(() => {
+        zustand = 'jetzt'; document.body.className = 'jetzt';
+        gross.textContent = 'JETZT!'; klein.textContent = ''; start = performance.now();
+      }, 1500 + Math.random() * 3500);
+    } else if (zustand === 'warten') {
+      clearTimeout(timer); zustand = 'fertig'; document.body.className = '';
+      gross.textContent = 'Zu früh!'; klein.textContent = 'Nochmal: klicken oder Leertaste';
+    } else if (zustand === 'jetzt') {
+      const ms = Math.round(performance.now() - start);
+      zustand = 'fertig'; document.body.className = '';
+      gross.textContent = ms + ' ms'; klein.textContent = 'Nochmal: klicken oder Leertaste';
+      if (!best || ms < best) { best = ms; localStorage.setItem('reaktion_rekord', best); }
+      zeigeRekord();
+    }
+  }
+  document.body.addEventListener('pointerdown', e => { if (!e.target.closest('a')) druecken(); });
+  addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat) { e.preventDefault(); druecken(); } });
+</script>
+</body>
+</html>

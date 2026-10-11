@@ -511,6 +511,7 @@ const bestTxt = (g, st) => st.best == null ? (st.extra || '–') : (g.id === 'mi
 // ---------- Start eines Spiels ----------
 function launch(g){
   Hub.sfx('launch');
+  if (g.auto){ const st = Hub.game(g.id); st.sessions++; st.last = Date.now(); Hub.save(); }
   $('lBg').innerHTML = cover(g);
   $('lLogo').innerHTML = logo(g);
   $('lTitle').textContent = g.title;
@@ -900,6 +901,43 @@ setInterval(tickClock, 15000); tickClock();
 
 $('partyCnt').textContent = Hub.party.active().length;
 renderSide(); renderHero(0, true); restartHero(); renderRecent(); renderFilters(); renderGrid();
+
+// ---------- Neue Spiele: jede HTML-Datei in spiele/ erscheint automatisch ----------
+// Die App liefert unter /__spiele alle Spieldateien. Was (noch) nicht im Katalog steht,
+// bekommt hier einen Eintrag mit erzeugtem Cover – Angaben aus <meta name="spielhalle-…">.
+const AUTO_COLORS = ['#7c6cff', '#ff8a3d', '#2fbf71', '#ff4f9a', '#3d8bff', '#c45cff', '#18c5d8', '#ffb020'];
+function autoGame(s){
+  const m = s.meta || {}, A = HubArt;
+  const x = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'})[c]);
+  const name = s.file.replace(/^spiele\//, '').replace(/\.html$/i, '');
+  const hash = [...name].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const accent = /^#[0-9a-f]{3,8}$/i.test(m.farbe || '') ? m.farbe : AUTO_COLORS[hash % AUTO_COLORS.length];
+  const sym = [...(m.symbol || '🎮')].slice(0, 4).join('');
+  const title = (m.titel || s.title || name).replace(/\s+[–|-]\s+Spielhalle$/i, '').replace(/[<>"]/g, '');
+  const genres = (m.genre || '').split(',').map(t => x(t.trim())).filter(Boolean);
+  const controls = (m.steuerung || '').split(';').map(t => t.split('=').map(v => v.trim())).filter(([k, v]) => k && v);
+  const id = 'datei_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  const played = (Hub.profile.games[id] || {}).sessions;
+  return {id, file:s.file, title, auto:true, isNew:!played, accent,
+    tagline:x(m.beschreibung || 'Neu in der Spielhalle.'), genres:genres.length ? genres : ['Neu'],
+    desc:x(m.text || m.beschreibung || 'Ein neues Spiel in der Spielhalle. Viel Spaß!'), controls:controls.map(r => r.map(x)),
+    cover(){
+      const u = A.uid(), fs = Math.max(26, Math.min(52, Math.round(1000 / Math.max(10, title.length))));
+      return A.wrap(u, A.lg(u + 'a', [[0, accent], [1, '#0d0f16']], 1, 1) + A.rg(u + 'r', [[0, '#fff', .22], [1, '#fff', 0]]),
+        `<rect width="640" height="360" fill="url(#${u}a)"/><circle cx="470" cy="150" r="170" fill="url(#${u}r)"/>
+         <text x="470" y="150" font-size="150" text-anchor="middle" dominant-baseline="central">${x(sym)}</text>
+         <text x="40" y="318" font-size="${fs}" font-weight="800" fill="#fff" font-family="Segoe UI,system-ui,sans-serif">${x(title)}</text>`);
+    },
+    logo:() => A.logoWrap([[0, accent], [1, '#151822']], `<text x="32" y="34" font-size="34" text-anchor="middle" dominant-baseline="central">${x(sym)}</text>`),
+  };
+}
+if (location.port === '8777') fetch('/__spiele', {cache:'no-store'}).then(r => r.json()).then(list => {
+  const known = new Set(GAMES.map(g => g.file));
+  const neu = list.filter(s => s && s.file && !known.has(s.file)).map(autoGame).sort((a, b) => a.title.localeCompare(b.title));
+  if (!neu.length) return;
+  GAMES.push(...neu);
+  renderSide(); renderRecent(); renderFilters(); renderGrid();
+}).catch(() => {});
 
 // ---------- App: Version, Online-Updates, Hinweise ----------
 if (location.port === '8777'){
