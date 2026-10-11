@@ -1,0 +1,1597 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz-Show</title>
+<meta name="spielhalle-beschreibung" content="Buzzer-Quiz wie im Fernsehen – wer zuerst drückt, darf antworten.">
+<meta name="spielhalle-text" content="Die Frage erscheint groß, nach kurzer Lesezeit kommen vier Antworten. Jeder hat seine eigene Buzzer-Taste auf der Tastatur – wer zuerst drückt, ist dran. Schnell sein bringt mehr Punkte, falsche Antworten kosten welche. Über 300 Fragen aus 10 Kategorien, Finalfrage mit doppelten Punkten. Für 2 bis 8 Leute.">
+<meta name="spielhalle-genre" content="Party, Quiz">
+<meta name="spielhalle-symbol" content="🔔">
+<meta name="spielhalle-farbe" content="#ffb81f">
+<meta name="spielhalle-steuerung" content="Eigene Buzzer-Taste = Buzzern; 1–4 = Antwort wählen; Enter = Weiter; Esc = Pause">
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+  :root{ --qgold:#ffc83d; --qgold2:#ff9d00; --qblue:#2b6bff; --qcyan:#5fd8ff; --qbd:rgba(130,165,255,.3); }
+  html,body{height:100%}
+  body{display:flex;flex-direction:column;overflow:hidden;color:#fff;
+    background:#03051a radial-gradient(1500px 900px at 50% -20%,#26339a 0%,#0d1458 38%,#050826 72%,#02030f 100%)}
+  body::before{content:'';position:fixed;inset:-10% -10% 0;pointer-events:none;z-index:0;transform-origin:50% 0;
+    background:conic-gradient(from 148deg at 16% 0%,transparent 0deg,rgba(130,175,255,.14) 7deg,transparent 15deg),
+               conic-gradient(from 197deg at 84% 0%,transparent 0deg,rgba(255,205,100,.11) 8deg,transparent 16deg),
+               conic-gradient(from 172deg at 50% -5%,transparent 0deg,rgba(150,120,255,.08) 8deg,transparent 16deg);
+    animation:beams 13s ease-in-out infinite alternate}
+  body::after{content:'';position:fixed;left:-10%;right:-10%;bottom:-32vh;height:62vh;pointer-events:none;z-index:0;
+    background:radial-gradient(closest-side,rgba(60,110,255,.25),transparent)}
+  body.finale{background:#0d0700 radial-gradient(1500px 900px at 50% -20%,#7a4a00 0%,#3a2200 38%,#140a00 72%,#060300 100%)}
+  body.finale::after{background:radial-gradient(closest-side,rgba(255,180,40,.25),transparent)}
+  @keyframes beams{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+  #app{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column}
+  .scr{display:none;flex:1;min-height:0}
+  .scr.on{display:flex;animation:scrIn .4s var(--ease) backwards}
+  @keyframes scrIn{from{opacity:0;transform:translateY(10px)}}
+  kbd{font-family:var(--font)}
+  .grow{flex:1}
+  .av{font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif}
+
+  /* ---------- Großer Knopf ---------- */
+  .bigbtn{display:inline-flex;align-items:center;justify-content:center;gap:14px;height:72px;padding:0 42px;border-radius:999px;border:0;cursor:pointer;
+    font:800 28px var(--font-display);letter-spacing:.5px;color:#2a1700;white-space:nowrap;
+    background:linear-gradient(180deg,#fff0a8,#ffc83d 45%,#ff9d00);box-shadow:0 7px 0 #a65d00,0 16px 40px rgba(255,170,30,.45),inset 0 2px 0 rgba(255,255,255,.6);transition:transform .1s,filter .15s,box-shadow .1s}
+  .bigbtn:hover{filter:brightness(1.07)}
+  .bigbtn:active{transform:translateY(4px);box-shadow:0 3px 0 #a65d00,0 10px 26px rgba(255,170,30,.4),inset 0 2px 0 rgba(255,255,255,.6)}
+  .bigbtn:disabled{filter:grayscale(.85) brightness(.6);cursor:not-allowed;transform:none}
+  .bigbtn kbd,.h-btn kbd{font-size:14px;font-weight:800;padding:3px 8px;border-radius:7px;background:rgba(0,0,0,.18);border:1px solid rgba(0,0,0,.2);border-bottom-width:3px;color:inherit}
+  .h-btn.xl{height:60px;padding:0 28px;font-size:21px;border-radius:999px;background:rgba(14,20,70,.8);border:2px solid var(--qbd)}
+  .h-btn.xl:hover{background:rgba(30,42,120,.9);border-color:rgba(255,255,255,.4)}
+  .h-btn.xl kbd{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)}
+
+  /* =================== LOBBY =================== */
+  #lobby{overflow:auto}
+  .lb{width:min(1560px,100%);margin:auto;padding:16px 28px 22px;display:flex;flex-direction:column;gap:16px}
+  .lb-head{display:flex;align-items:center;gap:34px;flex-wrap:wrap;padding:8px 6px 0 12px}
+  .logo{position:relative;display:flex;align-items:center;gap:14px;padding:8px 30px 10px 20px;border-radius:22px;background:linear-gradient(180deg,#26157e,#0d0838);
+    box-shadow:0 0 0 4px #ffc83d,0 0 0 9px #2a1a6e,0 0 50px rgba(255,190,40,.35);outline:4px dotted #fff3c4;outline-offset:11px;animation:bulbs 1s steps(1) infinite;margin:12px}
+  @keyframes bulbs{50%{outline-color:#ffae00}}
+  .lg-bell{font-size:clamp(38px,4.2vw,62px);display:inline-block;animation:bell 2.6s ease-in-out infinite;transform-origin:50% 12%}
+  @keyframes bell{0%,60%,100%{transform:rotate(0)}66%{transform:rotate(16deg)}72%{transform:rotate(-14deg)}78%{transform:rotate(10deg)}84%{transform:rotate(-6deg)}}
+  .lg-t{font:900 clamp(40px,4.8vw,76px)/1 var(--font-display);letter-spacing:2px;background:linear-gradient(180deg,#fff8d6,#ffd34d 45%,#ff9d00);
+    -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #7a3d00) drop-shadow(0 0 18px rgba(255,190,40,.35))}
+  .lb-lead{flex:1;min-width:300px;font-size:22px;line-height:1.45;color:#d9e0fb;margin:0}
+  .lb-lead b{color:var(--qgold)}
+  .lb-grid{display:grid;grid-template-columns:1.12fr 1fr;gap:18px;align-items:start}
+  .col-r{display:flex;flex-direction:column;gap:16px}
+  .panel{background:linear-gradient(180deg,rgba(24,32,104,.74),rgba(10,14,54,.8));border:1px solid var(--qbd);border-radius:24px;padding:16px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .ph{display:flex;align-items:baseline;gap:12px}
+  .ph h2{margin:0;font:700 25px var(--font-display);letter-spacing:.3px}
+  .ph .cnt{margin-left:auto;font:800 20px var(--font-display);color:var(--qgold)}
+  .sub{margin:4px 0 0;font-size:18px;color:#aeb8e6;line-height:1.35}
+  .chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin:14px 0 12px}
+  .chip{position:relative;display:flex;align-items:center;gap:6px;padding:5px;border-radius:999px;border:3px solid var(--pc);
+    background:color-mix(in srgb,var(--pc) 24%,rgba(8,12,40,.85));box-shadow:0 0 18px color-mix(in srgb,var(--pc) 32%,transparent);transition:opacity .2s,box-shadow .2s,transform .15s}
+  .chip .c-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;background:none;border:0;cursor:pointer;padding:0 4px 0 0;text-align:left;color:#fff}
+  .chip .av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--pc);font-size:27px;flex:none;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  .chip .nm{font:700 22px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip .gst{flex:none;font:800 11px var(--font);letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.15);color:#e6eaff}
+  .chip .c-key{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:72px;height:48px;padding:0 10px;border-radius:999px;
+    border:2px solid rgba(255,255,255,.28);background:rgba(0,0,0,.38);cursor:pointer;color:#fff;transition:.15s}
+  .chip .c-key:hover{border-color:#fff;background:rgba(0,0,0,.55)}
+  .chip .c-key kbd{font:800 22px/1 var(--font-display);background:none;border:0;padding:0;color:#fff}
+  .chip .c-ed{font:700 10px/1 var(--font);color:#c9d2ff;letter-spacing:.8px;text-transform:uppercase}
+  .chip .cap-t{font:800 13px/1.1 var(--font);color:#2a1a00;text-align:center}
+  .chip.cap .c-key{background:var(--qgold);border-color:#fff;animation:capPulse .7s infinite alternate}
+  @keyframes capPulse{to{box-shadow:0 0 0 6px rgba(255,200,61,.35)}}
+  .chip .c-off{flex:none;font:700 15px var(--font);color:#aab3dd;padding:0 12px}
+  .chip .c-x{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.1);color:#fff;font-size:16px;cursor:pointer;margin-right:4px}
+  .chip .c-x:hover{background:rgba(255,80,100,.5)}
+  .chip.out{border-style:dashed;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.03);box-shadow:none;opacity:.62}
+  .chip.out .av{filter:grayscale(1);opacity:.7}
+  .chip.out .nm{text-decoration:line-through;color:#c3c9e6}
+  .chip.ping{animation:ping .45s var(--ease)}
+  @keyframes ping{40%{transform:scale(1.06);box-shadow:0 0 0 6px var(--pc),0 0 40px var(--pc)}}
+  .guest{display:flex;gap:10px}
+  .guest .h-input{flex:1;height:50px;font-size:20px;border-radius:14px;background:rgba(5,8,32,.7);border:2px solid var(--qbd)}
+  .guest .h-btn{height:50px;padding:0 22px;font-size:19px;border-radius:14px;background:rgba(20,30,100,.85);border:2px solid var(--qbd)}
+  .hint{margin-top:12px;font-size:20px;line-height:1.4;color:#cfd7fb;min-height:28px}
+  .hint.warn{color:#ffd27a}
+  .hint .bell{display:inline-block;animation:bell 2.6s ease-in-out infinite}
+  .set{display:flex;align-items:center;gap:14px;margin-top:11px;flex-wrap:wrap}
+  .set > label{min-width:150px;font:700 20px var(--font);color:#dfe5ff}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{height:46px;min-width:62px;padding:0 15px;border-radius:12px;border:2px solid rgba(140,170,255,.3);background:rgba(8,12,44,.6);color:#dfe5ff;font:700 19px var(--font);cursor:pointer;transition:.15s}
+  .seg button:hover{border-color:rgba(255,255,255,.6);color:#fff}
+  .seg button.on{background:linear-gradient(180deg,#ffe07a,#ffb300);border-color:transparent;color:#2a1a00;box-shadow:0 5px 16px rgba(255,190,40,.35)}
+  .pool{font-size:17px;color:#aeb8e6}
+  .pool.warn{color:#ffd27a}
+  .cats{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .cat{display:flex;align-items:center;gap:7px;height:44px;padding:0 12px 0 8px;border-radius:999px;border:2px solid color-mix(in srgb,var(--cc) 45%,transparent);
+    background:rgba(8,12,44,.55);color:#c8d0f2;font:700 18px var(--font);cursor:pointer;transition:.15s;opacity:.55}
+  .cat .ce{font-size:22px}
+  .cat .cn{font:700 12px var(--font);padding:2px 6px;border-radius:999px;background:rgba(0,0,0,.3);color:#cdd5f7}
+  .cat.on{background:color-mix(in srgb,var(--cc) 30%,#0a0f3a);border-color:var(--cc);color:#fff;opacity:1}
+  .cat:hover{opacity:1}
+  .cat.all{--cc:#ffffff;opacity:.85;padding:0 16px}
+  .start-row{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap}
+  .start-row small{font-size:18px;color:#aeb8e6}
+  @media (max-width:1050px){ .lb-grid{grid-template-columns:1fr} }
+
+  /* =================== SPIEL =================== */
+  #game{flex-direction:column;position:relative;padding:12px 22px 14px;gap:clamp(8px,1.5vh,14px);overflow:hidden}
+  .g-top{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:9px;height:46px;padding:0 20px;border-radius:999px;background:rgba(10,16,60,.78);border:2px solid var(--qbd);font:600 21px var(--font-display);letter-spacing:.4px;white-space:nowrap}
+  .pill b{color:var(--qgold);font-weight:800}
+  .pill.catp{border-color:var(--cc,#fff);background:color-mix(in srgb,var(--cc,#334) 24%,#0a0f3a)}
+  .pill .ce{font-size:24px}
+  body.finale .pill.num{border-color:var(--qgold);color:var(--qgold);font-weight:800}
+  .diff{display:flex;align-items:center;gap:6px;font-size:16px;color:#b8c2ee;font-weight:700}
+  .diff i{width:13px;height:13px;border-radius:50%;background:rgba(255,255,255,.18)}
+  .diff i.on{background:var(--qgold);box-shadow:0 0 8px var(--qgold)}
+  .diff span{margin-left:4px}
+  #pauseBtn{height:46px;font-size:17px;color:#cdd5f7}
+  #pauseBtn kbd{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)}
+  .value{display:flex;align-items:center;gap:10px;height:56px;padding:0 20px 0 14px;border-radius:999px;background:linear-gradient(180deg,#2a1c00,#120c00);border:2px solid var(--qgold);box-shadow:0 0 24px rgba(255,200,61,.3)}
+  .value .ico{width:28px;height:28px;color:var(--qgold)}
+  .value small{display:block;font:800 12px/1 var(--font);letter-spacing:1.5px;text-transform:uppercase;color:#ffe3a0}
+  .value b{display:block;font:800 32px/1 var(--font-display);color:var(--qgold);font-variant-numeric:tabular-nums;min-width:3ch}
+  .value .x2{display:none;font:900 20px var(--font-display);color:#2a1700;background:var(--qgold);border-radius:999px;padding:3px 9px}
+  body.finale .value .x2{display:inline-block}
+  .value.tick b{animation:valTick .3s}
+  @keyframes valTick{40%{transform:scale(1.15)}}
+
+  .qcard{flex:1 1 auto;min-height:110px;display:flex;align-items:center;justify-content:center;padding:14px 44px;border-radius:30px;position:relative;
+    background:linear-gradient(180deg,rgba(30,42,135,.86),rgba(10,15,62,.92)) padding-box,linear-gradient(120deg,#5fd8ff,#2b6bff 42%,#ffc83d) border-box;border:3px solid transparent;
+    box-shadow:0 0 60px rgba(60,110,255,.25),inset 0 0 70px rgba(0,0,0,.3)}
+  body.finale .qcard{background:linear-gradient(180deg,rgba(90,56,0,.9),rgba(30,18,0,.94)) padding-box,linear-gradient(120deg,#fff1b0,#ffb300 50%,#ff7a00) border-box;box-shadow:0 0 80px rgba(255,170,30,.3)}
+  .qtext{font:600 clamp(28px,2.5vw + 1.7vh,66px)/1.2 var(--font-display);text-align:center;text-wrap:balance;letter-spacing:.2px;text-shadow:0 3px 14px rgba(0,0,0,.45);max-width:1500px}
+  .qtext.long{font-size:clamp(25px,2.1vw + 1.4vh,56px)}
+  .qtext.in{animation:qIn .55s var(--ease) backwards}
+  @keyframes qIn{from{opacity:0;transform:translateY(14px) scale(.97)}}
+  .qtext.idle{color:#c8d1f7}
+
+  .status{flex:none;height:clamp(78px,11.5vh,112px);display:flex;align-items:center;gap:18px;padding:0 6px}
+  .st-l{display:flex;align-items:center;gap:14px;flex:none}
+  .st-ic{font-size:clamp(34px,5vh,48px);font-family:'Segoe UI Emoji',sans-serif;display:inline-block}
+  .status.open .st-ic{animation:bell 1.3s ease-in-out infinite}
+  .st-l b{display:block;font:800 clamp(26px,2.2vw,40px)/1.05 var(--font-display);letter-spacing:.4px}
+  .st-l small{display:block;font-size:20px;color:#c7d0f5;margin-top:3px}
+  .status.open .st-l b{color:var(--qgold);animation:blink .65s ease-in-out infinite alternate}
+  @keyframes blink{to{opacity:.55}}
+  .tbar{flex:1;min-width:120px;height:18px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,.4)}
+  .tbar i{display:block;height:100%;width:100%;transform-origin:left center;transform:scaleX(0);background:linear-gradient(90deg,#5fd8ff,#2b6bff);border-radius:inherit}
+  .status.open .tbar i{background:linear-gradient(90deg,#ffe07a,#ff9d00)}
+  .status.hurry .tbar i{background:linear-gradient(90deg,#ff9aa4,#ff3b4f)}
+  .status.reveal .tbar{height:10px}
+  .st-p{display:flex;align-items:center;gap:20px;margin:0 auto;padding:5px 30px 5px 6px;border-radius:999px;max-width:100%;
+    background:color-mix(in srgb,var(--pc) 30%,rgba(6,10,40,.92));border:3px solid var(--pc);box-shadow:0 0 44px color-mix(in srgb,var(--pc) 55%,transparent);animation:pIn .4s var(--ease) backwards}
+  @keyframes pIn{from{opacity:0;transform:scale(.85)}}
+  .ring{position:relative;width:clamp(64px,9.4vh,98px);aspect-ratio:1;flex:none}
+  .ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .ring circle{fill:none;stroke-width:8}
+  .ring .bg{stroke:rgba(255,255,255,.16)}
+  .ring .fg{stroke:#fff;stroke-linecap:round;stroke-dasharray:282.74;stroke-dashoffset:0}
+  .ring .av{position:absolute;inset:13%;border-radius:50%;background:var(--pc);display:grid;place-items:center;font-size:clamp(28px,4.4vh,46px);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  .st-pn{min-width:0}
+  .st-pn b{display:block;font:800 clamp(30px,3vw,54px)/1 var(--font-display);text-shadow:0 0 22px var(--pc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .st-pn small{display:block;font-size:20px;color:#e6ebff;margin-top:4px}
+  .st-pn kbd{font-size:16px;font-weight:800;padding:1px 7px;color:#fff;background:rgba(0,0,0,.3);border-color:rgba(255,255,255,.3)}
+  .secs{font:800 clamp(38px,4vw,62px)/1 var(--font-display);min-width:1.3em;text-align:center;font-variant-numeric:tabular-nums}
+  .secs.low{color:#ff8a95;animation:blink .4s infinite alternate}
+  .st-res{display:flex;align-items:center;gap:16px;flex:none;max-width:62%;padding:6px 28px 6px 6px;border-radius:999px;animation:pIn .4s var(--ease) backwards}
+  .st-res.good{background:linear-gradient(90deg,rgba(40,200,120,.42),rgba(40,200,120,.12));border:3px solid #4be39a}
+  .st-res.bad{background:linear-gradient(90deg,rgba(255,70,90,.42),rgba(255,70,90,.1));border:3px solid #ff5d6c}
+  .st-res.none{background:rgba(255,255,255,.08);border:3px solid rgba(255,255,255,.32)}
+  .st-res .av{width:clamp(54px,8vh,74px);height:clamp(54px,8vh,74px);border-radius:50%;display:grid;place-items:center;background:var(--pc,#3a4170);font-size:clamp(28px,4.4vh,42px);flex:none;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  .st-res b{display:block;font:800 clamp(26px,2.4vw,42px)/1.05 var(--font-display)}
+  .st-res small{display:block;font-size:20px;color:#eef1ff;margin-top:4px}
+  .st-res small em{font-style:normal;font-weight:800;color:#7dffb5}
+  .status .h-btn.xl{flex:none}
+
+  .answers{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,1.4vh,16px) 26px}
+  .ans{--bd:linear-gradient(90deg,#3d7bff,#a8dcff 50%,#3d7bff);--in:linear-gradient(180deg,#1c2b8a,#0b1250);
+    position:relative;display:flex;align-items:center;gap:14px;min-height:clamp(62px,10.2vh,104px);padding:6px 46px 6px 32px;border:0;background:var(--bd);color:#fff;text-align:left;
+    cursor:default;font:inherit;clip-path:polygon(28px 0,calc(100% - 28px) 0,100% 50%,calc(100% - 28px) 100%,28px 100%,0 50%);transition:opacity .3s}
+  .ans::before{content:'';position:absolute;inset:3px;background:var(--in);clip-path:polygon(26px 0,calc(100% - 26px) 0,100% 50%,calc(100% - 26px) 100%,26px 100%,0 50%)}
+  .ans > *{position:relative}
+  .ans .lt{flex:none;width:clamp(40px,5.6vh,56px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font:800 clamp(20px,2.9vh,29px)/1 var(--font-display);color:#2a1a00;
+    background:linear-gradient(180deg,#ffe58f,#ffb300);box-shadow:0 3px 0 #9c6200}
+  .ans .tx{flex:1;min-width:0;font:600 clamp(20px,1.5vw + .9vh,40px)/1.15 var(--font)}
+  .ans .tx.long{font-size:clamp(18px,1.15vw + .8vh,32px)}
+  .ans .nk{flex:none;font:800 17px/1 var(--font);padding:5px 10px;border-radius:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-bottom-width:3px;color:#dfe6ff;opacity:.45;transition:.2s}
+  .ans.hid{--bd:linear-gradient(90deg,rgba(90,120,255,.35),rgba(140,180,255,.45),rgba(90,120,255,.35));--in:linear-gradient(180deg,rgba(20,30,100,.7),rgba(10,15,60,.7))}
+  .ans.hid .tx,.ans.hid .nk{opacity:0}
+  .ans.hid .lt{filter:grayscale(.7) brightness(.6)}
+  .ans.show{animation:ansIn .45s var(--ease) backwards}
+  @keyframes ansIn{from{opacity:0;transform:translateX(-24px) scale(.95)}}
+  .ans:nth-child(even).show{animation-name:ansInR}
+  @keyframes ansInR{from{opacity:0;transform:translateX(24px) scale(.95)}}
+  .answers.sel .ans:not(.gone){cursor:pointer}
+  .answers.sel .ans:not(.gone):hover{--in:linear-gradient(180deg,#2c40c4,#152284)}
+  .answers.sel .ans:not(.gone) .nk{opacity:1;background:var(--qgold);color:#2a1a00;border-color:#9c6200}
+  .ans.pick{--bd:linear-gradient(90deg,#fff1b0,#ffb300,#fff1b0);--in:linear-gradient(180deg,#ffb52e,#d97a00);animation:pickPulse .5s ease-in-out infinite alternate}
+  .ans.pick .tx{color:#1d1000}
+  @keyframes pickPulse{to{filter:brightness(1.2)}}
+  .ans.right{--bd:linear-gradient(90deg,#d4ffe8,#3fe08f,#d4ffe8);--in:linear-gradient(180deg,#27c476,#0d7642);animation:rightBlink .38s ease-in-out 5 alternate}
+  @keyframes rightBlink{to{filter:brightness(1.45)}}
+  .ans.wrong{--bd:linear-gradient(90deg,#ffc2c8,#ff4d5e,#ffc2c8);--in:linear-gradient(180deg,#d8303f,#7d0f1b)}
+  .ans.gone{opacity:.45}
+  .ans.gone .tx{text-decoration:line-through}
+  .ans.dim{opacity:.36}
+
+  .board{flex:none;display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:10px;padding-top:6px}
+  .pc{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;row-gap:3px;align-items:center;
+    padding:7px 12px 7px 7px;border-radius:18px;cursor:pointer;user-select:none;
+    background:linear-gradient(180deg,color-mix(in srgb,var(--pc) 28%,#0b103e),rgba(8,11,40,.92));border:2px solid color-mix(in srgb,var(--pc) 65%,transparent);
+    transition:transform .25s var(--ease),opacity .25s,box-shadow .25s,filter .25s}
+  .pc .av{grid-row:1/3;width:clamp(40px,6.2vh,58px);aspect-ratio:1;border-radius:50%;background:var(--pc);display:grid;place-items:center;font-size:clamp(23px,3.6vh,34px);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  .pc .pn{min-width:0;font:700 clamp(17px,1.25vw,22px)/1.1 var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pc .pr{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+  .pc .kb{flex:none;font:800 16px/1 var(--font-display);padding:4px 8px;min-width:28px;text-align:center;border-radius:7px;background:#fff;color:#111;border:0;border-bottom:3px solid #aab2cc}
+  .pc .ps{font:800 clamp(22px,1.9vw,34px)/1 var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pc .ps.neg{color:#ff8a95}
+  .pc .crown{position:absolute;left:-4px;top:-16px;font-size:24px;transform:rotate(-18deg);display:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+  .pc.lead .crown{display:block}
+  .pc .lk{position:absolute;right:8px;top:5px;font-size:17px;display:none}
+  .pc.locked{opacity:.38;filter:grayscale(.7)}
+  .pc.locked .lk{display:block}
+  .pc .tag{position:absolute;right:6px;top:-13px;background:#ff5d6c;color:#fff;font:800 12px var(--font);letter-spacing:.8px;padding:3px 8px;border-radius:999px;display:none}
+  .pc.early{animation:shake .4s}
+  .pc.early .tag{display:block}
+  .pc.nope{animation:shake .3s}
+  @keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+  .pc.act{transform:translateY(-8px) scale(1.05);border-color:#fff;box-shadow:0 0 0 3px var(--pc),0 0 36px var(--pc);z-index:2}
+  .pc.act.bad{border-color:#ff5d6c;box-shadow:0 0 0 3px #ff5d6c,0 0 36px #ff5d6c}
+  .pc.won{border-color:#7dffb5;box-shadow:0 0 0 3px #3fe08f,0 0 36px rgba(63,224,143,.7);animation:wonPop .6s var(--ease)}
+  @keyframes wonPop{40%{transform:translateY(-10px) scale(1.07)}}
+  .fl{position:absolute;left:50%;top:-8px;font:800 34px var(--font-display);color:#5ff0a6;text-shadow:0 2px 12px rgba(0,0,0,.7);animation:floatUp 1.5s ease-out forwards;pointer-events:none;white-space:nowrap;z-index:3}
+  .fl.bad{color:#ff6b7a}
+  @keyframes floatUp{from{transform:translate(-50%,10px) scale(.6);opacity:0}20%{transform:translate(-50%,-14px) scale(1.1);opacity:1}to{transform:translate(-50%,-60px) scale(1);opacity:0}}
+
+  .splash{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(3,5,22,.8);backdrop-filter:blur(8px);
+    opacity:0;pointer-events:none;transition:opacity .25s}
+  .splash.on{opacity:1;pointer-events:auto}
+  .sp-box{width:min(1180px,100%);max-height:100%;overflow:auto;text-align:center;padding:24px 30px 26px;border-radius:30px;background:linear-gradient(180deg,#1b2580,#0a0f3e);
+    border:2px solid var(--qbd);box-shadow:0 30px 90px rgba(0,0,0,.6);animation:popIn .45s var(--ease) backwards}
+  @keyframes popIn{from{opacity:0;transform:scale(.9)}}
+  .sp-tag{font:800 17px var(--font);letter-spacing:3px;color:var(--qgold)}
+  .sp-box h2{margin:6px 0 4px;font:800 clamp(34px,3.8vw,60px)/1.08 var(--font-display)}
+  .sp-box p{font-size:22px;color:#d3dbff;margin:6px auto 12px;max-width:900px;line-height:1.4}
+  .sp-box p b{color:var(--qgold)}
+  .ck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0 20px}
+  .ck{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 10px;border-radius:22px;border:3px solid color-mix(in srgb,var(--pc) 45%,transparent);
+    background:rgba(6,10,40,.6);cursor:pointer;transition:transform .2s var(--ease),background .2s,box-shadow .2s,border-color .2s}
+  .ck .av{width:62px;height:62px;border-radius:50%;background:var(--pc);display:grid;place-items:center;font-size:36px;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+  .ck b{font:700 22px var(--font);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ck kbd{font:800 36px/1 var(--font-display);padding:8px 18px;min-width:70px;border-radius:14px;background:#fff;color:#111;border:0;border-bottom:6px solid #aab2cc}
+  .ck .ok{font:800 15px var(--font);letter-spacing:1.5px;color:#9aa6d8}
+  .ck.ready{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 32%,#0a0f3a);box-shadow:0 0 30px color-mix(in srgb,var(--pc) 50%,transparent);transform:scale(1.04)}
+  .ck.ready .ok{color:#7dffb5}
+  .sp-box.fin{background:linear-gradient(180deg,#4a3000,#160d00);border-color:#ffc83d;box-shadow:0 0 90px rgba(255,190,40,.35)}
+  .sp-box.fin h2{background:linear-gradient(180deg,#fff8d6,#ffd34d 50%,#ff9d00);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .fin-st{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:8px 0 16px}
+  .fin-st div{display:flex;align-items:center;gap:10px;padding:6px 18px 6px 6px;border-radius:999px;background:rgba(0,0,0,.35);border:2px solid var(--pc);font:700 21px var(--font)}
+  .fin-st .av{width:40px;height:40px;border-radius:50%;background:var(--pc);display:grid;place-items:center;font-size:24px}
+  .fin-st span:last-child{font-family:var(--font-display);color:var(--qgold)}
+  .sp-box .tbar{max-width:520px;margin:0 auto 18px;height:10px}
+  .sp-box.fin .tbar i{background:linear-gradient(90deg,#ffe07a,#ff9d00)}
+
+  /* =================== PAUSE =================== */
+  .pause{position:fixed;inset:0;z-index:700;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,5,20,.82);backdrop-filter:blur(8px)}
+  .pause.on{display:flex}
+  .pbox{width:min(760px,100%);text-align:center;padding:28px;border-radius:30px;background:linear-gradient(180deg,#1b2580,#0a0f3e);border:2px solid var(--qbd);box-shadow:0 30px 90px rgba(0,0,0,.6);animation:popIn .3s var(--ease) backwards}
+  .pbox h2{margin:6px 0 4px;font:800 48px var(--font-display)}
+  .pbox p{font-size:22px;color:#d3dbff;margin:4px 0 20px}
+  .prow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+
+  /* =================== ENDE =================== */
+  #end{overflow:auto}
+  .end{width:min(1560px,100%);margin:auto;padding:14px 28px 22px;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .end-tag{font:800 17px var(--font);letter-spacing:3px;color:var(--qgold)}
+  .end h1{margin:0;font:800 clamp(32px,3.5vw,60px)/1.08 var(--font-display);text-align:center;text-shadow:0 0 30px rgba(255,200,61,.35)}
+  .end-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:28px;width:100%;align-items:center;margin-top:6px}
+  .podium{display:flex;align-items:flex-end;justify-content:center;gap:14px;min-height:clamp(240px,42vh,400px)}
+  .pp{display:flex;flex-direction:column;align-items:center;gap:6px;width:min(210px,31%)}
+  .pp .top{display:flex;flex-direction:column;align-items:center;gap:4px;animation:popIn .5s var(--ease) backwards;max-width:100%}
+  .pp .av{width:clamp(66px,11vh,104px);aspect-ratio:1;border-radius:50%;background:var(--pc);display:grid;place-items:center;font-size:clamp(38px,6.4vh,62px);
+    box-shadow:0 0 0 5px rgba(255,255,255,.14),0 0 46px var(--pc),inset 0 -6px 0 rgba(0,0,0,.25)}
+  .pp.r1 .av{width:clamp(80px,13vh,124px);font-size:clamp(46px,7.6vh,74px)}
+  .pp b{font:800 clamp(22px,1.8vw,30px) var(--font-display);text-shadow:0 0 18px var(--pc);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pp .pts{font:800 clamp(20px,1.6vw,28px) var(--font-display);color:var(--qgold)}
+  .pp .blk{width:100%;border-radius:16px 16px 0 0;background:linear-gradient(180deg,var(--pc),color-mix(in srgb,var(--pc) 25%,#000));display:flex;justify-content:center;
+    padding-top:10px;font:800 46px var(--font-display);transform-origin:bottom;animation:rise .8s var(--ease) backwards;box-shadow:inset 0 2px 0 rgba(255,255,255,.3)}
+  .pp.r1 .blk{height:clamp(100px,19vh,190px)} .pp.r2 .blk{height:clamp(72px,13vh,130px)} .pp.r3 .blk{height:clamp(50px,9vh,90px)}
+  @keyframes rise{from{transform:scaleY(0)}}
+  .rank{display:flex;flex-direction:column;gap:7px;width:100%}
+  .rk{display:grid;grid-template-columns:46px 46px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:6px 18px 6px 10px;border-radius:16px;background:rgba(10,15,58,.8);
+    border-left:6px solid var(--pc);animation:slideIn .45s var(--ease) backwards}
+  @keyframes slideIn{from{opacity:0;transform:translateX(30px)}}
+  .rk .n{font:800 26px var(--font-display);color:var(--qgold);text-align:center}
+  .rk .av{width:44px;height:44px;border-radius:50%;background:var(--pc);display:grid;place-items:center;font-size:26px}
+  .rk b{font:700 22px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rk .st{font-size:18px;color:#b9c3ee;white-space:nowrap}
+  .rk .p{font:800 30px var(--font-display);font-variant-numeric:tabular-nums;min-width:3.4ch;text-align:right}
+  .rk .p.neg{color:#ff8a95}
+  .awards{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px}
+  .aw{display:flex;align-items:center;gap:10px;padding:8px 18px;border-radius:999px;background:rgba(255,200,61,.12);border:2px solid rgba(255,200,61,.45);font-size:20px}
+  .aw b{color:var(--qgold)}
+  .end-btns{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:10px}
+
+  #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:650}
+
+  @media (max-width:860px){
+    #game{overflow:auto}
+    .answers{grid-template-columns:1fr}
+    .board{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .end-grid{grid-template-columns:1fr}
+    .qcard{min-height:150px;padding:14px 22px}
+    .value{margin-left:0}
+    .st-res{max-width:100%}
+    .status{height:auto;min-height:80px;flex-wrap:wrap;padding:6px}
+  }
+</style>
+</head>
+<body>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<script src="shared/catalog5.js"></script>
+
+<div id="app">
+  <!-- ======================= LOBBY ======================= -->
+  <section id="lobby" class="scr on">
+    <div class="lb">
+      <header class="lb-head">
+        <div class="logo"><span class="lg-bell av">🔔</span><span class="lg-t">QUIZ-SHOW</span></div>
+        <p class="lb-lead">Frage lesen, Antwort wissen, <b>Buzzer hauen!</b> Wer zuerst seine Taste drückt, darf antworten – schnell sein bringt mehr Punkte, falsche Antworten kosten welche.</p>
+      </header>
+      <div class="lb-grid">
+        <div class="panel">
+          <div class="ph"><h2>Wer spielt mit?</h2><span class="cnt" id="plCount"></span></div>
+          <p class="sub">Namen antippen = aussetzen oder wieder mitspielen · Taste antippen = eigene Buzzer-Taste wählen</p>
+          <div class="chips" id="chips"></div>
+          <div class="guest"><input id="guestName" class="h-input" maxlength="14" placeholder="Name für einen Gast …" autocomplete="off" spellcheck="false"><button class="h-btn" id="guestAdd">+ Gast</button></div>
+          <div class="hint" id="lbHint"></div>
+        </div>
+        <div class="col-r">
+          <div class="panel">
+            <div class="ph"><h2>Einstellungen</h2></div>
+            <div class="set"><label>Fragen</label><div class="seg" id="segN"></div></div>
+            <div class="set"><label>Antwortzeit</label><div class="seg" id="segT"></div></div>
+            <div class="set"><label>Schwierigkeit</label><div class="seg" id="segD"></div></div>
+            <div class="set"><label>Finale</label><div class="seg" id="segF"></div></div>
+            <div class="set"><label>Kategorien</label><span class="pool" id="pool"></span></div>
+            <div class="cats" id="cats"></div>
+          </div>
+          <div class="start-row"><button class="bigbtn" id="startBtn">▶ Show starten <kbd>Enter</kbd></button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= SPIEL ======================= -->
+  <section id="game" class="scr">
+    <div class="g-top">
+      <div class="pill num" id="gNum"></div>
+      <div class="pill catp" id="gCat"></div>
+      <div class="diff" id="gDiff"></div>
+      <div class="grow"></div>
+      <button class="h-btn ghost" id="pauseBtn">⏸ Pause <kbd>Esc</kbd></button>
+      <div class="value" id="gVal"><span id="gCoin"></span><div><small>Wert</small><b id="gValN">200</b></div><span class="x2">×2</span></div>
+    </div>
+    <div class="qcard"><div class="qtext" id="qText"></div></div>
+    <div class="status" id="status"></div>
+    <div class="answers" id="answers">
+      <button class="ans hid" data-k="0"><span class="lt">A</span><span class="tx"></span><kbd class="nk">1</kbd></button>
+      <button class="ans hid" data-k="1"><span class="lt">B</span><span class="tx"></span><kbd class="nk">2</kbd></button>
+      <button class="ans hid" data-k="2"><span class="lt">C</span><span class="tx"></span><kbd class="nk">3</kbd></button>
+      <button class="ans hid" data-k="3"><span class="lt">D</span><span class="tx"></span><kbd class="nk">4</kbd></button>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="splash" id="splash"></div>
+  </section>
+
+  <!-- ======================= ENDE ======================= -->
+  <section id="end" class="scr">
+    <div class="end">
+      <div class="end-tag">🏆 SIEGEREHRUNG</div>
+      <h1 id="endTitle"></h1>
+      <div class="end-grid"><div class="podium" id="podium"></div><div class="rank" id="rankList"></div></div>
+      <div class="awards" id="awards"></div>
+      <div class="end-btns">
+        <button class="bigbtn" id="againBtn">↻ Nochmal <kbd>Enter</kbd></button>
+        <button class="h-btn xl" id="setBtn">Spieler &amp; Einstellungen</button>
+        <button class="h-btn xl" id="homeBtn">Zur Spielhalle</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="pause" id="pause">
+  <div class="pbox">
+    <div class="sp-tag">⏸ PAUSE</div>
+    <h2>Kurze Werbepause</h2>
+    <p>Die Zeit ist angehalten – weiter geht’s, wenn alle bereit sind.</p>
+    <button class="bigbtn" data-p="go">▶ Weiter <kbd>Enter</kbd></button>
+    <div class="prow">
+      <button class="h-btn xl" data-p="skip">Frage überspringen</button>
+      <button class="h-btn xl" data-p="end">Show beenden</button>
+      <button class="h-btn xl" data-p="lobby">Zur Lobby</button>
+    </div>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+'use strict';
+/* =====================================================================
+   Quiz-Show – Buzzer-Quiz für 2 bis 8 Leute an einer Tastatur
+   ===================================================================== */
+Hub.init('quiz');
+const bar = Hub.bar({id:'quiz', title:'Quiz-Show', stats:[['q', 'Frage'], ['lead', 'Führung'], ['pl', 'Spieler']], actions:['help', 'sound', 'full']});
+
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[c]);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = n => Math.round(n).toLocaleString('de-DE');
+
+// =====================================================================
+//  Fragenkatalog – Format pro Zeile: Frage|Richtig|Falsch|Falsch|Falsch|Schwierigkeit (1 leicht, 2 mittel, 3 schwer)
+// =====================================================================
+const CATS = [
+  {id:'allg',  name:'Allgemeinwissen',        short:'Allgemeinwissen', emo:'💡', col:'#ffcf3d'},
+  {id:'geo',   name:'Geografie',              short:'Geografie',       emo:'🌍', col:'#2fd08a'},
+  {id:'gesch', name:'Geschichte',             short:'Geschichte',      emo:'🏛️', col:'#e0a96d'},
+  {id:'natur', name:'Natur & Tiere',          short:'Natur & Tiere',   emo:'🦁', col:'#8bdc4a'},
+  {id:'sport', name:'Sport',                  short:'Sport',           emo:'⚽', col:'#ff7f3f'},
+  {id:'film',  name:'Film & Musik',           short:'Film & Musik',    emo:'🎬', col:'#ff5fa8'},
+  {id:'essen', name:'Essen & Trinken',        short:'Essen & Trinken', emo:'🍝', col:'#ffa94d'},
+  {id:'wiss',  name:'Wissenschaft & Technik', short:'Wissenschaft',    emo:'🔬', col:'#47c8ff'},
+  {id:'de',    name:'Deutschland',            short:'Deutschland',     emo:'🦅', col:'#ff5d6c'},
+  {id:'kids',  name:'Kinder-leicht',          short:'Kinder-leicht',   emo:'🧸', col:'#c08cff'},
+];
+const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
+
+const QDATA = {
+allg:`
+Wie viele Tage hat ein Schaltjahr?|366|365|364|360|1
+Wie viele Sekunden hat eine Stunde?|3600|360|6000|1200|1
+Wie nennt man ein Vieleck mit acht Ecken?|Oktogon|Hexagon|Pentagon|Dekagon|2
+Wie viele Felder hat ein Schachbrett?|64|49|81|100|1
+Mit wie vielen Karten wird Skat gespielt?|32|52|36|24|2
+Wie viele Karten hat ein französisches Kartenspiel ohne Joker?|52|54|48|32|2
+Was misst ein Barometer?|Den Luftdruck|Die Temperatur|Die Windstärke|Die Luftfeuchtigkeit|2
+Wie heißt eine Zahl größer als 1, die nur durch 1 und sich selbst teilbar ist?|Primzahl|Quadratzahl|Bruchzahl|Kubikzahl|1
+Welches römische Zahlzeichen steht für 50?|L|C|D|V|2
+Welche Jahreszahl ist MMXX in römischen Ziffern?|2020|2002|1020|2200|2
+Wie nennt man einen Zeitraum von 100 Jahren?|Jahrhundert|Jahrzehnt|Jahrtausend|Dekade|1
+Wie viele Monate im Jahr haben 31 Tage?|7|6|5|8|2
+Wie viele Tasten hat ein klassisches Klavier?|88|76|96|64|3
+Welches dieser Wörter ist ein Palindrom – also vorwärts wie rückwärts gleich?|Rentner|Lehrer|Bäcker|Maler|2
+Wie nennt man ein Wort mit gegenteiliger Bedeutung?|Antonym|Synonym|Homonym|Pseudonym|3
+Wie viele Buchstaben hat das deutsche Alphabet ohne Ä, Ö, Ü und ß?|26|24|28|30|1
+Welche Farbe leuchtet bei einer Verkehrsampel ganz oben?|Rot|Gelb|Grün|Blau|1
+Wie viel Grad hat ein rechter Winkel?|90 Grad|180 Grad|45 Grad|60 Grad|1
+Wann ist auf der Nordhalbkugel der längste Tag des Jahres?|Um den 21. Juni|Um den 21. März|Um den 21. Dezember|Um den 23. September|2
+Wie viele Nullen hat eine Milliarde?|9|6|12|8|2
+Welche ist die kleinste Primzahl?|2|1|3|5|2
+Wie viele Kanten hat ein Würfel?|12|8|6|10|2
+Wie viele Augen hat ein normaler Spielwürfel insgesamt?|21|18|24|36|2
+Welcher Monat hat die wenigsten Tage?|Februar|April|November|Juni|1
+Wie heißt die japanische Kunst des Papierfaltens?|Origami|Ikebana|Bonsai|Kalligrafie|2
+Wie heißt der erste Buchstabe des griechischen Alphabets?|Alpha|Beta|Omega|Delta|1
+Wie heißt der letzte Buchstabe des griechischen Alphabets?|Omega|Zeta|Ypsilon|Sigma|2
+Wie viele Stunden hat eine Woche?|168|144|172|120|3
+Wie nennt man die Angst vor Spinnen?|Arachnophobie|Klaustrophobie|Akrophobie|Agoraphobie|3
+Welcher Edelstein ist typischerweise grün?|Smaragd|Rubin|Saphir|Bernstein|2
+Wie heißt der 25. Hochzeitstag?|Silberne Hochzeit|Goldene Hochzeit|Eiserne Hochzeit|Diamantene Hochzeit|2
+Mit wie vielen Figuren beginnt jeder Spieler eine Schachpartie?|16|12|18|20|2
+Wer malte die „Mona Lisa“?|Leonardo da Vinci|Michelangelo|Raffael|Rembrandt|1
+Wer malte „Die Sternennacht“?|Vincent van Gogh|Claude Monet|Pablo Picasso|Paul Cézanne|2
+`,
+geo:`
+Was ist die Hauptstadt von Frankreich?|Paris|Lyon|Marseille|Nizza|1
+Was ist die Hauptstadt von Spanien?|Madrid|Barcelona|Sevilla|Valencia|1
+Was ist die Hauptstadt von Australien?|Canberra|Sydney|Melbourne|Perth|3
+Was ist die Hauptstadt von Kanada?|Ottawa|Toronto|Vancouver|Montreal|3
+Welcher ist der größte Ozean der Erde?|Pazifik|Atlantik|Indischer Ozean|Arktischer Ozean|1
+Auf welchem Kontinent liegt der größte Teil Ägyptens?|Afrika|Asien|Europa|Australien|1
+Welcher ist der höchste Berg der Erde?|Mount Everest|K2|Kilimandscharo|Mont Blanc|1
+Welches Land hat ungefähr die Form eines Stiefels?|Italien|Griechenland|Spanien|Portugal|1
+In welchem Land stehen die Pyramiden von Gizeh?|Ägypten|Mexiko|Peru|Sudan|1
+Welche Hauptstadt liegt an der Themse?|London|Paris|Dublin|Amsterdam|1
+Durch welche Stadt fließt die Moldau?|Prag|Wien|Budapest|Bratislava|2
+An welchem Fluss liegt Wien?|Donau|Rhein|Elbe|Moldau|2
+Welches Land ist flächenmäßig das größte der Erde?|Russland|Kanada|China|USA|1
+Welches ist der kleinste Staat der Welt?|Vatikanstadt|Monaco|San Marino|Liechtenstein|2
+Welches Meer liegt zwischen Europa und Afrika?|Mittelmeer|Rotes Meer|Schwarzes Meer|Nordsee|1
+In welchem Land liegt die Ruinenstadt Machu Picchu?|Peru|Mexiko|Chile|Bolivien|2
+Welche ist die größte heiße Wüste der Erde?|Sahara|Gobi|Kalahari|Atacama|2
+Welcher Kontinent ist der kleinste?|Australien|Europa|Antarktika|Südamerika|2
+In welchem Land liegt Marrakesch?|Marokko|Tunesien|Algerien|Ägypten|2
+Was ist die Hauptstadt von Japan?|Tokio|Kyoto|Osaka|Seoul|1
+Welcher Fluss fließt durch Paris?|Seine|Loire|Rhône|Garonne|2
+Auf welcher Insel liegt die Stadt Palma?|Mallorca|Sizilien|Kreta|Korsika|2
+Welches dieser Länder grenzt NICHT an Deutschland?|Ungarn|Polen|Dänemark|Luxemburg|2
+Welcher ist der höchste Berg Afrikas?|Kilimandscharo|Mount Kenia|Ruwenzori|Tafelberg|2
+Welche Stadt trägt den Spitznamen „Big Apple“?|New York|Los Angeles|Chicago|San Francisco|2
+Was ist die Hauptstadt von Norwegen?|Oslo|Bergen|Stockholm|Helsinki|1
+In welchem Land liegt der Kilimandscharo?|Tansania|Kenia|Uganda|Äthiopien|3
+Welche ist die größte Insel der Erde (Kontinente nicht mitgezählt)?|Grönland|Island|Neuguinea|Borneo|2
+Was ist die Hauptstadt von Portugal?|Lissabon|Porto|Faro|Coimbra|1
+Welcher Ozean liegt zwischen Europa und Amerika?|Atlantik|Pazifik|Indischer Ozean|Südpolarmeer|1
+Welches Land hat die Hauptstadt Ankara?|Türkei|Griechenland|Iran|Syrien|2
+Welche Stadt ist Sitz der Schweizer Regierung?|Bern|Zürich|Genf|Basel|2
+An der Grenze welcher zwei Länder liegt das Matterhorn?|Schweiz und Italien|Schweiz und Frankreich|Österreich und Italien|Deutschland und Österreich|3
+Welcher US-Bundesstaat ist der flächengrößte?|Alaska|Texas|Kalifornien|Montana|2
+Wie heißt die Meerenge zwischen Spanien und Marokko?|Straße von Gibraltar|Bosporus|Ärmelkanal|Straße von Messina|2
+Was ist die Hauptstadt von Griechenland?|Athen|Thessaloniki|Sparta|Korinth|1
+Welche Millionenstadt liegt auf zwei Kontinenten?|Istanbul|Kairo|Moskau|Athen|2
+In welchem Land liegt die Lagunenstadt Venedig?|Italien|Frankreich|Kroatien|Spanien|1
+`,
+gesch:`
+In welchem Jahr fiel die Berliner Mauer?|1989|1990|1987|1991|1
+Wer betrat als erster Mensch den Mond?|Neil Armstrong|Buzz Aldrin|Juri Gagarin|Michael Collins|1
+In welchem Jahr landeten zum ersten Mal Menschen auf dem Mond?|1969|1965|1972|1959|2
+Welcher Seefahrer erreichte 1492 Amerika?|Christoph Kolumbus|Vasco da Gama|Ferdinand Magellan|James Cook|1
+Wer war der erste römische Kaiser?|Augustus|Julius Caesar|Nero|Konstantin|3
+In welcher Stadt steht das Kolosseum?|Rom|Athen|Pompeji|Neapel|1
+Welches Schiff sank 1912 nach dem Zusammenstoß mit einem Eisberg?|Titanic|Lusitania|Bismarck|Queen Mary|1
+In welchem Jahr begann der Erste Weltkrieg?|1914|1918|1912|1939|2
+In welchem Jahr endete der Zweite Weltkrieg in Europa?|1945|1944|1946|1949|1
+Wer war Kleopatra?|Eine Königin von Ägypten|Eine römische Kaiserin|Eine griechische Göttin|Eine persische Prinzessin|1
+Welcher französische Herrscher wurde 1815 bei Waterloo besiegt?|Napoleon Bonaparte|Ludwig XIV.|Karl der Große|Ludwig XVI.|2
+Wer flog 1961 als erster Mensch ins Weltall?|Juri Gagarin|Neil Armstrong|John Glenn|Alan Shepard|2
+In welchem Land fanden die Olympischen Spiele der Antike statt?|Griechenland|Italien|Ägypten|Persien|1
+Wer erfand um 1450 den Buchdruck mit beweglichen Lettern in Europa?|Johannes Gutenberg|Martin Luther|Albrecht Dürer|Galileo Galilei|2
+Wer veröffentlichte 1517 die 95 Thesen?|Martin Luther|Johannes Calvin|Huldrych Zwingli|Thomas Müntzer|2
+Wie nennt man die skandinavischen Seefahrer, die im Mittelalter auf Raubzüge gingen?|Wikinger|Kelten|Hunnen|Goten|1
+Welcher US-Präsident unterzeichnete 1863 die Emanzipationsproklamation gegen die Sklaverei?|Abraham Lincoln|George Washington|Thomas Jefferson|John F. Kennedy|3
+Wer war der erste Präsident der USA?|George Washington|Abraham Lincoln|Thomas Jefferson|Benjamin Franklin|1
+Welche antike Stadt wurde im Jahr 79 n. Chr. beim Ausbruch des Vesuvs verschüttet?|Pompeji|Karthago|Troja|Sparta|2
+Welcher Pharao wurde durch sein 1922 entdecktes, fast unberührtes Grab berühmt?|Tutanchamun|Ramses II.|Cheops|Echnaton|2
+Wer startete 1519 die Expedition, der die erste Weltumsegelung gelang?|Ferdinand Magellan|Christoph Kolumbus|Vasco da Gama|Francis Drake|3
+Welcher Herrscher wurde im Jahr 800 in Rom zum Kaiser gekrönt?|Karl der Große|Otto der Große|Friedrich Barbarossa|Ludwig der Fromme|3
+Wie heißt die Epoche der „Wiedergeburt“ von Kunst und Wissenschaft im 15. und 16. Jahrhundert?|Renaissance|Barock|Romantik|Gotik|2
+In welchem Jahr begann die Französische Revolution?|1789|1776|1815|1848|2
+Welches Land schenkte den USA die Freiheitsstatue?|Frankreich|Großbritannien|Spanien|Italien|2
+Was war die Hanse?|Ein Bund von Kaufleuten und Städten|Ein Ritterorden|Ein Königreich im Norden|Eine Kirchenreform|2
+Welche Stadt wurde der Sage nach von Romulus und Remus gegründet?|Rom|Athen|Karthago|Alexandria|1
+Mit welchem Schiff segelten die Pilgerväter 1620 nach Amerika?|Mayflower|Santa María|Endeavour|Bounty|3
+Welches der sieben Weltwunder der Antike steht noch heute?|Die Cheops-Pyramide|Der Koloss von Rhodos|Der Leuchtturm von Alexandria|Die Hängenden Gärten|2
+Wie heißt der römische Grenzwall in Germanien, heute UNESCO-Welterbe?|Limes|Hadrianswall|Atlantikwall|Westwall|3
+Welches Volk gründete die Stadt Tenochtitlan, auf der heute Mexiko-Stadt steht?|Azteken|Inka|Maya|Olmeken|3
+Wie hieß der berühmte Handelsweg zwischen China und dem Mittelmeer?|Seidenstraße|Bernsteinstraße|Salzstraße|Via Appia|1
+`,
+natur:`
+Welches ist das größte Tier der Erde?|Blauwal|Afrikanischer Elefant|Pottwal|Walhai|1
+Welches ist das schnellste Landtier?|Gepard|Löwe|Gazelle|Pferd|1
+Wie viele Beine hat eine Spinne?|8|6|10|12|1
+Wie viele Beine hat ein Insekt?|6|8|4|10|1
+Was frisst ein Großer Panda hauptsächlich?|Bambus|Fisch|Eukalyptus|Beeren|1
+Welches ist das schwerste Landtier?|Afrikanischer Elefant|Nashorn|Giraffe|Flusspferd|1
+Welches Landtier wird am höchsten?|Giraffe|Elefant|Kamel|Strauß|1
+Wie nennt man ein junges Pferd?|Fohlen|Kalb|Lamm|Ferkel|1
+Was ist ein Wal?|Ein Säugetier|Ein Fisch|Ein Reptil|Ein Amphibium|1
+Welches Säugetier legt Eier?|Schnabeltier|Koala|Känguru|Faultier|2
+Wie viele Herzen hat ein Oktopus?|3|1|2|4|3
+Welches dieser Tiere hält echten Winterschlaf?|Igel|Reh|Fuchs|Wildschwein|2
+Welcher Vogel kann sogar rückwärts fliegen?|Kolibri|Spatz|Adler|Schwalbe|2
+Welcher Nadelbaum verliert im Herbst seine Nadeln?|Lärche|Fichte|Tanne|Kiefer|3
+Woraus bauen Bienen ihre Waben?|Aus Wachs|Aus Honig|Aus Holz|Aus Lehm|2
+Wie nennt man die Verwandlung einer Raupe zum Schmetterling?|Metamorphose|Photosynthese|Mutation|Evolution|2
+Welches Gas nehmen Pflanzen für die Photosynthese auf?|Kohlendioxid|Sauerstoff|Stickstoff|Helium|2
+Welcher ist der größte Vogel der Welt?|Strauß|Emu|Kondor|Albatros|2
+Welches dieser Tiere ist ein Beuteltier?|Koala|Panda|Faultier|Waschbär|2
+Wie viele Arme haben die meisten Seesterne?|5|4|6|8|2
+Welches Tier kann seine Farbe wechseln und die Augen unabhängig voneinander bewegen?|Chamäleon|Leguan|Gecko|Salamander|2
+Wie viele Mägen hat eine Kuh?|4|2|3|1|2
+Welche Insekten leben in einem Volk mit einer Königin und stellen Honig her?|Bienen|Libellen|Marienkäfer|Grillen|1
+Welcher ist der größte Fisch der Welt?|Walhai|Weißer Hai|Mondfisch|Riesenmanta|2
+Was ist ein Axolotl?|Ein Schwanzlurch|Ein Fisch|Ein Reptil|Ein Insekt|3
+Welche Farbe hat das Blut von Tintenfischen?|Blau|Rot|Grün|Gelb|3
+Womit atmen Fische?|Mit Kiemen|Mit Lungen|Mit Flossen|Mit Schuppen|1
+Welche Pflanze brennt bei Berührung auf der Haut?|Brennnessel|Löwenzahn|Gänseblümchen|Klee|1
+Wie lange ist eine Elefantenkuh ungefähr trächtig?|Fast 2 Jahre|9 Monate|6 Monate|3 Jahre|3
+Welches dieser Tiere ist kein Säugetier?|Pinguin|Delfin|Fledermaus|Wal|2
+Wie nennt man Tiere, die sowohl Pflanzen als auch Fleisch fressen?|Allesfresser|Pflanzenfresser|Fleischfresser|Aasfresser|1
+Welches Tier baut Dämme in Flüssen?|Biber|Otter|Bisamratte|Nutria|1
+Was ist die Hauptnahrung von Koalas?|Eukalyptusblätter|Bambus|Gras|Insekten|1
+Welcher Vogel gilt seit der Antike als Symbol der Weisheit?|Eule|Rabe|Adler|Taube|2
+`,
+sport:`
+Wie viele Spieler einer Mannschaft stehen beim Fußball auf dem Feld?|11|10|9|12|1
+Wie viele Spieler einer Mannschaft stehen beim Basketball auf dem Feld?|5|6|7|4|2
+Wie viele Spieler einer Mannschaft stehen beim Hallenvolleyball auf dem Feld?|6|5|7|4|2
+Wie oft finden die Olympischen Sommerspiele normalerweise statt?|Alle 4 Jahre|Alle 2 Jahre|Jedes Jahr|Alle 5 Jahre|1
+Wie viele Ringe zeigt das olympische Symbol?|5|4|6|7|1
+Wie lang ist ein Marathon?|42,195 km|40 km|21,1 km|50 km|2
+In welcher Sportart gibt es ein „Hole-in-One“?|Golf|Tennis|Bowling|Cricket|1
+Wie viele Punkte bringt ein Touchdown im American Football?|6|3|7|2|3
+Was ist beim Tennis ein „Ass“?|Ein Aufschlag, den der Gegner nicht erreicht|Ein doppelter Fehler beim Aufschlag|Ein gewonnener Satz|Ein Ball, der die Netzkante streift|2
+Wie lange dauert ein Fußballspiel ohne Nachspielzeit?|90 Minuten|80 Minuten|100 Minuten|60 Minuten|1
+In welcher Sportart wird mit einem Puck gespielt?|Eishockey|Curling|Feldhockey|Polo|1
+Wie viele Pins stehen beim Bowling zu Beginn?|10|9|12|8|2
+In welcher Stadt fanden 1972 die Olympischen Sommerspiele statt?|München|Berlin|Montreal|Rom|2
+In welchem Land wurde Deutschland 2014 Fußball-Weltmeister?|Brasilien|Südafrika|Russland|Argentinien|2
+Welche Sportart verbindet Schwimmen, Radfahren und Laufen?|Triathlon|Biathlon|Pentathlon|Zehnkampf|1
+Welche Wintersportart verbindet Skilanglauf und Schießen?|Biathlon|Triathlon|Nordische Kombination|Skicross|2
+Welche Gürtelfarbe tragen Anfänger im Judo?|Weiß|Schwarz|Rot|Braun|1
+Wie viele Löcher hat eine volle Runde auf einem normalen Golfplatz?|18|9|12|24|2
+In welcher Sportart gibt es den „Siebenmeter“?|Handball|Fußball|Basketball|Volleyball|1
+Wie viele Spieler einer Handballmannschaft stehen auf dem Feld – mit Torwart?|7|6|11|5|2
+Welcher Schwimmstil ist der schnellste?|Kraul|Brust|Rücken|Delfin|2
+Wie viele Gewinnsätze braucht man im Herren-Einzel bei Grand-Slam-Turnieren?|3|2|4|5|3
+In welchem Land fand die Fußball-WM 2006 statt?|Deutschland|Frankreich|Südafrika|Italien|1
+Wie nennt man beim Baseball den Werfer?|Pitcher|Catcher|Batter|Shortstop|3
+Welche Sportart wird beim berühmten Turnier in Wimbledon gespielt?|Tennis|Golf|Cricket|Rugby|1
+Welche Schachfigur zieht nur diagonal?|Läufer|Turm|Springer|König|2
+Welche Sportart wird auch „Ping-Pong“ genannt?|Tischtennis|Badminton|Squash|Tennis|1
+Wie hoch hängt ein Basketballkorb?|3,05 m|2,50 m|3,50 m|2,80 m|3
+In welcher Sportart wird die „Tour de France“ ausgetragen?|Radsport|Segeln|Motorsport|Laufen|1
+Wie lange dauert ein Drittel beim Eishockey (reine Spielzeit)?|20 Minuten|15 Minuten|25 Minuten|30 Minuten|2
+In welcher Sportart gibt es den „Slam Dunk“?|Basketball|Volleyball|Tennis|Handball|1
+Bei welcher Sportart gibt es Abfahrt, Slalom und Riesenslalom?|Ski alpin|Skispringen|Skilanglauf|Rodeln|1
+Was ist beim Fußball ein „Hattrick“?|Drei Tore eines Spielers in einem Spiel|Ein Eigentor|Ein Tor per Fallrückzieher|Ein Platzverweis|2
+Wie viele Spieler einer Mannschaft stehen beim Eishockey auf dem Eis – mit Torwart?|6|5|7|11|2
+`,
+film:`
+Wie heißt der lustige Schneemann in „Die Eiskönigin“?|Olaf|Sven|Kristoff|Hans|1
+Wie heißt Mufasas Sohn in „Der König der Löwen“?|Simba|Scar|Timon|Pumbaa|1
+Wie heißt der Zauberschüler mit der blitzförmigen Narbe auf der Stirn?|Harry Potter|Ron Weasley|Neville Longbottom|Draco Malfoy|1
+Wie heißt die Zauberschule in „Harry Potter“?|Hogwarts|Durmstrang|Beauxbatons|Askaban|2
+Wie viele Saiten hat eine klassische Gitarre?|6|4|5|7|1
+Welche Band sang „Yellow Submarine“?|The Beatles|The Rolling Stones|Queen|ABBA|1
+Aus welchem Land kommt die Band ABBA?|Schweden|Norwegen|Dänemark|Finnland|1
+Wie hieß der Leadsänger der Band Queen?|Freddie Mercury|Mick Jagger|Elton John|David Bowie|2
+Wer komponierte „Eine kleine Nachtmusik“?|Wolfgang Amadeus Mozart|Ludwig van Beethoven|Johann Sebastian Bach|Joseph Haydn|2
+Welcher Komponist schrieb seine 9. Sinfonie, obwohl er fast taub war?|Ludwig van Beethoven|Wolfgang Amadeus Mozart|Franz Schubert|Johann Sebastian Bach|2
+In welchem Film sucht ein Clownfisch-Vater seinen Sohn?|Findet Nemo|Arielle, die Meerjungfrau|Große Haie – Kleine Fische|Vaiana|1
+In welchem Film spielen Cowboy Woody und Astronaut Buzz Lightyear mit?|Toy Story|Cars|Shrek|Ice Age|1
+Welche Hautfarbe hat der Oger Shrek?|Grün|Blau|Braun|Grau|1
+Wer bringt in „Der Herr der Ringe“ den Einen Ring nach Mordor?|Frodo Beutlin|Bilbo Beutlin|Gandalf|Aragorn|2
+Wie viele Linien hat ein Notensystem?|5|4|6|7|2
+Aus welchem Land stammt der Tango?|Argentinien|Spanien|Brasilien|Kuba|2
+Wie heißt der Superheld, der Spinnennetze verschießt?|Spider-Man|Batman|Superman|Iron Man|1
+In welcher Stadt kämpft Batman gegen das Verbrechen?|Gotham City|Metropolis|Star City|Central City|2
+Wie heißt der goldene, menschenähnliche Roboter in „Star Wars“?|C-3PO|R2-D2|BB-8|K-2SO|2
+Wer ist der Sohn von Darth Vader?|Luke Skywalker|Han Solo|Obi-Wan Kenobi|Anakin Skywalker|2
+Welches dieser Instrumente spielt man mit einem Bogen?|Geige|Trompete|Querflöte|Harfe|1
+Welches ist das tiefste Streichinstrument im Orchester?|Kontrabass|Cello|Bratsche|Geige|2
+Zu welcher Instrumentengruppe gehört das Saxofon?|Holzblasinstrumente|Blechblasinstrumente|Schlaginstrumente|Streichinstrumente|3
+Wie heißt die Ratte, die im Film „Ratatouille“ in Paris kocht?|Remy|Emile|Linguini|Gusteau|3
+Welche Disney-Prinzessin verliert auf dem Ball einen gläsernen Schuh?|Cinderella|Schneewittchen|Arielle|Rapunzel|1
+In welcher Filmreihe treten die gelben Minions zum ersten Mal auf?|Ich – Einfach unverbesserlich|Shrek|Madagascar|Ice Age|2
+Wer wird „King of Rock ’n’ Roll“ genannt?|Elvis Presley|Chuck Berry|Johnny Cash|Little Richard|2
+Wer spielte Jack im Film „Titanic“ von 1997?|Leonardo DiCaprio|Brad Pitt|Tom Cruise|Matt Damon|2
+Wie viele Musiker spielen in einem Quartett?|4|3|5|8|1
+Wie heißt der fliegende Elefant von Disney?|Dumbo|Benjamin Blümchen|Babar|Elmar|1
+Wer komponierte „Die vier Jahreszeiten“?|Antonio Vivaldi|Wolfgang Amadeus Mozart|Johann Sebastian Bach|Georg Friedrich Händel|2
+In welchem Film reist ein umgebauter DeLorean durch die Zeit?|Zurück in die Zukunft|Terminator|Matrix|Jurassic Park|2
+Welche Farbe hat das Lichtschwert von Darth Vader?|Rot|Blau|Grün|Lila|2
+`,
+essen:`
+Aus welchem Land stammt die Pizza ursprünglich?|Italien|Griechenland|USA|Spanien|1
+Woraus wird Guacamole hauptsächlich gemacht?|Avocado|Erbsen|Gurke|Zucchini|2
+Was ist die Hauptzutat von Hummus?|Kichererbsen|Linsen|Weiße Bohnen|Erbsen|2
+Aus welchen Bohnen wird Schokolade gemacht?|Kakaobohnen|Kaffeebohnen|Sojabohnen|Kidneybohnen|1
+Aus welchem Gemüse wird Sauerkraut gemacht?|Weißkohl|Rotkohl|Spinat|Lauch|1
+Aus welchem Land stammt Sushi?|Japan|China|Korea|Thailand|1
+Woraus wird Tofu hergestellt?|Aus Sojabohnen|Aus Reis|Aus Weizen|Aus Kartoffeln|2
+Welches Gewürz gilt als das teuerste der Welt?|Safran|Vanille|Zimt|Pfeffer|2
+Was ist eine Paella?|Ein spanisches Reisgericht|Ein italienisches Nudelgericht|Eine französische Suppe|Ein griechischer Salat|1
+Woraus wird Popcorn gemacht?|Aus Mais|Aus Reis|Aus Weizen|Aus Hafer|1
+Welche Frucht gehört auf einen klassischen Toast Hawaii?|Ananas|Mango|Banane|Pfirsich|1
+Woraus wird Butter hergestellt?|Aus Sahne|Aus Quark|Aus Joghurt|Aus Eiweiß|2
+Welche Nüsse sind die Hauptzutat von Marzipan?|Mandeln|Haselnüsse|Walnüsse|Erdnüsse|2
+Welches Getreide verwendet man für ein klassisches Risotto?|Reis|Weizen|Gerste|Hirse|1
+Aus welchem Land stammt das Gulasch ursprünglich?|Ungarn|Österreich|Tschechien|Polen|2
+Was ist Wasabi?|Japanischer Meerrettich|Eingelegter Ingwer|Getrockneter Seetang|Gewürzte Sojasoße|2
+Wie heißt das gefüllte Fladenbrot mit Fleisch vom Drehspieß?|Döner Kebab|Burrito|Calzone|Wrap|1
+Welche Wurst wird mit Ketchup und Currypulver serviert?|Currywurst|Weißwurst|Leberwurst|Blutwurst|1
+Welche Wurst isst man in Bayern traditionell vor dem Mittagsläuten?|Weißwurst|Currywurst|Bockwurst|Wiener Würstchen|2
+Welche dieser Früchte ist eine Zitrusfrucht?|Mandarine|Kiwi|Apfel|Banane|1
+Welches Vitamin steckt besonders reichlich in Zitronen?|Vitamin C|Vitamin D|Vitamin B12|Vitamin K|1
+Aus welcher Milch wird echter „Mozzarella di Bufala“ gemacht?|Büffelmilch|Ziegenmilch|Schafsmilch|Kuhmilch|3
+Aus welchem Land stammt der Käse Feta?|Griechenland|Türkei|Italien|Frankreich|2
+Welche Zutat lässt einen Brotteig aufgehen?|Hefe|Salz|Zucker|Essig|1
+Aus welcher Pflanze wird in Deutschland Zucker gewonnen?|Zuckerrübe|Zuckerrohr|Mais|Ahorn|2
+Woraus wird Ketchup hauptsächlich gemacht?|Aus Tomaten|Aus Paprika|Aus Karotten|Aus Kürbis|1
+Wie heißen die Nudeln in Schmetterlingsform?|Farfalle|Penne|Fusilli|Rigatoni|2
+Welches Kraut ist die Hauptzutat von „Pesto alla Genovese“?|Basilikum|Petersilie|Rosmarin|Thymian|2
+Aus welchem Land stammen Tacos?|Mexiko|Spanien|Argentinien|Brasilien|1
+Bei welcher Frucht sitzen die kleinen Nüsschen außen auf der Frucht?|Erdbeere|Himbeere|Kiwi|Weintraube|2
+Was ist die Hauptzutat eines deutschen Käsekuchens?|Quark|Joghurt|Schlagsahne|Pudding|2
+Welches Heißgetränk wird aus gerösteten und gemahlenen Bohnen aufgebrüht?|Kaffee|Früchtetee|Pfefferminztee|Heiße Zitrone|1
+Aus welchem Teil des Zimtbaums wird Zimt gewonnen?|Aus der Rinde|Aus den Blüten|Aus den Wurzeln|Aus den Samen|3
+Welche dieser „Nüsse“ ist eigentlich eine Hülsenfrucht?|Erdnuss|Walnuss|Haselnuss|Cashewnuss|3
+Woraus wird Couscous meistens gemacht?|Aus Hartweizengrieß|Aus Reismehl|Aus Kartoffeln|Aus Mais|3
+`,
+wiss:`
+Welcher Planet ist der Sonne am nächsten?|Merkur|Venus|Mars|Erde|1
+Welcher ist der größte Planet unseres Sonnensystems?|Jupiter|Saturn|Neptun|Uranus|1
+Welcher Planet wird „der Rote Planet“ genannt?|Mars|Venus|Jupiter|Merkur|1
+Welcher Himmelskörper verlor 2006 seinen Status als Planet?|Pluto|Merkur|Neptun|Ganymed|2
+Welches chemische Zeichen hat Gold?|Au|Ag|Go|Gd|2
+Welcher Stoff hat die chemische Formel H₂O?|Wasser|Wasserstoff|Sauerstoff|Salz|1
+Bei wie viel Grad Celsius kocht Wasser auf Meereshöhe?|100 °C|90 °C|120 °C|80 °C|1
+Wer entwickelte die Relativitätstheorie?|Albert Einstein|Isaac Newton|Stephen Hawking|Niels Bohr|1
+Welches Gas macht den größten Teil unserer Luft aus?|Stickstoff|Sauerstoff|Kohlendioxid|Argon|3
+Wie viele Knochen hat ein erwachsener Mensch ungefähr?|206|156|256|306|2
+Welches ist das größte Organ des Menschen?|Die Haut|Die Leber|Die Lunge|Das Gehirn|2
+Wie viele Zähne hat ein Erwachsener mit Weisheitszähnen?|32|28|30|36|2
+Wie schnell ist das Licht ungefähr?|300.000 km pro Sekunde|30.000 km pro Sekunde|3.000 km pro Sekunde|3 Millionen km pro Sekunde|2
+In welcher Einheit misst man die elektrische Spannung?|Volt|Ampere|Ohm|Watt|2
+Wofür steht die Abkürzung „WWW“?|World Wide Web|World Wide Window|Web World Wide|Wide World Web|1
+Welches Metall ist bei Zimmertemperatur flüssig?|Quecksilber|Blei|Zinn|Aluminium|2
+Welcher Stern ist der Erde am nächsten?|Die Sonne|Proxima Centauri|Sirius|Der Polarstern|3
+Wie lange braucht das Licht der Sonne ungefähr bis zur Erde?|Etwa 8 Minuten|Etwa 8 Sekunden|Etwa 8 Stunden|Etwa 8 Tage|2
+Wie heißt Natriumchlorid im Alltag?|Kochsalz|Zucker|Backpulver|Kalk|2
+Welche Farbe entsteht, wenn man rotes, grünes und blaues Licht mischt?|Weiß|Schwarz|Braun|Grau|3
+Wer entdeckte 1928 das Penicillin?|Alexander Fleming|Robert Koch|Louis Pasteur|Marie Curie|2
+Wer formulierte das Gravitationsgesetz – angeblich inspiriert von einem fallenden Apfel?|Isaac Newton|Galileo Galilei|Albert Einstein|Johannes Kepler|1
+Wie viele Bits hat ein Byte?|8|4|16|10|2
+Welcher Planet ist für seine auffälligen Ringe berühmt?|Saturn|Jupiter|Mars|Venus|1
+Woraus besteht der Erdkern hauptsächlich?|Aus Eisen und Nickel|Aus Gestein und Sand|Aus Gold und Silber|Aus Wasser und Eis|3
+Wie heißt das negativ geladene Teilchen im Atom?|Elektron|Proton|Neutron|Photon|2
+Aus welchem Element besteht ein Diamant?|Kohlenstoff|Silizium|Kalzium|Schwefel|2
+In welcher Einheit misst man die Frequenz?|Hertz|Watt|Newton|Joule|2
+Welches Tier umkreiste 1957 als erstes Lebewesen die Erde?|Ein Hund|Ein Affe|Eine Katze|Eine Maus|3
+Wer meldete 1886 das erste Automobil mit Verbrennungsmotor zum Patent an?|Carl Benz|Gottlieb Daimler|Henry Ford|Rudolf Diesel|3
+Welches Organ pumpt das Blut durch den Körper?|Das Herz|Die Lunge|Die Leber|Die Niere|1
+Wofür ist Marie Curie berühmt?|Für ihre Forschung zur Radioaktivität|Für die Erfindung des Telefons|Für die Entdeckung des Penicillins|Für die Relativitätstheorie|2
+Welcher Planet ist ungefähr so groß wie die Erde?|Venus|Mars|Merkur|Jupiter|3
+Was gibt ein „Lichtjahr“ an?|Eine Entfernung|Eine Zeitspanne|Eine Helligkeit|Eine Geschwindigkeit|2
+`,
+de:`
+Wie viele Bundesländer hat Deutschland?|16|12|14|18|1
+Welcher ist der höchste Berg Deutschlands?|Zugspitze|Watzmann|Brocken|Feldberg|1
+Welcher Fluss fließt durch Köln?|Rhein|Main|Elbe|Mosel|1
+Was ist die Landeshauptstadt von Bayern?|München|Nürnberg|Augsburg|Regensburg|1
+Was ist die Landeshauptstadt von Nordrhein-Westfalen?|Düsseldorf|Köln|Dortmund|Bonn|2
+Was ist die Landeshauptstadt von Niedersachsen?|Hannover|Braunschweig|Oldenburg|Osnabrück|2
+Was ist die Landeshauptstadt von Hessen?|Wiesbaden|Frankfurt am Main|Kassel|Darmstadt|3
+Was ist die Landeshauptstadt von Baden-Württemberg?|Stuttgart|Karlsruhe|Mannheim|Freiburg|2
+Was ist die Landeshauptstadt von Schleswig-Holstein?|Kiel|Lübeck|Flensburg|Husum|2
+Was ist die Landeshauptstadt von Rheinland-Pfalz?|Mainz|Koblenz|Trier|Ludwigshafen|3
+Was ist die Landeshauptstadt von Brandenburg?|Potsdam|Cottbus|Frankfurt (Oder)|Brandenburg an der Havel|3
+Was ist die Landeshauptstadt von Thüringen?|Erfurt|Weimar|Jena|Gera|2
+Welche Farben hat die deutsche Flagge – von oben nach unten?|Schwarz, Rot, Gold|Rot, Gold, Schwarz|Schwarz, Gold, Rot|Rot, Schwarz, Gold|1
+An welchem Tag wird der Tag der Deutschen Einheit gefeiert?|3. Oktober|9. November|1. Mai|17. Juni|2
+In welcher Stadt steht das Brandenburger Tor?|Berlin|Potsdam|Brandenburg an der Havel|Hamburg|1
+Welche Stadt war vor der Wiedervereinigung Hauptstadt der Bundesrepublik?|Bonn|Frankfurt am Main|Köln|München|2
+Welches Schloss ließ König Ludwig II. von Bayern bauen?|Neuschwanstein|Sanssouci|Schloss Schwerin|Heidelberger Schloss|2
+Welche ist die größte Insel Deutschlands?|Rügen|Usedom|Sylt|Fehmarn|2
+An welchem Fluss liegt Hamburg?|Elbe|Weser|Rhein|Oder|1
+Wie heißen die Brüder, die Märchen wie „Hänsel und Gretel“ sammelten?|Brüder Grimm|Brüder Lumière|Brüder Wright|Brüder Mann|1
+In welcher Stadt wurde Johann Wolfgang von Goethe geboren?|Frankfurt am Main|Weimar|Leipzig|Berlin|3
+In welcher Stadt wurde Ludwig van Beethoven geboren?|Bonn|Wien|Salzburg|Köln|3
+Wie heißt das vom Volk gewählte Parlament Deutschlands?|Bundestag|Bundesrat|Bundesversammlung|Landtag|1
+In welchem Gebirge liegt der Brocken?|Harz|Schwarzwald|Erzgebirge|Eifel|2
+Welcher große See grenzt an Deutschland, Österreich und die Schweiz?|Bodensee|Chiemsee|Gardasee|Starnberger See|1
+Welches Tier ist das Wappentier Deutschlands?|Der Adler|Der Löwe|Der Bär|Der Hirsch|1
+Mit welchen Worten beginnt die deutsche Nationalhymne?|„Einigkeit und Recht und Freiheit“|„Freude, schöner Götterfunken“|„Brüder, zur Sonne, zur Freiheit“|„Land der Berge, Land am Strome“|2
+In welcher Stadt steht das Holstentor?|Lübeck|Hamburg|Bremen|Rostock|2
+Welche Tiere sind die Bremer Stadtmusikanten?|Esel, Hund, Katze und Hahn|Esel, Pferd, Katze und Huhn|Hund, Katze, Maus und Hahn|Esel, Hund, Schwein und Gans|2
+Welcher Fluss bildet einen großen Teil der Grenze zu Polen?|Oder|Elbe|Weichsel|Spree|2
+Welche Stadt wird „Elbflorenz“ genannt?|Dresden|Magdeburg|Hamburg|Meißen|2
+Wer war die erste Bundeskanzlerin Deutschlands?|Angela Merkel|Ursula von der Leyen|Annegret Kramp-Karrenbauer|Andrea Nahles|1
+Wer war der erste Bundeskanzler der Bundesrepublik Deutschland?|Konrad Adenauer|Willy Brandt|Ludwig Erhard|Helmut Schmidt|2
+In welchem Jahr wurde Deutschland wiedervereinigt?|1990|1989|1991|1993|2
+Welche Stadt ist berühmt für ihren Dom mit zwei über 150 Meter hohen Türmen?|Köln|Ulm|Regensburg|Mainz|2
+Welche Stadt ist für ihre Lebkuchen und den Christkindlesmarkt berühmt?|Nürnberg|Aachen|Dresden|Lübeck|2
+`,
+kids:`
+Welche Farbe hat eine reife Banane?|Gelb|Blau|Rot|Lila|1
+Wie viele Beine hat ein Hund?|4|2|6|8|1
+Welches Tier macht „Muh“?|Die Kuh|Das Schaf|Die Ziege|Das Pferd|1
+Wie viele Tage hat eine Woche?|7|5|6|8|1
+Was ist die Hauptstadt von Deutschland?|Berlin|München|Hamburg|Köln|1
+Wie viele Monate hat ein Jahr?|12|10|11|13|1
+Welches Tier hat einen Rüssel?|Der Elefant|Die Giraffe|Das Nashorn|Das Nilpferd|1
+Wie heißt die faule Drohne, die mit Biene Maja befreundet ist?|Willi|Flip|Kurt|Max|2
+Welche Farbe entsteht, wenn man Blau und Gelb mischt?|Grün|Lila|Orange|Braun|1
+Welche Farbe entsteht, wenn man Rot und Weiß mischt?|Rosa|Lila|Orange|Grau|1
+Wie viele Finger hat eine Hand?|5|4|6|10|1
+Welches Tier hüpft und trägt sein Junges im Beutel?|Das Känguru|Der Hase|Der Frosch|Das Eichhörnchen|1
+Wie heißt der honigliebende Bär aus dem Hundertmorgenwald?|Winnie Puuh|Paddington|Balu|Petzi|1
+Wie viele Räder hat ein Fahrrad?|2|3|4|1|1
+Was ist 5 + 7?|12|11|13|14|1
+Was ist 3 × 4?|12|7|9|16|1
+Welches Mädchen trifft im Märchen im Wald den bösen Wolf?|Rotkäppchen|Schneewittchen|Dornröschen|Aschenputtel|1
+Welches Tier ruft „Kikeriki“?|Der Hahn|Die Ente|Die Gans|Der Truthahn|1
+Welches orange Gemüse knabbern Hasen gern?|Die Karotte|Die Gurke|Der Brokkoli|Die Erbse|1
+Was ist das Gegenteil von „heiß“?|Kalt|Warm|Nass|Laut|1
+Wie viele Ecken hat ein Dreieck?|3|4|5|6|1
+Welche Jahreszeit kommt nach dem Winter?|Frühling|Sommer|Herbst|Regenzeit|1
+Wie heißt das Pferd von Pippi Langstrumpf?|Kleiner Onkel|Herr Nilsson|Fury|Black Beauty|2
+Was legen Hühner?|Eier|Nüsse|Steine|Kartoffeln|1
+Welche Form hat ein Fußball?|Eine Kugel|Ein Würfel|Eine Pyramide|Ein Zylinder|1
+Welcher Elefant ruft „Törööö“?|Benjamin Blümchen|Dumbo|Elmar|Babar|1
+Welche Farbe haben Feuerwehrautos in Deutschland meistens?|Rot|Blau|Gelb|Grün|1
+Wie viele Stunden hat ein Tag?|24|12|20|48|1
+Welches Tier hat schwarz-weiße Streifen?|Das Zebra|Der Tiger|Die Giraffe|Der Leopard|1
+Wer wohnt in einer Ananas ganz tief im Meer?|SpongeBob|Patrick|Nemo|Arielle|1
+Wie viele Monde hat die Erde?|1|2|0|3|1
+Welches Säugetier kann richtig fliegen?|Die Fledermaus|Der Maulwurf|Der Igel|Der Biber|2
+Welches Tier lebt am Südpol?|Der Pinguin|Der Eisbär|Der Elch|Das Kamel|1
+Welches Tier wird „König der Tiere“ genannt?|Der Löwe|Der Elefant|Der Tiger|Der Bär|1
+`,
+};
+
+const QUESTIONS = [];
+const hashId = s => { let h = 7; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h.toString(36); };
+CATS.forEach(c => (QDATA[c.id] || '').split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
+  const f = l.split('|').map(s => s.trim());
+  if (f.length === 6 && f.every(Boolean)) QUESTIONS.push({id:c.id + '-' + hashId(f[0]), cat:c.id, q:f[0], a:f[1], w:f.slice(2, 5), d:clamp(+f[5] || 2, 1, 3)});
+}));
+const countCat = id => QUESTIONS.filter(q => q.cat === id).length;
+
+// =====================================================================
+//  Einstellungen (Hub.read/Hub.write unter 'quiz_v1')
+// =====================================================================
+const DEF = {n:15, time:8, diff:'mix', finale:true, cats:CATS.filter(c => c.id !== 'kids').map(c => c.id), keys:{}, seen:[]};
+const S = Object.assign({}, DEF, Hub.read('quiz_v1', {}));
+if (![10, 15, 20, 30].includes(S.n)) S.n = DEF.n;
+if (![6, 8, 12].includes(S.time)) S.time = DEF.time;
+if (!['easy', 'mix', 'hard'].includes(S.diff)) S.diff = DEF.diff;
+S.finale = S.finale !== false;
+S.cats = Array.isArray(S.cats) ? S.cats.filter(id => CAT[id]) : DEF.cats.slice();
+if (!S.cats.length) S.cats = DEF.cats.slice();
+if (!S.keys || typeof S.keys !== 'object' || Array.isArray(S.keys)) S.keys = {};
+if (!Array.isArray(S.seen)) S.seen = [];
+const saveS = () => Hub.write('quiz_v1', S);
+
+const MAXP = 8, BUZZ_MS = 15000, DECAY_MS = 12000, REOPEN_MS = 7000, PEN = 50;
+
+// =====================================================================
+//  Töne (alles über Hub.tone – Lautstärke-Einstellungen gelten automatisch)
+// =====================================================================
+const BUZZ_F = [262, 330, 392, 466, 523, 622, 698, 784];
+const SND = {
+  buzz(i){ const f = BUZZ_F[((i % 8) + 8) % 8]; Hub.tone(f, .34, 'square', .05); Hub.tone(f * 1.26, .34, 'square', .025); Hub.tone(f * 2, .1, 'sawtooth', .02); },
+  jingle(){ [392, 523, 659, 784].forEach((f, k) => Hub.tone(f, .2, 'triangle', .045, k * .085)); Hub.tone(1047, .35, 'sine', .03, .34); },
+  whoosh(k){ Hub.tone(380 + k * 90, .16, 'sine', .028, k * .11, 900 + k * 160); },
+  beat(n, hurry){
+    const m = Hub.settings.music; if (!(m > 0)) return;
+    const B = [110, 110, 165, 110, 131, 110, 165, 147];
+    Hub.tone(B[n % 8] * (hurry ? 1.19 : 1), .17, 'triangle', .075 * m);
+    if (n % 2 === 1) Hub.tone(hurry ? 3200 : 2600, .025, 'square', .008 * m);
+  },
+  tick(){ Hub.tone(1250, .035, 'square', .016); },
+  urgent(){ Hub.tone(880, .14, 'square', .04); Hub.tone(1320, .1, 'square', .02, .02); },
+  lock(){ Hub.tone(330, .5, 'sine', .035, 0, 495); Hub.tone(660, .5, 'triangle', .02, .05, 990); },
+  right(){ [523, 659, 784].forEach((f, k) => Hub.tone(f, .14, 'triangle', .06, k * .09)); Hub.tone(1047, .55, 'triangle', .06, .27); Hub.tone(1568, .45, 'sine', .025, .3); },
+  wrong(){ Hub.tone(150, .5, 'sawtooth', .055); Hub.tone(143, .5, 'square', .035); },
+  nobody(){ [[392, 370], [370, 349], [349, 294]].forEach(([a, b], k) => Hub.tone(a, k === 2 ? .8 : .32, 'triangle', .055, k * .34, b)); },
+  early(){ Hub.tone(200, .12, 'square', .035); Hub.tone(160, .12, 'square', .03, .1); },
+  drum(sec){
+    for (let t = 0, k = 0; t < sec; t += .055, k++) Hub.tone(85 + (k % 2) * 12, .06, 'triangle', .02 + .05 * (t / sec), t);
+    Hub.tone(130, .6, 'sawtooth', .035, sec); Hub.tone(523, .7, 'triangle', .04, sec); Hub.tone(784, .7, 'triangle', .035, sec);
+  },
+  fanfare(){
+    [[523, 0, .16], [523, .18, .1], [523, .3, .1], [659, .42, .25], [523, .7, .16], [659, .88, .16], [784, 1.06, .7]]
+      .forEach(([f, d, l]) => { Hub.tone(f, l, 'square', .028, d); Hub.tone(f / 2, l, 'triangle', .04, d); });
+  },
+};
+
+// =====================================================================
+//  Buzzer-Tasten (physische Taste per e.code, Anzeige je nach Tastatur)
+// =====================================================================
+const KEY_ORDER = ['KeyQ', 'KeyP', 'KeyZ', 'KeyM', 'KeyT', 'KeyB', 'KeyA', 'KeyL', 'KeyX', 'Digit0', 'KeyG', 'KeyU', 'KeyV', 'KeyO', 'KeyS', 'KeyK', 'KeyH', 'KeyN'];
+const DE_LABEL = {KeyZ:'Y', KeyY:'Z', Minus:'ß', Semicolon:'Ö', Quote:'Ä', BracketLeft:'Ü', Slash:'-', Backquote:'^', Equal:'´', BracketRight:'+', Backslash:'#', IntlBackslash:'<'};
+const BLOCK = /^(Digit[1-4]|Numpad[1-4]|NumpadEnter|Enter|Space|Escape|Tab|F\d+|Shift|Control|Alt|Meta|OS|ContextMenu|CapsLock|NumLock|ScrollLock|Pause|PrintScreen|Backspace|Insert|Home|End|PageUp|PageDown|Lang|Fn)/;
+let layoutMap = null;
+function codeLabel(code){
+  const m = layoutMap && layoutMap.get(code);
+  if (m && m.trim()) return m.toUpperCase();
+  if (DE_LABEL[code]) return DE_LABEL[code];
+  if (/^Key/.test(code)) return code.slice(3);
+  if (/^Digit/.test(code)) return code.slice(5);
+  if (/^Numpad/.test(code)) return 'Num ' + code.slice(6).replace('Add', '+').replace('Subtract', '−').replace('Multiply', '×').replace('Divide', '÷').replace('Decimal', ',');
+  return {ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→', Delete:'Entf', Comma:',', Period:'.'}[code] || code;
+}
+function keyLabel(e){
+  const c = e.code;
+  if (/^Numpad/.test(c)) return 'Num ' + (e.key && e.key.length === 1 ? e.key : codeLabel(c).replace('Num ', ''));
+  if (/^Arrow|^Delete$/.test(c)) return codeLabel(c);
+  if (e.key && e.key.length === 1 && e.key !== ' ') return e.key.toUpperCase();
+  return codeLabel(c);
+}
+try {
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) navigator.keyboard.getLayoutMap().then(m => {
+    layoutMap = m;
+    roster.forEach(r => { if (r.key && !r.key.custom) r.key.label = codeLabel(r.key.code); });
+    if (screen === 'lobby') renderLobby();
+  }).catch(() => {});
+} catch(e){}
+
+// =====================================================================
+//  LOBBY
+// =====================================================================
+let roster = [], capture = -1, screen = 'lobby';
+const included = () => roster.filter(r => !r.out);
+function prefKey(name){
+  const k = S.keys[name.toLowerCase()];
+  return k && k.code && !BLOCK.test(k.code) ? {code:k.code, label:k.label || codeLabel(k.code), custom:true} : null;
+}
+function savePref(r){ S.keys[r.name.toLowerCase()] = {code:r.key.code, label:r.key.label}; saveS(); }
+function initRoster(){
+  roster = Hub.party.active().map(p => ({name:p.name.trim().slice(0, 16), color:p.color, avatar:p.avatar, guest:false, out:false, key:null}));
+  roster.forEach((r, i) => { if (i >= MAXP) r.out = true; r.key = prefKey(r.name); });
+  assignKeys();
+}
+function assignKeys(){
+  const used = new Set();
+  included().forEach(r => { if (r.key && !used.has(r.key.code)) used.add(r.key.code); else r.key = null; });
+  included().forEach(r => {
+    if (r.key) return;
+    const p = prefKey(r.name);
+    if (p && !used.has(p.code)) r.key = p;
+    else { const code = KEY_ORDER.find(c => !used.has(c)); r.key = {code, label:codeLabel(code), custom:false}; }
+    used.add(r.key.code);
+  });
+}
+function renderLobby(){
+  const inc = included();
+  $('chips').innerHTML = roster.map((r, i) => `
+    <div class="chip ${r.out ? 'out' : ''} ${capture === i ? 'cap' : ''}" data-i="${i}" style="--pc:${r.color}">
+      <button class="c-main" data-act="toggle" title="${r.out ? 'Wieder mitspielen lassen' : 'Für dieses Spiel aussetzen'}"><span class="av">${r.avatar}</span><span class="nm">${esc(r.name)}</span>${r.guest ? '<span class="gst">Gast</span>' : ''}</button>
+      ${r.out ? '<span class="c-off">setzt aus</span>'
+        : `<button class="c-key" data-act="key" title="Buzzer-Taste ändern">${capture === i ? '<span class="cap-t">Taste<br>drücken …</span>' : `<kbd>${esc(r.key.label)}</kbd><span class="c-ed">ändern</span>`}</button>`}
+      ${r.guest ? '<button class="c-x" data-act="del" title="Gast entfernen">✕</button>' : ''}
+    </div>`).join('') || '<p class="sub" style="grid-column:1/-1">Noch niemand da – füge unten Gäste hinzu oder lege im Launcher unter „Wer spielt mit?“ Leute an.</p>';
+  $('plCount').textContent = `${inc.length} / ${MAXP}`;
+  const h = $('lbHint');
+  if (capture >= 0){ h.className = 'hint warn'; h.innerHTML = `⌨ <b>${esc(roster[capture].name)}</b>: Drück jetzt die Taste, die dein Buzzer sein soll. <kbd>Esc</kbd> = abbrechen`; }
+  else if (inc.length < 2){ h.className = 'hint warn'; h.innerHTML = `Für die Quiz-Show braucht ihr <b>mindestens 2 Leute</b> – tippe Namen an oder füge Gäste hinzu.`; }
+  else { h.className = 'hint'; h.innerHTML = `<span class="bell av">🔔</span> Buzzer testen: Jeder drückt einmal seine Taste!`; }
+  $('guestAdd').disabled = inc.length >= MAXP;
+  renderSegs(); renderCats(); renderPool();
+  barStats();
+}
+const SEG_DEF = {
+  segN:['n', [[10, '10'], [15, '15'], [20, '20'], [30, '30']]],
+  segT:['time', [[6, '6 s'], [8, '8 s'], [12, '12 s']]],
+  segD:['diff', [['easy', 'Leicht'], ['mix', 'Gemischt'], ['hard', 'Knifflig']]],
+  segF:['finale', [[true, 'Mit Finale ×2'], [false, 'Ohne']]],
+};
+function renderSegs(){
+  Object.entries(SEG_DEF).forEach(([id, [key, opts]]) => {
+    const el = $(id);
+    el.innerHTML = opts.map(([v, l], k) => `<button data-k="${k}" class="${S[key] === v ? 'on' : ''}">${l}</button>`).join('');
+    el.querySelectorAll('button').forEach(b => b.onclick = () => { S[key] = opts[+b.dataset.k][0]; saveS(); Hub.sfx('click'); renderSegs(); renderPool(); });
+  });
+}
+function renderCats(){
+  const el = $('cats');
+  el.innerHTML = CATS.map(c => `<button class="cat ${S.cats.includes(c.id) ? 'on' : ''}" data-c="${c.id}" style="--cc:${c.col}" title="${esc(c.name)}"><span class="ce av">${c.emo}</span>${esc(c.short)}<span class="cn">${countCat(c.id)}</span></button>`).join('')
+    + `<button class="cat all" data-c="*" title="Alle Kategorien einschalten">✓ Alle</button>`;
+  el.querySelectorAll('.cat').forEach(b => b.onclick = () => {
+    const id = b.dataset.c;
+    if (id === '*') S.cats = CATS.map(c => c.id);
+    else if (S.cats.includes(id)){
+      if (S.cats.length === 1){ Hub.toast('Mindestens eine Kategorie', 'Ohne Kategorie gibt’s keine Fragen.', 'info'); Hub.sfx('bad'); return; }
+      S.cats = S.cats.filter(x => x !== id);
+    } else S.cats = S.cats.concat(id);
+    saveS(); Hub.sfx('click'); renderCats(); renderPool();
+  });
+}
+function renderPool(){
+  const n = QUESTIONS.filter(q => S.cats.includes(q.cat)).length, el = $('pool');
+  el.className = 'pool' + (n < S.n ? ' warn' : '');
+  el.textContent = n < S.n ? `nur ${n} Fragen in der Auswahl – es werden ${n} gespielt` : `${n} Fragen in deiner Auswahl`;
+  $('startBtn').disabled = included().length < 2;
+}
+function lobbyPing(r){
+  SND.buzz(included().indexOf(r));
+  const el = $('chips').querySelector(`.chip[data-i="${roster.indexOf(r)}"]`);
+  if (el){ el.classList.remove('ping'); void el.offsetWidth; el.classList.add('ping'); }
+}
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const ch = b.closest('.chip'), i = +ch.dataset.i, r = roster[i]; if (!r) return;
+  const act = b.dataset.act;
+  if (act === 'toggle'){
+    capture = -1;
+    if (r.out){
+      if (included().length >= MAXP){ Hub.toast('Das Studio ist voll', 'Höchstens 8 Leute können mitspielen.', 'user'); Hub.sfx('bad'); return; }
+      r.out = false;
+    } else r.out = true;
+    assignKeys(); Hub.sfx('click');
+  } else if (act === 'key'){ capture = capture === i ? -1 : i; Hub.sfx('click'); }
+  else if (act === 'del'){ roster.splice(i, 1); capture = -1; assignKeys(); Hub.sfx('click'); }
+  renderLobby();
+});
+function addGuest(){
+  const inp = $('guestName');
+  let name = inp.value.trim().replace(/\s+/g, ' ').slice(0, 14);
+  if (!name){ inp.focus(); return; }
+  if (included().length >= MAXP){ Hub.toast('Das Studio ist voll', 'Höchstens 8 Leute können mitspielen – nimm erst jemanden raus.', 'user'); Hub.sfx('bad'); return; }
+  const base = name; let k = 1;
+  while (roster.some(r => r.name.toLowerCase() === name.toLowerCase())) name = `${base} ${++k}`;
+  const usedC = new Set(included().map(r => r.color)), usedA = new Set(roster.map(r => r.avatar));
+  const color = Hub.party.COLORS.find(c => !usedC.has(c)) || Hub.party.COLORS[roster.length % Hub.party.COLORS.length];
+  const avatar = Hub.party.AVATARS.find(a => !usedA.has(a)) || '🙂';
+  roster.push({name, color, avatar, guest:true, out:false, key:null});
+  assignKeys(); inp.value = ''; Hub.sfx('ok'); renderLobby();
+}
+$('guestAdd').onclick = addGuest;
+$('startBtn').onclick = () => startShow(false);
+function captureKey(e){
+  const r = roster[capture];
+  if (!r || r.out){ capture = -1; return renderLobby(); }
+  if (e.key === 'Escape'){ capture = -1; Hub.sfx('click'); return renderLobby(); }
+  if (e.repeat || !e.code || BLOCK.test(e.code)){
+    if (!e.repeat){ Hub.toast('Diese Taste geht nicht', '1–4, Enter, Leertaste, Esc und Sondertasten braucht das Spiel selbst.', 'keyboard'); Hub.sfx('bad'); }
+    return;
+  }
+  const other = roster.find((o, j) => j !== capture && !o.out && o.key && o.key.code === e.code);
+  if (other){ other.key = r.key; savePref(other); Hub.toast('Tasten getauscht', `${other.name} hat jetzt „${other.key.label}“.`, 'keyboard'); }
+  r.key = {code:e.code, label:keyLabel(e), custom:true}; savePref(r);
+  capture = -1; renderLobby(); lobbyPing(r);
+}
+function lobbyKey(e){
+  const inInput = e.target && e.target.tagName === 'INPUT';
+  if (capture >= 0){ e.preventDefault(); e.stopPropagation(); return captureKey(e); }
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    if (inInput && $('guestName').value.trim()) addGuest(); else startShow(false);
+    return;
+  }
+  if (inInput || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+  const r = included().find(x => x.key && x.key.code === e.code);
+  if (r){ e.preventDefault(); lobbyPing(r); }
+}
+
+// =====================================================================
+//  SPIELABLAUF – eigene Spielzeit (vt), die bei Pause stehen bleibt
+// =====================================================================
+const G = {players:[], qs:[], qi:-1, phase:'idle', q:null, opts:[], correct:0, gone:new Set(), locked:new Set(), early:{}, ready:new Set(),
+  answerer:-1, buzzT:0, buzzLimit:BUZZ_MS, buzzAt:0, value:200, lockVal:200, readT:0, readDur:3000, ansT:0, ansLimit:8000,
+  revT:0, revDur:5000, introT:0, introDur:6500, beatT:0, beatN:0, lastSec:-1, res:null, fill:null, ring:null, secs:null, stSmall:null};
+const PZ = {menu:false, help:false};
+const isPaused = () => PZ.menu || PZ.help;
+let vt = 0, lastT = performance.now(), boardEls = [];
+const tasks = [];
+const after = (ms, fn) => tasks.push({t:vt + ms, fn});
+const ansEls = [...document.querySelectorAll('#answers .ans')];
+$('gCoin').innerHTML = Hub.icon('coins');
+
+function loop(now){
+  const dt = clamp(now - lastT, 0, 100); lastT = now;
+  if (!isPaused() && screen === 'game'){
+    vt += dt;
+    for (let guard = 0; guard < 20; guard++){
+      let k = -1;
+      for (let i = 0; i < tasks.length; i++) if (tasks[i].t <= vt && (k < 0 || tasks[i].t < tasks[k].t)) k = i;
+      if (k < 0) break;
+      tasks.splice(k, 1)[0].fn();
+    }
+    update(dt);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(t => { lastT = t; requestAnimationFrame(loop); });
+
+function setPhase(p){
+  G.phase = p; tasks.length = 0; G.lastSec = -1;
+  const a = document.activeElement;
+  if (a && a !== document.body && a.blur) a.blur();
+}
+const valueAt = t => 200 - Math.round(10 * clamp(t / DECAY_MS, 0, 1)) * 10;
+const setFill = f => { if (G.fill) G.fill.style.transform = `scaleX(${clamp(f, 0, 1)})`; };
+
+function update(dt){
+  const ph = G.phase;
+  if (ph === 'read'){
+    G.readT += dt; setFill(G.readT / G.readDur);
+    if (G.readT >= G.readDur) openBuzz();
+  } else if (ph === 'open'){
+    G.buzzT += dt;
+    const v = valueAt(G.buzzT);
+    if (v !== G.value){ G.value = v; showValue(true); }
+    const left = G.buzzLimit - G.buzzT;
+    setFill(left / BUZZ_MS);
+    $('status').classList.toggle('hurry', left < 4000);
+    const sec = Math.ceil(left / 1000);
+    if (sec <= 3 && sec > 0 && sec !== G.lastSec){ G.lastSec = sec; SND.urgent(); }
+    G.beatT += dt;
+    const bl = left < 4000 ? 170 : 240;
+    while (G.beatT >= bl){ G.beatT -= bl; SND.beat(G.beatN++, left < 4000); }
+    if (left <= 0) reveal({who:-1, reason:'time'});
+  } else if (ph === 'answer'){
+    G.ansT += dt;
+    const left = Math.max(0, G.ansLimit - G.ansT);
+    if (G.ring) G.ring.style.strokeDashoffset = (282.74 * (1 - left / G.ansLimit)).toFixed(1);
+    const sec = Math.ceil(left / 1000);
+    if (sec !== G.lastSec){
+      G.lastSec = sec;
+      if (G.secs){ G.secs.textContent = sec; G.secs.classList.toggle('low', sec <= 3); }
+      if (sec > 0 && sec <= 3) SND.urgent(); else if (sec > 0) SND.tick();
+    }
+    if (left <= 0) answerTimeout();
+  } else if (ph === 'reveal'){
+    G.revT += dt; setFill(1 - G.revT / G.revDur);
+    if (G.revT >= G.revDur) nextQuestion();
+  } else if (ph === 'intro'){
+    G.introT += dt; setFill(1 - G.introT / G.introDur);
+    if (G.introT >= G.introDur) startFinal();
+  }
+}
+
+// ---------- Fragen für eine Partie zusammenstellen ----------
+function buildSet(){
+  const seenIdx = new Map(S.seen.map((id, i) => [id, i]));
+  const age = q => seenIdx.has(q.id) ? seenIdx.get(q.id) : -1;          // nie gesehen zuerst, dann am längsten her
+  const prefer = arr => shuffle(arr.slice()).sort((a, b) => age(a) - age(b));
+  const pool = QUESTIONS.filter(q => S.cats.includes(q.cat));
+  const okD = S.diff === 'easy' ? (d => d === 1) : S.diff === 'hard' ? (d => d >= 2) : (() => true);
+  const need = Math.min(S.n, pool.length);
+  let final = null;
+  if (S.finale && need >= 2){
+    const want = S.diff === 'easy' ? 2 : 3;
+    final = prefer(pool.filter(q => q.d === want))[0] || prefer(pool.filter(q => q.d >= 2))[0] || prefer(pool)[0];
+  }
+  const pick = [], target = need - (final ? 1 : 0);
+  const roundRobin = list => {
+    const by = {};
+    prefer(list).forEach(q => (by[q.cat] = by[q.cat] || []).push(q));
+    const keys = shuffle(Object.keys(by));
+    let added = true;
+    while (pick.length < target && added){
+      added = false;
+      for (const k of keys){ if (pick.length >= target) break; const q = by[k].shift(); if (q){ pick.push(q); added = true; } }
+    }
+  };
+  roundRobin(pool.filter(q => q !== final && okD(q.d)));
+  roundRobin(pool.filter(q => q !== final && !okD(q.d)));
+  // sanft steigende Schwierigkeit, aber gemischt
+  const r = new Map(pick.map(q => [q, q.d + Math.random() * 1.8]));
+  pick.sort((a, b) => r.get(a) - r.get(b));
+  // gleiche Kategorie nicht direkt hintereinander
+  for (let i = 1; i < pick.length; i++) if (pick[i].cat === pick[i - 1].cat){
+    const j = pick.findIndex((q, k) => k > i && q.cat !== pick[i - 1].cat);
+    if (j > 0) [pick[i], pick[j]] = [pick[j], pick[i]];
+  }
+  const out = pick.map(q => Object.assign({}, q, {final:false}));
+  if (final) out.push(Object.assign({}, final, {final:true}));
+  return out;
+}
+
+// ---------- Show starten ----------
+function startShow(skipCheck){
+  if (screen === 'game') return;
+  const inc = included();
+  if (inc.length < 2){ Hub.toast('Zu wenige Mitspieler', 'Für die Quiz-Show braucht ihr mindestens 2 Leute.', 'user'); Hub.sfx('bad'); return; }
+  capture = -1;
+  clearEndTimers();
+  G.players = inc.map(r => ({name:r.name, color:r.color, avatar:r.avatar, key:Object.assign({}, r.key), score:0, right:0, wrong:0, buzzes:0, times:[]}));
+  G.qs = buildSet(); G.qi = -1; G.res = null; G.answerer = -1; G.locked = new Set(); G.gone = new Set(); G.q = null;
+  document.body.classList.remove('finale');
+  showScreen('game');
+  renderBoard(); updateBoard();
+  $('gNum').innerHTML = `<b>${G.qs.length}</b> Fragen`; $('gCat').innerHTML = '<span class="ce av">🎤</span>Gleich geht’s los'; $('gCat').style.removeProperty('--cc');
+  $('gDiff').innerHTML = ''; $('gValN').textContent = '200';
+  const qt = $('qText'); qt.className = 'qtext idle'; qt.textContent = 'Willkommen zur Quiz-Show!';
+  ansEls.forEach(el => { el.className = 'ans hid'; el.querySelector('.tx').textContent = ''; });
+  $('status').innerHTML = ''; $('status').className = 'status';
+  if (inc.length >= 6) Hub.achieve('quiz', 'studio', 'Volles Studio', 'Eine Quiz-Show mit 6 oder mehr Leuten gestartet');
+  Hub.sfx('launch');
+  setPhase('check');
+  if (skipCheck) nextQuestion(); else renderCheck();
+}
+function renderCheck(){
+  G.ready = new Set();
+  showSplash(`<div class="sp-box"><div class="sp-tag">🔔 BUZZER-CHECK</div><h2>Jeder drückt einmal seine Taste!</h2>
+    <p>So weiß jeder, wo sein Buzzer ist. Antworten gibt’s später mit <b>1</b>–<b>4</b> – oder per Klick.</p>
+    <div class="ck-grid">${G.players.map((p, i) => `<div class="ck" data-i="${i}" style="--pc:${p.color}"><span class="av">${p.avatar}</span><b>${esc(p.name)}</b><kbd>${esc(p.key.label)}</kbd><span class="ok">WARTET …</span></div>`).join('')}</div>
+    <button class="bigbtn" id="ckGo">Los geht’s! <kbd>Enter</kbd></button></div>`);
+  $('splash').querySelectorAll('.ck').forEach(el => el.onclick = () => ready(+el.dataset.i));
+  $('ckGo').onclick = beginShow;
+}
+function ready(i){
+  if (G.phase !== 'check' || !$('splash').classList.contains('on')) return;
+  SND.buzz(i);
+  if (G.ready.has(i)) return;
+  G.ready.add(i);
+  const el = $('splash').querySelector(`.ck[data-i="${i}"]`);
+  if (el){ el.classList.add('ready'); el.querySelector('.ok').textContent = 'BEREIT ✓'; }
+  if (G.ready.size === G.players.length) after(900, beginShow);
+}
+function beginShow(){ if (G.phase !== 'check') return; hideSplash(); nextQuestion(); }
+
+function nextQuestion(){
+  if (G.phase !== 'check' && G.phase !== 'reveal') return;
+  G.qi++;
+  if (G.qi >= G.qs.length) return endShow();
+  const q = G.qs[G.qi];
+  if (q.final) finalIntro(); else showQuestion(q);
+}
+function finalIntro(){
+  setPhase('intro'); G.introT = 0;
+  document.body.classList.add('finale');
+  $('status').innerHTML = ''; $('status').className = 'status';
+  ansEls.forEach(el => { el.className = 'ans hid'; el.querySelector('.tx').textContent = ''; });
+  const qt = $('qText'); qt.className = 'qtext idle'; qt.textContent = 'Das große Finale …';
+  const top = ranking().slice(0, 4);
+  showSplash(`<div class="sp-box fin"><div class="sp-tag">🏆 DAS FINALE</div><h2>Die Finalfrage!</h2>
+    <p>Jetzt zählt alles <b>doppelt</b>: bis zu 400 Punkte für die richtige Antwort – aber auch ${PEN * 2} Punkte Abzug bei einer falschen.</p>
+    <div class="fin-st">${top.map(r => `<div style="--pc:${r.p.color}"><span class="av">${r.p.avatar}</span>${esc(r.p.name)}<span>${fmt(r.p.score)}</span></div>`).join('')}</div>
+    <div class="tbar"><i></i></div>
+    <button class="bigbtn" id="finGo">Zur Finalfrage <kbd>Enter</kbd></button></div>`);
+  G.fill = $('splash').querySelector('.tbar i');
+  $('finGo').onclick = startFinal;
+  SND.drum(1.6);
+  barStats();
+}
+function startFinal(){ if (G.phase !== 'intro') return; hideSplash(); showQuestion(G.qs[G.qi]); }
+
+function showQuestion(q){
+  hideSplash();
+  G.q = q; G.opts = shuffle([q.a].concat(q.w)); G.correct = G.opts.indexOf(q.a);
+  G.gone = new Set(); G.locked = new Set(); G.early = {}; G.answerer = -1; G.res = null;
+  G.buzzT = 0; G.buzzLimit = BUZZ_MS; G.value = 200; G.lockVal = 200; G.readT = 0; G.beatT = 0; G.beatN = 0;
+  G.readDur = clamp(1500 + q.q.length * 40, 2600, 6500);
+  document.body.classList.toggle('finale', !!q.final);
+  setPhase('read');
+  renderTop();
+  const qt = $('qText');
+  qt.textContent = q.q; qt.className = 'qtext' + (q.q.length > 95 ? ' long' : '');
+  void qt.offsetWidth; qt.classList.add('in');
+  ansEls.forEach(el => { el.className = 'ans hid'; el.style.animationDelay = ''; el.querySelector('.tx').textContent = ''; });
+  $('answers').classList.remove('sel');
+  renderStatus();
+  updateBoard(); barStats();
+  SND.jingle();
+  // gesehene Fragen merken, damit sie in den nächsten Partien erst später wiederkommen
+  S.seen = S.seen.filter(id => id !== q.id); S.seen.push(q.id);
+  if (S.seen.length > 400) S.seen.splice(0, S.seen.length - 400);
+  saveS();
+}
+function renderTop(){
+  const q = G.q, c = CAT[q.cat];
+  $('gNum').innerHTML = q.final ? '🏆 Finalfrage' : `Frage <b>${G.qi + 1}</b> / ${G.qs.length}`;
+  $('gCat').innerHTML = `<span class="ce av">${c.emo}</span>${esc(c.name)}`; $('gCat').style.setProperty('--cc', c.col);
+  $('gDiff').innerHTML = [1, 2, 3].map(k => `<i class="${k <= q.d ? 'on' : ''}"></i>`).join('') + `<span>${['leicht', 'mittel', 'schwer'][q.d - 1]}</span>`;
+  showValue(false);
+}
+function showValue(anim){
+  const m = G.q && G.q.final ? 2 : 1;
+  const v = (['answer', 'judge', 'feedback'].includes(G.phase) ? G.lockVal : G.value) * m;
+  const el = $('gValN');
+  if (el.textContent !== String(v)){
+    el.textContent = v;
+    if (anim){ const b = $('gVal'); b.classList.remove('tick'); void b.offsetWidth; b.classList.add('tick'); }
+  }
+}
+function openBuzz(){
+  if (G.phase !== 'read') return;
+  setPhase('open');
+  ansEls.forEach((el, k) => {
+    el.className = 'ans show'; el.style.animationDelay = (k * 110) + 'ms';
+    const t = el.querySelector('.tx'); t.textContent = G.opts[k]; t.classList.toggle('long', G.opts[k].length > 30);
+    SND.whoosh(k);
+  });
+  renderStatus();
+}
+function flashCard(i, cls){
+  const el = boardEls[i]; if (!el) return;
+  el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 600);
+}
+function buzz(i){
+  const p = G.players[i]; if (!p) return;
+  if (G.phase === 'read'){                                   // Fehlstart: kurz gesperrt
+    if ((G.early[i] || 0) > vt) return;
+    G.early[i] = vt + 1000; SND.early(); flashCard(i, 'early');
+    return;
+  }
+  if (G.phase !== 'open') return;
+  if (G.locked.has(i) || (G.early[i] || 0) > vt){ flashCard(i, 'nope'); return; }
+  G.answerer = i; G.lockVal = G.value; G.buzzAt = G.buzzT; p.buzzes++;
+  setPhase('answer'); G.ansT = 0; G.ansLimit = S.time * 1000;
+  SND.buzz(i);
+  $('answers').classList.add('sel');
+  $('status').classList.remove('hurry');
+  renderStatus(); updateBoard(); showValue(false);
+}
+function choose(k){
+  if (G.phase !== 'answer' || G.gone.has(k) || k < 0 || k > 3) return;
+  setPhase('judge');
+  $('answers').classList.remove('sel');
+  ansEls[k].classList.add('pick');
+  if (G.stSmall) G.stSmall.textContent = `Antwort ${'ABCD'[k]} eingeloggt …`;
+  SND.lock();
+  after(1150, () => judge(k));
+}
+function judge(k){
+  const i = G.answerer, p = G.players[i], m = G.q.final ? 2 : 1;
+  ansEls[k].classList.remove('pick');
+  if (k === G.correct){
+    const pts = G.lockVal * m;
+    p.score += pts; p.right++; p.times.push(G.buzzAt);
+    floatScore(i, '+' + pts, false); burstAt(i);
+    SND.right();
+    if (G.buzzAt < 1000) Hub.achieve('quiz', 'blitz', 'Blitzmerker', 'Richtig geantwortet und keine Sekunde nach dem Einblenden gebuzzert');
+    if (G.q.final) Hub.achieve('quiz', 'finale', 'Finalist', 'Die Finalfrage der Quiz-Show richtig beantwortet');
+    reveal({who:i, pts});
+  } else {
+    ansEls[k].classList.add('wrong', 'gone'); G.gone.add(k);
+    penalize(i, false);
+  }
+}
+function penalize(i, timeout){
+  const p = G.players[i], pen = PEN * (G.q.final ? 2 : 1);
+  p.score -= pen; p.wrong++; G.locked.add(i);
+  floatScore(i, '−' + pen, true); SND.wrong();
+  setPhase('feedback');
+  const free = G.players.some((_, j) => !G.locked.has(j)), left = 4 - G.gone.size, goOn = free && left > 1;
+  renderStatus({timeout, pen, goOn});
+  updateBoard(); barStats();
+  after(1800, () => {
+    if (!goOn) return reveal({who:-1, reason:free ? 'eine' : 'alle'});
+    G.answerer = -1; G.buzzLimit = Math.max(G.buzzLimit, G.buzzT + REOPEN_MS);
+    setPhase('open'); renderStatus({again:true}); updateBoard(); showValue(false);
+  });
+}
+function answerTimeout(){
+  if (G.phase !== 'answer') return;
+  $('answers').classList.remove('sel');
+  penalize(G.answerer, true);
+}
+function reveal(res){
+  setPhase('reveal'); G.revT = 0; G.revDur = res.who >= 0 ? 5000 : 6000; G.res = res;
+  $('answers').classList.remove('sel');
+  ansEls.forEach((el, k) => {
+    if (el.classList.contains('hid')){ el.classList.remove('hid'); el.querySelector('.tx').textContent = G.opts[k]; el.querySelector('.tx').classList.toggle('long', G.opts[k].length > 30); }
+    el.classList.remove('pick', 'show'); el.style.animationDelay = '';
+    el.classList.toggle('right', k === G.correct);
+    el.classList.toggle('dim', k !== G.correct && !el.classList.contains('wrong'));
+  });
+  if (res.who < 0) SND.nobody();
+  renderStatus(res); updateBoard(); barStats();
+}
+function skipQuestion(){
+  const ph = G.phase;
+  if (['read', 'open', 'answer', 'judge', 'feedback'].includes(ph)) reveal({who:-1, reason:'skip'});
+  else if (ph === 'reveal') nextQuestion();
+  else if (ph === 'intro') startFinal();
+  else if (ph === 'check') beginShow();
+}
+
+// ---------- Statuszeile (wer ist dran, Timer, Ergebnis) ----------
+function renderStatus(o = {}){
+  const st = $('status'), ph = G.phase;
+  st.className = 'status ' + ph;
+  let h = '';
+  if (ph === 'read'){
+    h = `<div class="st-l"><span class="st-ic">👀</span><div><b>Frage lesen …</b><small>Gleich kommen die Antworten – noch nicht buzzern!</small></div></div><div class="tbar"><i></i></div>`;
+  } else if (ph === 'open'){
+    h = `<div class="st-l"><span class="st-ic">🔔</span><div><b>${o.again ? 'Die anderen dürfen!' : 'Jetzt buzzern!'}</b><small>Wer es weiß, drückt seine Taste</small></div></div><div class="tbar"><i></i></div>`;
+  } else if (ph === 'answer'){
+    const p = G.players[G.answerer];
+    h = `<div class="st-p" style="--pc:${p.color}"><div class="ring"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="45"/><circle class="fg" cx="50" cy="50" r="45"/></svg><span class="av">${p.avatar}</span></div>
+      <div class="st-pn"><b>${esc(p.name)}</b><small>ist dran – Antwort mit <kbd>1</kbd>–<kbd>4</kbd> oder Klick</small></div><div class="secs">${S.time}</div></div>`;
+  } else if (ph === 'feedback'){
+    const p = G.players[G.answerer];
+    h = `<div class="st-res bad" style="--pc:${p.color}"><span class="av">${p.avatar}</span><div><b>${o.timeout ? 'Zeit abgelaufen!' : 'Leider falsch!'}</b><small>${esc(p.name)} −${o.pen} Punkte${o.goOn ? ' · gleich dürfen die anderen' : ''}</small></div></div>`;
+  } else if (ph === 'reveal'){
+    const last = G.qi >= G.qs.length - 1;
+    if (o.who >= 0){
+      const p = G.players[o.who];
+      h = `<div class="st-res good" style="--pc:${p.color}"><span class="av">${p.avatar}</span><div><b>Richtig, ${esc(p.name)}!</b><small><em>+${o.pts}</em> Punkte${G.q.final ? ' – doppelt im Finale!' : ''}</small></div></div>`;
+    } else {
+      const t = {time:'Niemand hat gebuzzert!', eine:'Nur noch eine Antwort übrig', alle:'Keiner lag richtig!', skip:'Frage übersprungen'}[o.reason] || 'Aufgelöst';
+      h = `<div class="st-res none"><span class="av">🤷</span><div><b>${t}</b><small>Richtig ist: <em>${esc(G.q.a)}</em></small></div></div>`;
+    }
+    h += `<div class="tbar"><i></i></div><button class="h-btn xl" id="nextBtn">${last ? 'Zur Siegerehrung' : 'Nächste Frage'} <kbd>Enter</kbd></button>`;
+  }
+  st.innerHTML = h;
+  G.fill = st.querySelector('.tbar i'); G.ring = st.querySelector('.ring .fg'); G.secs = st.querySelector('.secs'); G.stSmall = st.querySelector('.st-pn small');
+  if (G.fill) setFill(ph === 'read' ? 0 : ph === 'open' ? (G.buzzLimit - G.buzzT) / BUZZ_MS : 1);
+  const nb = $('nextBtn'); if (nb) nb.onclick = () => { if (G.phase === 'reveal') nextQuestion(); };
+}
+
+// ---------- Punktetafel ----------
+function renderBoard(){
+  const b = $('board');
+  b.style.setProperty('--n', G.players.length);
+  b.innerHTML = G.players.map((p, i) => `<div class="pc" data-i="${i}" style="--pc:${p.color}" title="Klick = für ${esc(p.name)} buzzern">
+    <span class="crown av">👑</span><span class="av">${p.avatar}</span><div class="pn">${esc(p.name)}</div>
+    <div class="pr"><kbd class="kb">${esc(p.key.label)}</kbd><span class="ps">0</span></div><span class="lk av">🔒</span><span class="tag">ZU FRÜH</span></div>`).join('');
+  boardEls = [...b.children];
+  boardEls.forEach((el, i) => el.onclick = () => { if (isPaused()) return; if (G.phase === 'open') buzz(i); else if (G.phase === 'check') ready(i); });
+}
+function updateBoard(){
+  const max = Math.max(...G.players.map(p => p.score));
+  const live = ['answer', 'judge', 'feedback'].includes(G.phase), inQ = ['read', 'open', 'answer', 'judge', 'feedback'].includes(G.phase);
+  boardEls.forEach((el, i) => {
+    const p = G.players[i];
+    el.classList.toggle('act', live && i === G.answerer);
+    el.classList.toggle('bad', G.phase === 'feedback' && i === G.answerer);
+    el.classList.toggle('won', G.phase === 'reveal' && !!G.res && G.res.who === i);
+    el.classList.toggle('locked', inQ && G.locked.has(i) && !(live && i === G.answerer));
+    el.classList.toggle('lead', max > 0 && p.score === max);
+    const s = el.querySelector('.ps'); s.textContent = fmt(p.score); s.classList.toggle('neg', p.score < 0);
+  });
+}
+function floatScore(i, txt, bad){
+  const el = boardEls[i]; if (!el) return;
+  const f = document.createElement('span'); f.className = 'fl' + (bad ? ' bad' : ''); f.textContent = txt;
+  el.appendChild(f); setTimeout(() => f.remove(), 1600);
+}
+function ranking(){
+  const arr = G.players.map((p, i) => ({p, i})).sort((a, b) => b.p.score - a.p.score || b.p.right - a.p.right || a.i - b.i);
+  arr.forEach(r => { r.rank = 1 + arr.filter(o => o.p.score > r.p.score).length; });
+  return arr;
+}
+
+// ---------- Overlays ----------
+function showSplash(html){ const s = $('splash'); s.innerHTML = html; s.classList.add('on'); }
+function hideSplash(){ $('splash').classList.remove('on'); }
+function showScreen(n){
+  screen = n;
+  ['lobby', 'game', 'end'].forEach(s => $(s).classList.toggle('on', s === n));
+  const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur();
+  barStats();
+}
+function barStats(){
+  if (screen === 'lobby'){ bar.set('q', '–'); bar.set('lead', '–'); bar.set('pl', included().length); return; }
+  bar.set('q', G.qs.length ? `${clamp(G.qi + 1, 0, G.qs.length)}/${G.qs.length}` : '–');
+  const rk = ranking(), top = rk.filter(r => r.rank === 1);
+  bar.set('lead', !rk.length || rk[0].p.score <= 0 ? '–' : top.length > 1 ? 'Gleichstand' : rk[0].p.name);
+  bar.set('pl', G.players.length);
+}
+function openPause(){
+  if (PZ.menu || screen !== 'game' || !['check', 'read', 'open', 'answer', 'judge', 'feedback', 'reveal', 'intro'].includes(G.phase)) return;
+  PZ.menu = true; $('pause').classList.add('on'); Hub.sfx('click');
+}
+function closePause(){ PZ.menu = false; $('pause').classList.remove('on'); }
+$('pauseBtn').onclick = openPause;
+$('pause').querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+  const a = b.dataset.p;
+  closePause();
+  if (a === 'skip') skipQuestion();
+  else if (a === 'end') endShow();
+  else if (a === 'lobby') toLobby();
+});
+function toLobby(){
+  clearEndTimers(); closePause();
+  setPhase('idle'); hideSplash(); document.body.classList.remove('finale');
+  showScreen('lobby'); renderLobby();
+}
+bar.on('help', () => {
+  if (PZ.help) return;
+  PZ.help = true;
+  Hub.dialog({title:'Quiz-Show – so geht’s', html:`
+    <p><b>Ablauf:</b> Die Frage erscheint, nach kurzer Lesezeit kommen die Antworten A–D. Wer die Antwort weiß, drückt <b>seine eigene Buzzer-Taste</b> (steht bei jedem Namen). Wer zuerst drückt, ist dran und wählt mit <kbd>1</kbd>–<kbd>4</kbd> oder per Klick.</p>
+    <p><b>Punkte:</b> Richtig gibt 100 bis 200 Punkte – je schneller gebuzzert, desto mehr. Falsch kostet ${PEN} Punkte und du bist für diese Frage gesperrt; die anderen dürfen nochmal. Wer zu früh drückt (bevor die Antworten da sind), ist kurz gesperrt.</p>
+    <p><b>Finale:</b> Die letzte Frage zählt doppelt – Gewinn und Abzug.</p>
+    <p><b>Tasten:</b> <kbd>Enter</kbd> weiter · <kbd>Esc</kbd> Pause · Klick auf einen Spieler unten = für ihn buzzern.</p>`}).then(() => { PZ.help = false; });
+});
+
+// =====================================================================
+//  SIEGEREHRUNG
+// =====================================================================
+let endTimers = [];
+function clearEndTimers(){ endTimers.forEach(clearTimeout); endTimers = []; }
+function endShow(){
+  if (screen !== 'game') return;
+  setPhase('end'); hideSplash(); closePause(); document.body.classList.remove('finale');
+  const rk = ranking(), winners = rk.filter(r => r.rank === 1), played = Math.max(0, Math.min(G.qi + 1, G.qs.length));
+  const allZero = rk.every(r => r.p.score === rk[0].p.score);
+  $('endTitle').innerHTML = allZero && rk.length > 1 ? 'Unentschieden – alle gleichauf!'
+    : winners.length > 1 ? `Gleichstand! ${winners.map(w => `<span style="color:${w.p.color}">${esc(w.p.name)}</span>`).join(' & ')} teilen sich den Sieg!`
+    : `<span style="color:${winners[0].p.color}">${esc(winners[0].p.name)}</span> gewinnt die Quiz-Show!`;
+  const medal = ['🥇', '🥈', '🥉'], delays = {1:1.5, 2:.8, 3:.2};
+  $('podium').innerHTML = rk.slice(0, 3).map((r, k) => {
+    const d = delays[r.rank] || .2;
+    return `<div class="pp r${r.rank}" style="--pc:${r.p.color};order:${[2, 1, 3][k]}">
+      <div class="top" style="animation-delay:${d + .55}s"><span class="av">${r.p.avatar}</span><b>${esc(r.p.name)}</b><span class="pts">${fmt(r.p.score)}</span></div>
+      <div class="blk" style="animation-delay:${d}s"><span class="av">${medal[r.rank - 1] || ''}</span></div></div>`;
+  }).join('');
+  $('rankList').innerHTML = rk.map((r, k) => `<div class="rk" style="--pc:${r.p.color};animation-delay:${.15 + k * .08}s"><span class="n">${r.rank}.</span><span class="av">${r.p.avatar}</span>
+    <b>${esc(r.p.name)}</b><span class="st">✔ ${r.p.right} · ✘ ${r.p.wrong}</span><span class="p ${r.p.score < 0 ? 'neg' : ''}">${fmt(r.p.score)}</span></div>`).join('');
+  // kleine Auszeichnungen
+  const aw = [];
+  const fast = G.players.filter(p => p.times.length).map(p => ({p, t:p.times.reduce((a, b) => a + b, 0) / p.times.length})).sort((a, b) => a.t - b.t)[0];
+  if (fast) aw.push(`⚡ Schnellster Buzzer: <b>${esc(fast.p.name)}</b> (Ø ${(fast.t / 1000).toLocaleString('de-DE', {maximumFractionDigits:1, minimumFractionDigits:1})} s)`);
+  const sure = G.players.filter(p => p.right + p.wrong >= 3).map(p => ({p, q:p.right / (p.right + p.wrong)})).sort((a, b) => b.q - a.q || b.p.right - a.p.right)[0];
+  if (sure && sure.q > 0) aw.push(`🎯 Treffsicher: <b>${esc(sure.p.name)}</b> (${Math.round(sure.q * 100)} % richtig)`);
+  const brave = G.players.slice().sort((a, b) => b.buzzes - a.buzzes)[0];
+  if (brave && brave.buzzes >= 3) aw.push(`🔔 Buzzer-König: <b>${esc(brave.name)}</b> (${brave.buzzes}× gedrückt)`);
+  $('awards').innerHTML = aw.map(t => `<div class="aw">${t}</div>`).join('');
+  showScreen('end');
+  // Ton & Konfetti
+  SND.drum(1.3);
+  endTimers.push(setTimeout(() => { SND.fanfare(); confetti(200, G.players.map(p => p.color).concat(['#ffc83d', '#ffffff'])); }, 1450));
+  endTimers.push(setTimeout(() => confetti(120, ['#ffc83d', '#fff1b0', '#ff9d00'].concat(winners.map(w => w.p.color))), 2600));
+  // Profil
+  if (played >= 5){
+    Hub.achieve('quiz', 'show', 'Showmaster', 'Eine Quiz-Show bis zur Siegerehrung gespielt');
+    Hub.score('quiz', Math.max(0, rk[0].p.score), {label:'Siegerpunkte', silent:true});
+  }
+}
+$('againBtn').onclick = () => again();
+$('setBtn').onclick = toLobby;
+$('homeBtn').onclick = () => { location.href = '../Launcher.html'; };
+function again(){ if (screen !== 'end') return; clearEndTimers(); startShow(true); }
+
+// =====================================================================
+//  Konfetti (Canvas)
+// =====================================================================
+const fx = $('fx'), fxc = fx.getContext('2d');
+let parts = [], fxOn = false;
+function fxSize(){ const d = window.devicePixelRatio || 1; fx.width = Math.round(innerWidth * d); fx.height = Math.round(innerHeight * d); fxc.setTransform(d, 0, 0, d, 0, 0); }
+addEventListener('resize', fxSize); fxSize();
+function fxRun(){
+  if (fxOn) return; fxOn = true;
+  let last = performance.now();
+  const step = now => {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    fxc.clearRect(0, 0, innerWidth, innerHeight);
+    parts = parts.filter(p => p.y < innerHeight + 40 && p.life > 0);
+    for (const p of parts){
+      p.vy += p.g * dt; p.vx *= (1 - .6 * dt); p.x += (p.vx + Math.sin(p.t * 3 + p.ph) * 30) * dt; p.y += p.vy * dt; p.r += p.vr * dt; p.t += dt; p.life -= dt;
+      fxc.save(); fxc.globalAlpha = Math.min(1, p.life * 2); fxc.translate(p.x, p.y); fxc.rotate(p.r); fxc.fillStyle = p.c;
+      fxc.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.t * 5 + p.ph)) + 1); fxc.restore();
+    }
+    if (parts.length) requestAnimationFrame(step); else { fxOn = false; fxc.clearRect(0, 0, innerWidth, innerHeight); }
+  };
+  requestAnimationFrame(step);
+}
+function confetti(n, cols){
+  if (Hub.settings.reduceMotion) n = Math.round(n / 3);
+  for (let k = 0; k < n; k++) parts.push({x:Math.random() * innerWidth, y:-20 - Math.random() * innerHeight * .5, vx:(Math.random() - .5) * 160, vy:120 + Math.random() * 240, g:40,
+    r:Math.random() * 6.3, vr:(Math.random() - .5) * 10, w:8 + Math.random() * 8, h:5 + Math.random() * 6, c:cols[k % cols.length], t:0, ph:Math.random() * 6, life:9});
+  fxRun();
+}
+function burstAt(i){
+  const el = boardEls[i]; if (!el) return;
+  const b = el.getBoundingClientRect(), p = G.players[i], cols = [p.color, '#ffc83d', '#ffffff', '#7dffb5'];
+  for (let k = 0; k < (Hub.settings.reduceMotion ? 12 : 40); k++){
+    const a = -Math.PI / 2 + (Math.random() - .5) * 1.6, s = 300 + Math.random() * 450;
+    parts.push({x:b.left + b.width / 2, y:b.top + 10, vx:Math.cos(a) * s, vy:Math.sin(a) * s, g:900, r:Math.random() * 6.3, vr:(Math.random() - .5) * 14,
+      w:6 + Math.random() * 6, h:4 + Math.random() * 4, c:cols[k % cols.length], t:0, ph:Math.random() * 6, life:2.2});
+  }
+  fxRun();
+}
+
+// =====================================================================
+//  Tastatur
+// =====================================================================
+function numKey(e){
+  const m = /^(?:Digit|Numpad)([1-4])$/.exec(e.code || '');
+  if (m) return +m[1] - 1;
+  return /^[1-4]$/.test(e.key) ? +e.key - 1 : -1;
+}
+function gameKey(e){
+  const k = e.key;
+  if (PZ.menu){ if (k === 'Enter' || k === 'Escape'){ e.preventDefault(); closePause(); } return; }
+  if (k === 'Escape'){ e.preventDefault(); openPause(); return; }
+  if (k === ' ' || k === 'Enter') e.preventDefault();
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const ph = G.phase, pi = e.repeat ? -1 : G.players.findIndex(p => p.key.code === e.code);
+  if (ph === 'check'){ if (pi >= 0){ e.preventDefault(); ready(pi); } else if (k === 'Enter') beginShow(); return; }
+  if (ph === 'intro'){ if (k === 'Enter' || k === ' ') startFinal(); return; }
+  if (ph === 'answer'){ const n = numKey(e); if (n >= 0){ e.preventDefault(); choose(n); } return; }
+  if (ph === 'reveal'){ if (!e.repeat && (k === 'Enter' || k === ' ')) nextQuestion(); return; }
+  if ((ph === 'open' || ph === 'read') && pi >= 0){ e.preventDefault(); buzz(pi); }
+}
+addEventListener('keydown', e => {
+  if (document.querySelector('.h-overlay.on')) return;     // Hub-Dialog (z. B. Anleitung) ist offen
+  if (screen === 'lobby') return lobbyKey(e);
+  if (screen === 'end'){ if (e.key === 'Enter' && !e.repeat){ e.preventDefault(); again(); } return; }
+  if (screen === 'game') gameKey(e);
+}, true);
+
+ansEls.forEach((el, k) => el.onclick = () => { if (!isPaused()) choose(k); });
+
+// ---------- Los geht's ----------
+initRoster();
+renderLobby();
+</script>
+</body>
+</html>
