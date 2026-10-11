@@ -26,8 +26,8 @@ Deinstallieren geht über *Einstellungen → Apps → Spielhalle*.
 | `installer/build.ps1` | baut App und Setup mit Windows-Bordmitteln |
 | `installer/veroeffentlichen.ps1` | neue Version als GitHub-Release veröffentlichen |
 
-Neue Version veröffentlichen:
+Neue Version veröffentlichen: passiert automatisch. Jede Änderung an `Launcher.html`, `spiele/` oder `installer/`, die in `main` landet, baut GitHub Actions auf Windows und veröffentlicht sie als neue Version (letzte Version + 1). Die installierten Spielhallen holen sich das Update dann selbst.
 
-```powershell
-.\installer\veroeffentlichen.ps1 -Notiz "Neu: ..."
-```
+- Neuigkeiten fürs Update: in `installer/neu.txt` schreiben, sonst werden die Commit-Titel genommen.
+- Größerer Versionssprung (z. B. 1.1.0): Nummer in `installer/version.txt` eintragen.
+- Von Hand vom eigenen PC geht weiterhin: `.\installer\veroeffentlichen.ps1 -Notiz "Neu: ..."`
