@@ -1,0 +1,51 @@
+# Nur zum Testen: installiert das fertige Setup aus dem neuesten Release auf einem
+# frischen Windows und prüft, ob die Spielhalle mit der Updates-Karte startet.
+name: Setup testen
+on:
+  push:
+    branches: [claude/update-einstellungen-pv1quj]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Setup herunterladen
+        shell: powershell
+        run: |
+          gh release download --pattern Spielhalle-Setup.exe --pattern version.json --dir dl
+          if ($LASTEXITCODE) { throw 'Download fehlgeschlagen' }
+          Get-Content dl\version.json
+          $sha = (Get-FileHash dl\Spielhalle-Setup.exe -Algorithm SHA256).Hash
+          "SHA256: $sha"
+          if ($sha -ne (Get-Content dl\version.json -Raw | ConvertFrom-Json).sha256) { throw 'Prüfsumme passt nicht' }
+      - name: Installieren
+        shell: powershell
+        run: |
+          $p = Start-Process dl\Spielhalle-Setup.exe -ArgumentList '--still' -PassThru -Wait
+          "Setup beendet mit Code $($p.ExitCode)"
+          $d = "$env:LOCALAPPDATA\Programs\Spielhalle"
+          Get-ChildItem $d | Format-Table Name, Length
+          if (-not (Test-Path "$d\Spielhalle.exe")) { throw 'Spielhalle.exe fehlt' }
+          if (-not (Select-String -Path "$d\app\Launcher.html" -Pattern 'id="setUpd"' -Quiet)) { throw 'Updates-Karte fehlt in Launcher.html' }
+          'Desktop-Verknüpfung: ' + (Test-Path "$([Environment]::GetFolderPath('Desktop'))\Spielhalle.lnk")
+          'Installiert, Updates-Karte ist drin.'
+      - name: Starten
+        shell: powershell
+        run: |
+          Start-Process "$env:LOCALAPPDATA\Programs\Spielhalle\Spielhalle.exe"
+          $ok = $false
+          for ($i = 0; $i -lt 40 -and -not $ok; $i++) {
+            Start-Sleep 2
+            try { $info = Invoke-RestMethod http://localhost:8777/__info -TimeoutSec 3; $ok = $true } catch {}
+          }
+          Get-Content "$env:LOCALAPPDATA\Programs\Spielhalle\*.log" -ErrorAction SilentlyContinue
+          if (-not $ok) { throw 'Spielhalle antwortet nicht' }
+          $info | ConvertTo-Json
+          $html = (Invoke-WebRequest http://localhost:8777/ -UseBasicParsing).Content
+          if ($html -notmatch 'id="setUpd"') { throw 'Updates-Karte fehlt in der laufenden Spielhalle' }
+          "Läuft: Version $($info.version), Updates-Karte ist da."
