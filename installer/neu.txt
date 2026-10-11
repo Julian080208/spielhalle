@@ -1,1 +1,1 @@
-Updates funktionieren jetzt auch, wenn das Projekt privat ist: einmal pro PC bei GitHub anmelden (Knopf links unten in der Spielhalle).
+Klappt ein Update nicht, zeigt die Spielhalle jetzt den Grund an, statt dass einfach nichts passiert.
