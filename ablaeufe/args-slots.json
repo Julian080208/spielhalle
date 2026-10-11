@@ -1,0 +1,41 @@
+{
+ "id": "slots",
+ "title": "Slots (Buch des Pharao, Früchte-Feuer, Zwillingsblitz)",
+ "prefix": "slot",
+ "globalPrefix": "SL_",
+ "portBase": 8950,
+ "files": "spiele/shared/slots.js (gemeinsamer Slot-Motor HubSlot, ~33 KB: Layout, Symbole, Auswertung Linien/Wege, Freispiele, Risiko, Gewinntabelle, Simulation der Auszahlungsquote) und die Automaten spiele/pharao.html, spiele/fruechte.html, spiele/zwilling.html (je eine Konfiguration für HubSlot)",
+ "about": "Drei Spielautomaten mit Spielgeld-Chips (Hub.chips, gemeinsames Konto für alle Casino-Spiele). Der Motor in slots.js wird von allen Automaten benutzt – Änderungen dort wirken überall.",
+ "wish": "Die Slots werden in der Runde viel gespielt: deutlich besser und VIEL mehr – mehr Automaten mit eigenen Themen und Bonus-Features, spannendere Gewinne (Big-Win-Animationen, Bonusrunden, Jackpots), schönere Optik am Fernseher, faire Auszahlungsquote (Spielgeld, aber nicht zu geizig und nicht zu großzügig).",
+ "angles": [
+  [
+   "inhalt",
+   "INHALT: neue Automaten (mindestens 5, z. B. Diamanten-Rausch, Wilder Westen, Tiefsee-Schatz, Weltraum, Süßigkeiten, Wikinger, Märchen) mit eigenem Thema, Symbolen, Gewinntabellen und Feature; welche bestehenden Konfigurationen sollten aufgewertet werden?"
+  ],
+  [
+   "mechanik",
+   "MECHANIK: Welche Features soll der Motor zusätzlich können (Cascading/Tumble, Sticky Wilds, Multiplikatoren, Bonus-Pick-Spiel, Hold&Win/Münzsammeln, progressiver Jackpot für alle Automaten gemeinsam, Kauf-Bonus, Turbo/Auto mit Stopp-Bedingungen)? Auszahlungsquote per Simulation pro Automat 94–97 % halten, Statistiken."
+  ],
+  [
+   "party",
+   "PARTY & OPTIK: Big-Win/Mega-Win-Animationen, Münzregen, Sound-Design, Automaten-Lobby/Auswahl-Halle, TV-Lesbarkeit, Partymodus (z. B. reihum drehen, wer gewinnt am meisten in 10 Drehs), Bestenliste."
+  ]
+ ],
+ "contentHint": "Neue Automaten als eigene Seiten spiele/slot-<name>.html (jede genau wie pharao.html/fruechte.html aufgebaut: hub.css, hub.js, catalog*.js, slots.js, HubSlot-Konfiguration; mit <meta name=\"spielhalle-beschreibung\">, <meta name=\"spielhalle-genre\" content=\"Casino, Slots\">, <meta name=\"spielhalle-symbol\"> und <meta name=\"spielhalle-farbe\">). Jedes neue Automaten-Paket = genau eine neue Seite. Neue Motor-Features dürfen in diesen Seiten erst konfiguriert werden, wenn der Plan sie vorsieht (das Spielwerk-Update bindet sie danach im Motor ein und passt die Seiten bei Bedarf an).",
+ "engineHints": "Der Motor bleibt rückwärtskompatibel: die drei alten Automaten müssen weiter laufen. Neue Features als Optionen in HubSlot. Auszahlungsquote jedes Automaten per eingebauter Simulation messen (Ziel 94–97 %) und Tabellen/Streifen anpassen. Test-Hilfen: window.SLOT_DEBUG mit simulate(n) und Zugriff auf Zustand; localStorage 'slot_test' = {\"fast\":true} für Drehs ohne Animation. Gemeinsamer progressiver Jackpot (falls geplant) über Hub.read/Hub.write.",
+ "visualMust": "Gewinne, Einsatz, Chips und Gewinnlinien vom Sofa lesbar; Big-Win-Animationen nicht nervig lang (überspringbar per Klick/Leertaste); kein Überlappen bei 1280×720.",
+ "testers": [
+  [
+   "quote",
+   "Für JEDEN Automaten (alt und neu): mit window.SLOT_DEBUG bzw. der Simulation mindestens 200.000 Drehs simulieren, Auszahlungsquote, Trefferhäufigkeit, Freispiel-/Bonus-Häufigkeit, maximaler Gewinn. Melde Automaten außerhalb 94–97 % oder mit absurden Ausreißern, und Konsolenfehler."
+  ],
+  [
+   "bedienung",
+   "Spiele jeden Automaten im Browser: Einsatz ändern, drehen (Maus/Leertaste), Auto/Turbo mit Stopp, Freispiele/Bonus auslösen (per Debug), Risiko-Spiel, Gewinntabelle, Pleite/Nachschub, Jackpot, Partymodus falls vorhanden. Finde Hänger, falsche Auszahlungen, Bedienprobleme."
+  ],
+  [
+   "optik",
+   "Screenshots aller Automaten bei 1280×720, 1600×900, 1920×1080 und im Fernseher-Modus, inkl. Big-Win, Freispiele, Bonus, Gewinntabelle. SIEH JEDEN AN; finde Überlappungen, abgeschnittene/zu kleine Texte, unschöne Symbole."
+  ]
+ ]
+}

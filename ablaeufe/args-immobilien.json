@@ -1,0 +1,41 @@
+{
+ "id": "immobilien",
+ "title": "Immobilienkönig",
+ "prefix": "immo",
+ "globalPrefix": "IK_",
+ "portBase": 8900,
+ "files": "spiele/immobilien.html (Markup/CSS, 3D-Spielbrett) und spiele/immobilien.js (~80 KB Spielwerk)",
+ "about": "Monopoly-artiges Grundstücks-Brettspiel auf einem 3D-Brett: drei Editionen (Klassik, Deutschland, Weltreise; Daten in EDITIONS/BASE), 2–6 Spieler (Mensch oder KI in drei Stärken), Würfel, Ereigniskarten CH_CARDS/CC_CARDS, Versteigerungen, Handel, Häuser/Hotels, Hypotheken, Hausregeln (Frei-Parken-Topf), Vermögensstatistik am Ende. Speichert unter immo2_save/immo2_lobby/immo2_view.",
+ "wish": "Das ist eins der Lieblingsspiele der Runde: deutlich besser und VIEL mehr – mehr Editionen/Spielbretter, viel mehr Ereigniskarten, mehr Abwechslung und Spannung, schönere Darstellung, partytauglicher am Fernseher. Partien sollen nicht endlos werden (optionaler Schnellmodus/Zeitlimit).",
+ "angles": [
+  [
+   "inhalt",
+   "INHALT: neue Editionen/Bretter (z. B. Fantasy, Weltraum, Unterwasser, Heimatstadt, Süßigkeiten) mit Straßennamen/Farben/Mittelgrafik; viel mehr Ereigniskarten (≥60 je Stapel, witzig, abwechslungsreich), Spielfiguren, Hausregeln."
+  ],
+  [
+   "mechanik",
+   "MECHANIK: Was macht Immobilienkönig spannender und kürzer? Schnellspiel-Modus (Zeit-/Rundenlimit, mehr Startgrundstücke), Bankrott-Regeln, faire und schlaue KI (Handel, Bauen, Versteigern), Handelsdialog verbessern, Statistiken, Ereignis-Würfel/Spezialfelder, Balance."
+  ],
+  [
+   "party",
+   "PARTY & OPTIK: Darstellung am Fernseher (Lesbarkeit von Feldern/Preisen/Geld), Animationen (Figuren, Würfel, Geld, Bauen), dramatische Momente (Bankrott, Hotel, Versteigerung), Sounds, Siegerehrung mit Auszeichnungen, Lobby."
+  ]
+ ],
+ "contentHint": "Sinnvolle Pakete z. B.: zusätzliche Editionen als Datendatei (spiele/immo-editionen.js, mindestens 5 neue komplette Editionen), Ereigniskarten (spiele/immo-karten.js, je Stapel ≥60 inkl. der bestehenden), Spielfiguren/Hausregeln/Auszeichnungen (spiele/immo-extras.js). Bestehende EDITIONS/CH_CARDS/CC_CARDS übernehmen.",
+ "engineHints": "Neue Speicherschlüssel immo3_save (alte Stände ignorieren); Lobby/Ansicht-Schlüssel dürfen bleiben. Test-Schnellmodus über localStorage 'immo_test' = {\"fast\":true} (keine Wartezeiten/Animationen, KI sofort) und window.IK_DEBUG = {state:()=>S}, damit Tester ganze Partien in Sekunden laufen lassen können. Alte Funktionen (Handel, Versteigerung, Hypotheken, Hausregeln) müssen weiter funktionieren.",
+ "visualMust": "Alle Feldnamen, Preise und Kontostände vom Sofa lesbar (TV), Dialoge groß, keine Überlappungen auf dem 3D-Brett in allen Editionen; Siegerehrung mit Podium/Auszeichnungen.",
+ "testers": [
+  [
+   "partien",
+   "Lass mindestens 15 komplette KI-Partien (2/3/4/6 Spieler, alle Editionen, verschiedene Hausregeln und Schnellspiel) im Schnellmodus laufen (localStorage immo_test={\"fast\":true}, window.IK_DEBUG.state()). Erkenne Hänger, Endlos-Partien, Konsolenfehler, NaN, falsche Mieten, Bankrott-Fehler, unfaire KI. Miss Runden pro Partie."
+  ],
+  [
+   "bedienung",
+   "Spiele als MENSCH (2 Menschen + 1 KI, normales Tempo): kaufen, versteigern, handeln (Dialog komplett), bauen, Hypothek, Gefängnis, Karten, Bankrott, Speichern/Fortsetzen, Lobby inkl. Partyrunde – Maus und Tastatur. Finde Hänger, Unklarheiten, Bedienfehler; Hilfe-Dialog aktuell?"
+  ],
+  [
+   "optik",
+   "Prüfe die Darstellung: Screenshots bei 1280×720, 1600×900, 1920×1080 und im Fernseher-Modus in Lobby, jeder Edition, Kauf-/Handels-/Versteigerungsdialog, Karten, Siegerehrung. SIEH JEDEN SCREENSHOT AN; finde Überlappungen, abgeschnittene/zu kleine Texte, schlechte Kontraste."
+  ]
+ ]
+}
