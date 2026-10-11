@@ -21,6 +21,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
@@ -296,13 +297,14 @@ static class App
                     SetAutoUpdate(ctx.Request.QueryString["an"] != "0");
                     Json(ctx, Info());
                     return;
+                case "__spiele": Json(ctx, Spiele()); return;
                 case "__yt": YouTube(ctx); return;
                 case "__import": Import(ctx); return;
             }
             if (path == "") path = "Launcher.html";
             string full = Path.GetFullPath(Path.Combine(AppDir, path.Replace('/', '\\')));
             if (full.StartsWith(AppDir + "\\", StringComparison.OrdinalIgnoreCase) && File.Exists(full))
-                Send(ctx, File.ReadAllBytes(full), Mime(full));
+                Send(ctx, WithBackButton(path, File.ReadAllBytes(full)), Mime(full));
             else
                 Text(ctx, "Nicht gefunden", "text/plain; charset=utf-8", 404);
         }
@@ -310,6 +312,57 @@ static class App
         {
             try { Text(ctx, "Fehler: " + e.Message, "text/plain; charset=utf-8", 500); } catch { }
         }
+    }
+
+    // ---------------------------------------------------------------- Neue Spiele
+    // Jede HTML-Datei direkt in spiele/ ist ein Spiel. Spiele ohne Katalog-Eintrag zeigt der
+    // Launcher trotzdem an – mit Titel und den Angaben aus <meta name="spielhalle-…" content="…">.
+    static List<object> Spiele()
+    {
+        var list = new List<object>();
+        string d = Path.Combine(AppDir, "spiele");
+        if (!Directory.Exists(d)) return list;
+        foreach (string f in Directory.GetFiles(d, "*.html"))
+        {
+            try
+            {
+                string html = Regex.Replace(File.ReadAllText(f, Encoding.UTF8), @"<!--.*?-->", "", RegexOptions.Singleline);
+                var t = Regex.Match(html, @"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                var meta = new Dictionary<string, object>();
+                foreach (Match m in Regex.Matches(html, @"<meta\b[^>]*>", RegexOptions.IgnoreCase))
+                {
+                    var n = Regex.Match(m.Value, @"\bname\s*=\s*[""']spielhalle-([a-z]+)[""']", RegexOptions.IgnoreCase);
+                    var c = Regex.Match(m.Value, @"\bcontent\s*=\s*(""[^""]*""|'[^']*')", RegexOptions.IgnoreCase);
+                    if (n.Success && c.Success)
+                        meta[n.Groups[1].Value.ToLowerInvariant()] = WebUtility.HtmlDecode(c.Groups[1].Value.Substring(1, c.Groups[1].Value.Length - 2)).Trim();
+                }
+                list.Add(new Dictionary<string, object> {
+                    { "file", "spiele/" + Path.GetFileName(f) },
+                    { "title", t.Success ? WebUtility.HtmlDecode(t.Groups[1].Value).Trim() : Path.GetFileNameWithoutExtension(f) },
+                    { "meta", meta },
+                });
+            }
+            catch (Exception e) { Log("Spiel nicht lesbar: " + f + " – " + e.Message); }
+        }
+        return list;
+    }
+
+    // Spiele ohne die gemeinsame Spielleiste (hub.js) bekommen einen Knopf zurück zur Spielhalle –
+    // das App-Fenster hat ja keine Zurück-Taste. Abschalten: <meta name="spielhalle-zurueck" content="nein">
+    const string BackButton = "<a id=\"spielhalle-zurueck\" href=\"/Launcher.html\" title=\"Zur Spielhalle\" style=\"position:fixed;left:12px;bottom:12px;z-index:2147483647;" +
+        "padding:8px 14px;border-radius:999px;background:rgba(14,15,22,.8);color:#fff;font:600 14px 'Segoe UI',system-ui,sans-serif;text-decoration:none;" +
+        "box-shadow:0 4px 14px rgba(0,0,0,.45);opacity:.6\" onmouseover=\"this.style.opacity=1\" onmouseout=\"this.style.opacity=.6\">&#8592; Spielhalle</a>" +
+        "<script>if(window.top!==window){var z=document.getElementById('spielhalle-zurueck');if(z)z.remove();}</script>";
+    static byte[] WithBackButton(string path, byte[] data)
+    {
+        if (!path.StartsWith("spiele/", StringComparison.OrdinalIgnoreCase) || path.IndexOf('/', 7) >= 0 ||
+            !path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) return data;
+        string html = Encoding.UTF8.GetString(data);
+        if (html.IndexOf("shared/hub.js", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            Regex.IsMatch(html, @"name\s*=\s*[""']spielhalle-zurueck[""']\s+content\s*=\s*[""']nein", RegexOptions.IgnoreCase)) return data;
+        int i = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+        html = i >= 0 ? html.Insert(i, BackButton) : html + BackButton;
+        return new UTF8Encoding(false).GetBytes(html);
     }
 
     // YouTube-Suche: Ergebnisseite laden und die eingebetteten Daten zurückgeben

@@ -18,11 +18,24 @@ Danach aktualisiert sich die Spielhalle von selbst, beim Start und während des 
 
 Deinstallieren geht über *Einstellungen → Apps → Spielhalle*.
 
+## Neues Spiel hinzufügen
+
+1. Eine HTML-Datei in den Ordner `spiele/` legen, z. B. `spiele/reaktion.html`.
+   Als Vorlage: [`vorlagen/neues-spiel.html`](vorlagen/neues-spiel.html), ein fertiges kleines Spiel zum Abschauen.
+2. Auf `main` bringen. Mehr nicht.
+
+GitHub baut dann automatisch eine neue Version, alle installierten Spielhallen holen sie sich selbst, und das Spiel steht in der Liste: mit Cover, „Neu“-Abzeichen und einem Knopf „← Spielhalle“ zum Zurückgehen.
+Name, Beschreibung, Kategorie, Emoji und Farbe fürs Cover kommen aus ein paar `<meta name="spielhalle-…">`-Zeilen im Spiel (siehe Vorlage), ohne sie aus dem `<title>`.
+
+Am einfachsten sagt man Claude einfach: *„Mach für die Spielhalle ein Spiel, bei dem …“*
+
 ## Für Entwickler
 
 | Ordner / Datei | Inhalt |
 |---|---|
 | `Launcher.html`, `spiele/` | die Spielhalle selbst (HTML/JS) |
+| `spiele/shared/catalog*.js` | Spiele mit selbst gezeichnetem Cover (freiwillig, sonst erzeugt die App eins) |
+| `vorlagen/neues-spiel.html` | Vorlage für neue Spiele |
 | `installer/Spielhalle.cs` | App: eigenes Fenster, lokaler Server (Port 8777), Online-Updates |
 | `installer/Setup.cs` | Installations-Assistent und Deinstaller |
 | `installer/build.ps1` | baut App und Setup mit Windows-Bordmitteln |
