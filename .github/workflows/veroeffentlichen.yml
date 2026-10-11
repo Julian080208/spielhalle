@@ -27,6 +27,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Einrichtungs-Datei prüfen
+        shell: powershell
+        run: |
+          $f = (Resolve-Path 'Spielhalle einrichten.cmd').Path
+          $fehler = $null
+          [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$null, [ref]$fehler) | Out-Null
+          if ($fehler) { $fehler | ForEach-Object { "Zeile $($_.Extent.StartLineNumber): $($_.Message)" }; throw 'Spielhalle einrichten.cmd hat Fehler' }
+          'Spielhalle einrichten.cmd: OK'
       - name: Version und Neuigkeiten
         id: v
         shell: powershell
