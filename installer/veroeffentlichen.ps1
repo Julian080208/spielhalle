@@ -1,4 +1,4 @@
-# =====================================================================
+﻿# =====================================================================
 #  Neue Version der Spielhalle veröffentlichen (GitHub-Release)
 #  Beispiel:  .\veroeffentlichen.ps1 -Notiz "Neu: Minigolf mit 18 Bahnen"
 #             .\veroeffentlichen.ps1 -Notiz "Großes Update" -Art minor
@@ -20,7 +20,8 @@ $repo = ([IO.File]::ReadAllText("$here\repo.txt")).Trim()
 
 # Version hochzählen
 $v = ([IO.File]::ReadAllText("$here\version.txt")).Trim().Split('.') | ForEach-Object { [int]$_ }
-switch ($Art) { 'major' { $v = @($v[0] + 1, 0, 0) } 'minor' { $v = @($v[0], $v[1] + 1, 0) } default { $v = @($v[0], $v[1], $v[2] + 1) } }
+# Klammern sind wichtig: in PowerShell bindet das Komma stärker als das Plus
+switch ($Art) { 'major' { $v = @(($v[0] + 1), 0, 0) } 'minor' { $v = @($v[0], ($v[1] + 1), 0) } default { $v = @($v[0], $v[1], ($v[2] + 1)) } }
 $version = $v -join '.'
 [IO.File]::WriteAllText("$here\version.txt", $version, $utf8)
 [IO.File]::WriteAllText("$here\neu.txt", $Notiz, $utf8)
