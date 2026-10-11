@@ -1,1 +1,1 @@
-Klappt ein Update nicht, zeigt die Spielhalle jetzt den Grund an, statt dass einfach nichts passiert.
+Die Spielhalle geht jetzt im eigenen Fenster auf statt im normalen Browser, auch wenn Edge oder Chrome woanders installiert ist. Brave und Vivaldi gehen jetzt auch.
