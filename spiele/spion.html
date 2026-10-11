@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wer ist der Spion?</title>
+<meta name="spielhalle-beschreibung" content="Alle kennen den geheimen Ort – nur einer nicht. Entlarvt den Spion!">
+<meta name="spielhalle-text" content="Jeder bekommt geheim den Einsatzort und eine Rolle – nur der Spion weiß nicht, wo ihr seid. Stellt euch reihum Fragen, ohne den Ort zu verraten, und stimmt ab, wer der Spion ist. Der Spion kann jederzeit versuchen, den Ort zu erraten. 52 Orte in 5 Paketen, Punkte über mehrere Runden. Für 3 bis 8 Leute.">
+<meta name="spielhalle-genre" content="Party, Bluffen">
+<meta name="spielhalle-symbol" content="🕵️">
+<meta name="spielhalle-farbe" content="#19d3b0">
+<meta name="spielhalle-steuerung" content="Enter/Leertaste = Weiter; A = Abstimmen; S = Spion rät; 1–8 = Spieler wählen; F = Frage-Idee; R = Rolle ansehen; P = Pause">
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+  html, body { height:100%; }
+  body { --accent:#19d3b0; --accent-2:#7af2dc; --accent-rgb:25,211,176; --spy:#ff4d64; --spy-2:#ff8a99; --amber:#ffc23d;
+         display:flex; flex-direction:column; overflow:hidden; user-select:none;
+         background:radial-gradient(1100px 650px at 80% -5%, rgba(25,211,176,.17), transparent 62%),
+                    radial-gradient(900px 620px at 5% 105%, rgba(255,77,100,.12), transparent 60%),
+                    linear-gradient(180deg, #07131c, #04080d); }
+  body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+                 background-image:linear-gradient(rgba(122,242,220,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(122,242,220,.05) 1px, transparent 1px);
+                 background-size:52px 52px; -webkit-mask-image:radial-gradient(ellipse at 50% 40%, #000 25%, transparent 78%); mask-image:radial-gradient(ellipse at 50% 40%, #000 25%, transparent 78%); }
+  [hidden] { display:none !important; }
+  #app { position:relative; z-index:1; flex:1; min-height:0; }
+  .screen { position:absolute; inset:0; display:none; }
+  .screen.on { display:flex; animation:scIn .4s var(--ease); }
+  @keyframes scIn { from { opacity:0; transform:translateY(12px); } }
+  .emo, .av, .le, .ds-emo, .md-emo { font-family:"Segoe UI Emoji","Noto Color Emoji","Apple Color Emoji",sans-serif; }
+  kbd { font-size:14px; padding:2px 7px; }
+  .lt { color:color-mix(in srgb, var(--pc) 62%, #fff); }
+
+  /* ------------------------------------------------------------ Knöpfe */
+  .bbtn { display:inline-flex; align-items:center; justify-content:center; gap:14px; min-height:64px; padding:0 32px; border:0; border-radius:18px; cursor:pointer;
+          font:800 clamp(21px, 3vh, 27px) var(--font-display); letter-spacing:.4px; color:#03241e; white-space:nowrap;
+          background:linear-gradient(180deg, #8ff5e2, #19d3b0 58%, #10aa8d); box-shadow:0 6px 0 #0a6b59, 0 14px 34px rgba(25,211,176,.32);
+          transition:transform .12s, filter .15s, box-shadow .15s; }
+  .bbtn:hover:not(:disabled) { filter:brightness(1.08); transform:translateY(-2px); }
+  .bbtn:active:not(:disabled) { transform:translateY(4px); box-shadow:0 2px 0 #0a6b59, 0 8px 20px rgba(25,211,176,.3); }
+  .bbtn.red { color:#fff; background:linear-gradient(180deg, #ff97a5, #ff4d64 58%, #d8304a); box-shadow:0 6px 0 #861a2c, 0 14px 34px rgba(255,77,100,.32); }
+  .bbtn.red:active:not(:disabled) { box-shadow:0 2px 0 #861a2c, 0 8px 20px rgba(255,77,100,.3); }
+  .bbtn.amber { color:#2d1e00; background:linear-gradient(180deg, #ffe39a, #ffc23d 58%, #e9a210); box-shadow:0 6px 0 #885c00, 0 14px 34px rgba(255,194,61,.3); }
+  .bbtn.amber:active:not(:disabled) { box-shadow:0 2px 0 #885c00, 0 8px 20px rgba(255,194,61,.3); }
+  .bbtn.ghost { color:var(--text); background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.16); box-shadow:none; }
+  .bbtn.ghost:hover:not(:disabled) { background:rgba(255,255,255,.11); }
+  .bbtn kbd { font-size:15px; background:rgba(0,0,0,.22); color:inherit; border-color:rgba(0,0,0,.25); }
+  .bbtn.ghost kbd { background:var(--surface-3); border-color:var(--border-2); }
+  .bbtn:disabled { filter:grayscale(.7) brightness(.62); cursor:not-allowed; }
+
+  /* ------------------------------------------------------------ Lobby */
+  #lobby { flex-direction:column; align-items:center; gap:clamp(8px, 1.6vh, 18px); overflow:auto; padding:clamp(10px, 2vh, 24px) 24px 0; }
+  .lb-head { display:flex; align-items:center; gap:clamp(12px, 2vw, 24px); animation:lbIn .7s var(--ease); }
+  .lb-logo { width:clamp(72px, 12vh, 124px); height:clamp(72px, 12vh, 124px); flex:none; animation:float 3.4s ease-in-out infinite; filter:drop-shadow(0 10px 24px rgba(0,0,0,.6)); }
+  .lb-logo .glint { animation:glint 3.4s ease-in-out infinite; }
+  .lb-title { margin:0; font:800 clamp(40px, 8.4vh, 96px)/1 var(--font-display); letter-spacing:2px; text-align:center;
+              background:linear-gradient(180deg, #ffffff 0%, #b9fbef 45%, #19d3b0 100%); -webkit-background-clip:text; background-clip:text; color:transparent;
+              filter:drop-shadow(0 5px 22px rgba(25,211,176,.35)); }
+  .lb-title em { font-style:normal; background:linear-gradient(180deg, #ffe1e5 0%, #ff8a99 45%, #ff3d57 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .lb-sub { margin:0; max-width:1120px; text-align:center; font-size:clamp(20px, 2.6vh, 25px); line-height:1.4; color:var(--text-2); }
+  .lb-sub b { color:var(--accent-2); }
+  .lb-sub b.red { color:var(--spy-2); }
+  .lb-cols { display:grid; grid-template-columns:minmax(0, .9fr) minmax(0, 1.1fr); gap:22px; width:min(1500px, 100%); }
+  .card { min-width:0; padding:16px 20px 18px; border-radius:24px; background:rgba(8,20,28,.72); border:1px solid rgba(122,242,220,.16); box-shadow:0 20px 50px rgba(0,0,0,.35); }
+  .card h3 { margin:0 0 12px; font:800 16px var(--font); letter-spacing:2.4px; text-transform:uppercase; color:var(--accent-2); }
+  .pchips { display:flex; flex-wrap:wrap; gap:10px; }
+  .pchip { position:relative; display:flex; align-items:center; gap:10px; height:60px; padding:0 14px 0 7px; border-radius:999px; border:3px solid var(--pc);
+           background:color-mix(in srgb, var(--pc) 26%, rgba(0,0,0,.3)); color:#fff; font:700 22px var(--font); cursor:pointer; transition:transform .15s, opacity .2s, filter .2s; }
+  .pchip:hover { transform:translateY(-2px); }
+  .pchip .av { width:44px; height:44px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:26px; box-shadow:inset 0 -3px 0 rgba(0,0,0,.25); flex:none; }
+  .pchip .nm { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pchip .gst { font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,.7); }
+  .pchip .rm { display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,.45); font-size:20px; line-height:1; }
+  .pchip .rm:hover { background:var(--bad); }
+  .pchip.off { opacity:.4; border-style:dashed; background:transparent; filter:grayscale(.85); }
+  .pchip.off .nm { text-decoration:line-through; }
+  .pchips.many { gap:8px; }
+  .pchips.many .pchip { height:52px; font-size:20px; gap:8px; padding-right:11px; }
+  .pchips.many .pchip .av { width:38px; height:38px; font-size:22px; }
+  .guest { display:flex; gap:10px; margin-top:14px; }
+  .guest .h-input { flex:1; min-width:0; height:54px; font-size:21px; border-radius:14px; background:rgba(0,0,0,.35); }
+  .guest .h-btn { height:54px; font-size:20px; padding:0 20px; border-radius:14px; }
+  .hint { margin:12px 2px 0; font-size:20px; line-height:1.4; color:var(--text-2); }
+  .hint.warn { color:#ffcf5a; font-weight:700; }
+  .hint.small { font-size:18px; color:var(--muted); }
+  #sets { display:grid; grid-template-columns:max-content minmax(0, 1fr); align-items:center; gap:10px 16px; }
+  .set-row { display:contents; }
+  .set-row > label { font-size:20px; font-weight:700; color:var(--text-2); white-space:nowrap; }
+  .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg button { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:52px; padding:4px 15px; border-radius:13px;
+                border:2px solid rgba(255,255,255,.12); background:rgba(255,255,255,.045); color:var(--text); font:700 20px/1.1 var(--font); cursor:pointer; transition:.15s; }
+  .seg button small { font-size:14px; font-weight:600; opacity:.75; margin-top:2px; }
+  .seg button:hover:not(:disabled) { border-color:rgba(122,242,220,.6); }
+  .seg button.on { background:linear-gradient(180deg, #7af2dc, #13b999); border-color:transparent; color:#03241e; box-shadow:0 5px 18px rgba(25,211,176,.35); }
+  .seg button:disabled { opacity:.3; cursor:not-allowed; }
+  .lb-foot { position:sticky; bottom:0; z-index:5; width:calc(100% + 48px); margin:auto -24px 0; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px 28px;
+             padding:12px 24px 16px; background:linear-gradient(0deg, rgba(4,9,14,.97) 55%, rgba(4,9,14,0)); }
+  .startbtn { display:flex; align-items:center; gap:16px; height:clamp(70px, 10vh, 92px); padding:0 52px; border:0; border-radius:999px; cursor:pointer;
+              font:800 clamp(28px, 4.4vh, 40px) var(--font-display); letter-spacing:1px; color:#03241e;
+              background:linear-gradient(180deg, #a6f9ea, #19d3b0 55%, #0d9c81); box-shadow:0 8px 0 #07604f, 0 18px 50px rgba(25,211,176,.45); transition:transform .12s, filter .2s; }
+  .startbtn:hover { filter:brightness(1.07); transform:translateY(-2px); }
+  .startbtn:active { transform:translateY(4px); box-shadow:0 4px 0 #07604f, 0 10px 30px rgba(25,211,176,.4); }
+  .startbtn.dim { filter:grayscale(.8) brightness(.62); }
+  .startbtn .emo { font-size:1.15em; }
+  .startbtn kbd { font-size:16px; background:rgba(0,0,0,.2); color:inherit; border-color:rgba(0,0,0,.25); }
+  .keys { font-size:18px; color:var(--muted); text-align:center; }
+  @keyframes lbIn { from { opacity:0; transform:translateY(-16px) scale(.96); } }
+  @keyframes float { 50% { transform:translateY(-7px) rotate(-2deg); } }
+  @keyframes glint { 0%, 60%, 100% { opacity:.25; } 70% { opacity:1; } }
+
+  /* ------------------------------------------------------------ Sichtschutz & Akte */
+  #cover { flex-direction:column; align-items:center; justify-content:center; gap:clamp(10px, 2vh, 22px); padding:16px 20px; overflow:auto;
+           background:repeating-linear-gradient(135deg, #050b11 0 28px, #07101a 28px 56px); }
+  .cv-top { font:800 clamp(15px, 2vh, 19px) var(--font); letter-spacing:3px; color:var(--amber); text-align:center; }
+  .cv-hide { display:flex; flex-direction:column; align-items:center; gap:clamp(8px, 1.8vh, 20px); text-align:center; animation:scIn .45s var(--ease); }
+  .cv-folder { width:clamp(110px, 19vh, 190px); filter:drop-shadow(0 16px 30px rgba(0,0,0,.6)); animation:float 3s ease-in-out infinite; }
+  .cv-h { margin:0; font:700 clamp(24px, 3.8vh, 38px) var(--font); color:var(--text-2); }
+  .cv-who { display:flex; align-items:center; justify-content:center; gap:22px; max-width:94vw; font:800 clamp(52px, 10vh, 112px)/1.05 var(--font-display);
+            color:color-mix(in srgb, var(--pc) 70%, #fff); text-shadow:0 0 40px color-mix(in srgb, var(--pc) 55%, transparent); animation:ptyIn .6s var(--ease); }
+  .cv-who > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cv-who .av { width:1.25em; height:1.25em; flex:none; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:.78em;
+                box-shadow:0 0 0 6px rgba(255,255,255,.14), 0 0 50px var(--pc), inset 0 -6px 0 rgba(0,0,0,.25); }
+  .cv-p { margin:0; font-size:clamp(21px, 3vh, 30px); line-height:1.35; }
+  .cv-btns { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:clamp(4px, 1vh, 12px); }
+  .cv-btns .bbtn, .cv-card > .bbtn { min-height:clamp(64px, 9vh, 84px); font-size:clamp(23px, 3.4vh, 32px); padding:0 40px; }
+  .cv-card { display:flex; flex-direction:column; align-items:center; gap:clamp(14px, 2.6vh, 28px); padding-top:30px; }
+  .cv-prog { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
+  .cv-prog span { position:relative; width:46px; height:46px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:26px; opacity:.35; transition:.3s; }
+  .cv-prog span.done { opacity:.9; }
+  .cv-prog span.done::after { content:'✓'; position:absolute; right:-5px; bottom:-5px; width:22px; height:22px; border-radius:50%; background:var(--good); color:#03241e; font:900 14px/22px var(--font); text-align:center; }
+  .cv-prog span.cur { opacity:1; transform:scale(1.18); box-shadow:0 0 0 3px #fff, 0 0 22px var(--pc); }
+
+  .dossier { position:relative; width:min(760px, 92vw); padding:clamp(20px, 3.4vh, 40px) clamp(20px, 3vw, 44px) clamp(18px, 3vh, 34px); border-radius:8px 22px 22px 22px; text-align:center;
+             background:linear-gradient(180deg, #f6eedc, #e8dabb); color:#2a2418; box-shadow:0 30px 80px rgba(0,0,0,.65), inset 0 0 0 2px rgba(0,0,0,.05);
+             animation:dsIn .55s cubic-bezier(.2,1.3,.4,1); }
+  .dossier::before { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:repeating-linear-gradient(0deg, rgba(90,70,30,.06) 0 1px, transparent 1px 36px); }
+  .ds-tab { position:absolute; top:-30px; left:0; padding:7px 20px 6px; border-radius:10px 14px 0 0; background:#f6eedc; font:800 15px var(--font); letter-spacing:2.5px; text-transform:uppercase; color:#7a6a48; }
+  .ds-label { font:800 clamp(14px, 2vh, 18px) var(--font); letter-spacing:4px; color:#8f7d58; }
+  .ds-emo { font-size:clamp(60px, 12vh, 124px); line-height:1.15; }
+  .ds-loc { font:800 clamp(42px, 7.6vh, 82px)/1.05 var(--font-display); color:#15110a; overflow-wrap:break-word; hyphens:manual; }
+  .ds-sep { width:72%; height:3px; margin:clamp(10px, 2vh, 22px) auto; background:repeating-linear-gradient(90deg, #bba982 0 12px, transparent 12px 20px); }
+  .ds-role { font:800 clamp(30px, 5.4vh, 56px)/1.1 var(--font-display); color:#0c7462; }
+  .ds-tip { margin:clamp(8px, 1.6vh, 16px) auto 0; max-width:600px; font-size:clamp(18px, 2.4vh, 22px); line-height:1.4; color:#5d5038; }
+  .ds-stamp { position:absolute; right:22px; top:20px; transform:rotate(12deg); padding:3px 14px; border:4px solid #c8283e; border-radius:8px; color:#c8283e;
+              font:900 clamp(16px, 2.4vh, 22px) var(--font-display); letter-spacing:3px; opacity:.85; animation:stampIn .5s .25s cubic-bezier(.2,1.6,.4,1) both; }
+  .dossier.spy { background:linear-gradient(180deg, #2c0d15, #15060a); color:#fff; box-shadow:0 0 0 3px var(--spy), 0 30px 80px rgba(255,77,100,.32); }
+  .dossier.spy::before { background:repeating-linear-gradient(0deg, rgba(255,77,100,.07) 0 1px, transparent 1px 36px); }
+  .dossier.spy .ds-tab { background:#2c0d15; color:var(--spy-2); }
+  .dossier.spy .ds-label { color:var(--spy-2); }
+  .dossier.spy .ds-loc { color:var(--spy); text-shadow:0 0 34px rgba(255,77,100,.55); }
+  .dossier.spy .ds-sep { background:repeating-linear-gradient(90deg, rgba(255,77,100,.55) 0 12px, transparent 12px 20px); }
+  .dossier.spy .ds-role { color:#fff; }
+  .dossier.spy .ds-tip { color:#ecc8ce; }
+  .dossier.spy .ds-stamp { border-color:var(--spy); color:var(--spy); }
+  @keyframes dsIn { from { opacity:0; transform:perspective(900px) rotateX(35deg) translateY(40px) scale(.9); } }
+  @keyframes stampIn { from { opacity:0; transform:rotate(12deg) scale(2.4); } }
+  @keyframes ptyIn { from { transform:scale(.6); opacity:0; } }
+
+  /* ------------------------------------------------------------ Fragerunde */
+  #play.on { display:grid; grid-template-columns:clamp(300px, 27vw, 440px) minmax(0, 1fr); gap:clamp(12px, 2vw, 26px); padding:clamp(10px, 2vh, 22px) clamp(12px, 2vw, 28px); }
+  .pl-left { display:flex; flex-direction:column; gap:clamp(8px, 1.5vh, 16px); min-height:0; min-width:0; }
+  .timer { position:relative; width:clamp(150px, 29vh, 290px); aspect-ratio:1; margin:0 auto; flex:none; }
+  .timer svg { width:100%; height:100%; transform:rotate(-90deg); overflow:visible; }
+  .tr-bg { fill:rgba(0,0,0,.4); stroke:rgba(255,255,255,.08); stroke-width:14; }
+  .tr-fg { fill:none; stroke:var(--accent); stroke-width:14; stroke-linecap:round; transition:stroke-dashoffset .25s linear, stroke .4s; filter:drop-shadow(0 0 9px rgba(25,211,176,.65)); }
+  .timer.warn .tr-fg { stroke:var(--amber); filter:drop-shadow(0 0 9px rgba(255,194,61,.65)); }
+  .timer.crit .tr-fg { stroke:var(--spy); filter:drop-shadow(0 0 12px rgba(255,77,100,.8)); }
+  .timer.crit { animation:pulse 1s ease-in-out infinite; }
+  .t-mid { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .t-num { font:800 clamp(44px, 8.6vh, 90px)/1 var(--font-display); font-variant-numeric:tabular-nums; letter-spacing:1px; }
+  .timer.warn .t-num { color:var(--amber); }
+  .timer.crit .t-num { color:var(--spy-2); }
+  .t-lbl { margin-top:4px; font:700 clamp(13px, 1.8vh, 17px) var(--font); letter-spacing:3px; text-transform:uppercase; color:var(--muted); }
+  @keyframes pulse { 50% { transform:scale(1.04); } }
+  .asker { padding:clamp(10px, 1.7vh, 18px) 18px; border-radius:22px; border:2px solid var(--pc); background:color-mix(in srgb, var(--pc) 15%, rgba(5,12,18,.85));
+           box-shadow:0 0 34px color-mix(in srgb, var(--pc) 28%, transparent); transition:border-color .3s, background .3s, box-shadow .3s; min-width:0; }
+  .asker > small { font:800 15px var(--font); letter-spacing:3px; text-transform:uppercase; color:var(--text-2); }
+  .ak-row { display:flex; align-items:center; gap:14px; margin:6px 0 4px; min-width:0; }
+  .ak-row .av { width:clamp(52px, 8vh, 74px); height:clamp(52px, 8vh, 74px); flex:none; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(30px, 4.8vh, 44px);
+                box-shadow:inset 0 -4px 0 rgba(0,0,0,.25), 0 0 24px color-mix(in srgb, var(--pc) 60%, transparent); }
+  .ak-row b { font:800 clamp(32px, 5.6vh, 54px)/1.05 var(--font-display); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ak-row.pop { animation:ptyIn .45s var(--ease); }
+  .ak-hint { font-size:clamp(17px, 2.2vh, 20px); line-height:1.35; color:var(--text-2); }
+  .ak-idea { margin-top:8px; padding:9px 13px; border-radius:13px; background:rgba(255,194,61,.12); border:1px dashed rgba(255,194,61,.5); font-size:clamp(18px, 2.4vh, 22px); font-weight:700; line-height:1.3; color:#ffe2a0; animation:ptyIn .4s var(--ease); }
+  .acts { display:flex; flex-direction:column; gap:10px; margin-top:auto; }
+  .acts .bbtn { width:100%; min-height:clamp(54px, 8.4vh, 76px); padding:0 22px; justify-content:space-between; font-size:clamp(20px, 3vh, 28px); }
+  .acts-sm { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
+  .sbtn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:clamp(52px, 7.4vh, 68px); padding:4px; border-radius:14px; cursor:pointer;
+          border:2px solid rgba(255,255,255,.13); background:rgba(255,255,255,.05); color:var(--text); font:700 clamp(15px, 2vh, 18px)/1.15 var(--font); text-align:center; transition:.15s; }
+  .sbtn:hover { background:rgba(255,255,255,.1); border-color:rgba(122,242,220,.5); }
+  .sbtn kbd { font-size:12px; padding:1px 6px; }
+  .pl-right { display:flex; flex-direction:column; gap:clamp(8px, 1.4vh, 14px); min-width:0; min-height:0; }
+  .locs-head { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 16px; }
+  .locs-head h3 { margin:0; font:800 clamp(16px, 2.3vh, 21px) var(--font); letter-spacing:3px; text-transform:uppercase; color:var(--accent-2); }
+  .locs-head span { font-size:clamp(16px, 2.1vh, 19px); color:var(--muted); }
+  .locs { flex:1; min-height:0; display:grid; gap:8px; align-content:start; overflow:auto; --th:64px; --fs:24px; }
+  .loc { display:flex; align-items:center; gap:.45em; height:var(--th); padding:0 .6em; border-radius:14px; min-width:0; text-align:left;
+         background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:var(--text); font:700 var(--fs)/1.1 var(--font); animation:locIn .4s var(--ease) both; }
+  .loc .le { font-size:1.3em; flex:none; }
+  .loc .ln { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; hyphens:manual; }
+  @keyframes locIn { from { opacity:0; transform:scale(.9); } }
+  .locs.pick .loc { cursor:pointer; border-width:2px; transition:transform .12s, background .15s, border-color .15s, box-shadow .15s; }
+  .locs.pick .loc:hover { background:rgba(255,77,100,.14); border-color:rgba(255,77,100,.55); }
+  .locs.pick .loc.sel { background:linear-gradient(180deg, #ff8a99, #e33a52); border-color:#fff; color:#fff; box-shadow:0 0 0 3px rgba(255,77,100,.35), 0 0 30px rgba(255,77,100,.55); transform:scale(1.03); }
+  .locs.pick .loc.cur:not(.sel) { border-color:rgba(255,255,255,.75); }
+  .strip-h { font-size:clamp(15px, 2vh, 18px); color:var(--muted); }
+  .strip-h kbd { font-size:12px; }
+  .pstrip { display:flex; flex-wrap:wrap; gap:8px; }
+  .sc { display:flex; align-items:center; gap:8px; height:clamp(46px, 6.6vh, 60px); padding:0 14px 0 6px; border-radius:999px; cursor:pointer;
+        border:2px solid color-mix(in srgb, var(--pc) 60%, transparent); background:rgba(0,0,0,.38); color:#fff; font:700 clamp(17px, 2.3vh, 21px) var(--font); transition:transform .15s, box-shadow .2s, background .2s; }
+  .sc:hover { transform:translateY(-2px); }
+  .sc .av { width:clamp(34px, 5vh, 46px); height:clamp(34px, 5vh, 46px); border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(20px, 3vh, 27px); flex:none; }
+  .sc .nm { max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sc .pts { font-family:var(--font-display); font-weight:800; color:var(--gold); }
+  .sc kbd { font-size:12px; padding:1px 6px; }
+  .sc.cur { background:var(--pc); border-color:#fff; box-shadow:0 0 24px var(--pc); }
+  .sc.cur .pts { color:#fff; }
+  .sc.cur::after { content:'🎤'; font-size:22px; }
+  .tu { position:absolute; inset:0; z-index:20; display:none; align-items:center; justify-content:center; pointer-events:none; background:rgba(40,0,8,.55);
+        font:900 clamp(70px, 16vh, 170px)/1 var(--font-display); letter-spacing:4px; color:#fff; text-shadow:0 0 50px var(--spy), 0 6px 0 rgba(0,0,0,.5); }
+  #play.timeup .tu { display:flex; animation:tuIn .5s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes tuIn { from { opacity:0; transform:scale(1.8); } }
+
+  /* ------------------------------------------------------------ Abstimmung / Raten / Ergebnis / Ende */
+  #vote, #guess, #result, #end { flex-direction:column; align-items:center; overflow:auto; padding:clamp(12px, 2.4vh, 28px) 24px clamp(12px, 2vh, 22px); text-align:center; }
+  .tag { font:800 clamp(15px, 2vh, 19px) var(--font); letter-spacing:3px; color:var(--amber); }
+  .big-h { margin:4px 0; font:800 clamp(36px, 6.6vh, 74px)/1.05 var(--font-display); }
+  .sub { margin:0 auto; max-width:1150px; font-size:clamp(19px, 2.6vh, 26px); line-height:1.4; color:var(--text-2); }
+  .sub b { color:#fff; }
+  .sub .warn { color:#ffcf5a; font-weight:800; }
+  .count { height:clamp(64px, 11vh, 128px); display:flex; align-items:center; justify-content:center; font:900 clamp(56px, 10.5vh, 124px)/1 var(--font-display); color:var(--amber); text-shadow:0 0 40px rgba(255,194,61,.5); }
+  .count.pop { animation:cnt .7s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes cnt { from { transform:scale(1.7); opacity:0; } }
+  .pgrid { display:flex; flex-wrap:wrap; justify-content:center; gap:clamp(10px, 1.5vw, 20px); margin:clamp(10px, 2vh, 22px) 0; max-width:1400px; }
+  .pcard { position:relative; display:flex; flex-direction:column; align-items:center; gap:clamp(4px, 1vh, 10px); width:clamp(130px, 13vw, 196px); padding:clamp(10px, 2vh, 18px) 10px clamp(10px, 1.6vh, 16px);
+           border-radius:22px; border:3px solid color-mix(in srgb, var(--pc) 55%, transparent); background:color-mix(in srgb, var(--pc) 13%, rgba(4,10,16,.85)); color:#fff; cursor:pointer;
+           transition:transform .15s, box-shadow .2s, opacity .2s, background .2s, border-color .2s; }
+  .pcard:hover { transform:translateY(-4px); }
+  .pcard .av { width:clamp(62px, 11vh, 104px); height:clamp(62px, 11vh, 104px); border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(36px, 6.6vh, 62px);
+               box-shadow:inset 0 -5px 0 rgba(0,0,0,.25); }
+  .pcard b { max-width:100%; font:800 clamp(20px, 3vh, 28px) var(--font-display); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pcard kbd { position:absolute; top:8px; left:8px; }
+  .pcard.sel { border-color:var(--spy); background:color-mix(in srgb, var(--spy) 28%, rgba(4,10,16,.85)); transform:translateY(-6px) scale(1.06);
+               box-shadow:0 0 0 4px rgba(255,77,100,.35), 0 0 44px rgba(255,77,100,.55); }
+  .pcard.sel::after { content:'🎯'; position:absolute; top:-16px; right:-12px; font-size:40px; animation:ptyIn .35s var(--ease); }
+  .pgrid.dim .pcard:not(.sel) { opacity:.5; }
+  .pcard.no { animation:shake .45s; opacity:.4; }
+  @keyframes shake { 20%, 60% { transform:translateX(-8px); } 40%, 80% { transform:translateX(8px); } }
+  .foot { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:auto; padding-top:12px; }
+  .foot .bbtn { min-height:clamp(58px, 8vh, 74px); }
+  #gsLocs { width:min(1500px, 100%); flex:1; min-height:240px; margin:clamp(8px, 1.6vh, 18px) 0; }
+
+  .rs-hero { display:flex; flex-direction:column; align-items:center; gap:clamp(4px, 1vh, 10px); transition:margin .5s var(--ease); }
+  .rs-hero.wait { margin-top:16vh; }
+  .rs-sus { display:flex; align-items:center; justify-content:center; gap:clamp(14px, 2vw, 26px); flex-wrap:wrap; margin:clamp(4px, 1vh, 10px) 0; }
+  .rs-sus .av { width:clamp(80px, 14vh, 130px); height:clamp(80px, 14vh, 130px); border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(48px, 8.4vh, 78px);
+                box-shadow:0 0 0 6px rgba(255,255,255,.12), 0 0 50px var(--pc), inset 0 -6px 0 rgba(0,0,0,.25); animation:ptyIn .6s var(--ease); transition:width .5s var(--ease), height .5s var(--ease), font-size .5s var(--ease); }
+  .rs-q { max-width:900px; font:800 clamp(30px, 5.4vh, 56px)/1.1 var(--font-display); }
+  .rs-q .pick { display:inline-block; padding:2px 16px; border-radius:14px; background:rgba(255,77,100,.18); border:2px solid rgba(255,77,100,.5); }
+  .rs-hero.wait .rs-sus .av { animation:ptyIn .6s var(--ease), sway 1s ease-in-out .6s infinite; }
+  @keyframes sway { 50% { transform:scale(1.06); } }
+  .rs-hero.done .rs-sus .av { width:clamp(60px, 9vh, 92px); height:clamp(60px, 9vh, 92px); font-size:clamp(36px, 5.4vh, 54px); }
+  .rs-hero.done .rs-q { font-size:clamp(24px, 3.8vh, 40px); }
+  .stamp { display:inline-block; margin:clamp(6px, 1.4vh, 14px) 0 clamp(10px, 2.2vh, 22px); padding:4px 26px; border:6px solid currentColor; border-radius:16px; font:900 clamp(40px, 7.6vh, 84px)/1.05 var(--font-display); letter-spacing:4px;
+           transform:rotate(-5deg); animation:stamp2 .5s cubic-bezier(.2,1.6,.4,1); }
+  .stamp.good { color:var(--good); text-shadow:0 0 30px rgba(63,210,139,.5); box-shadow:0 0 40px rgba(63,210,139,.25), inset 0 0 30px rgba(63,210,139,.15); }
+  .stamp.bad { color:var(--spy); text-shadow:0 0 30px rgba(255,77,100,.5); box-shadow:0 0 40px rgba(255,77,100,.25), inset 0 0 30px rgba(255,77,100,.15); }
+  @keyframes stamp2 { from { opacity:0; transform:rotate(-5deg) scale(2.6); } }
+  .rs-win { font:800 clamp(24px, 4vh, 42px) var(--font-display); animation:scIn .5s var(--ease); }
+  .rs-why { font-size:clamp(18px, 2.4vh, 23px); color:var(--text-2); }
+  .rs-body { grid-template-columns:minmax(240px, .7fr) minmax(0, 1.6fr); gap:clamp(14px, 2vw, 26px); width:min(1400px, 100%); margin-top:clamp(10px, 2vh, 20px); text-align:left;
+             display:none; }
+  .rs-body.on { display:grid; animation:bodyIn .55s var(--ease); }
+  @keyframes bodyIn { from { opacity:0; transform:translateY(18px); } }
+  .mdos { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:clamp(14px, 2.4vh, 26px) 18px; border-radius:20px; text-align:center;
+          background:linear-gradient(180deg, #f6eedc, #e8dabb); color:#2a2418; box-shadow:0 18px 50px rgba(0,0,0,.5); }
+  .mdos .ds-label { font-size:15px; }
+  .md-emo { font-size:clamp(50px, 9vh, 96px); line-height:1.1; }
+  .md-name { font:800 clamp(30px, 5vh, 52px)/1.05 var(--font-display); color:#15110a; hyphens:manual; overflow-wrap:break-word; max-width:100%; }
+  .md-pack { margin-top:4px; font-size:17px; font-weight:700; color:#7a6a48; }
+  .rs-right h3 { margin:0 0 8px; font:800 16px var(--font); letter-spacing:2.4px; text-transform:uppercase; color:var(--accent-2); }
+  .roles { display:grid; grid-template-columns:1fr; gap:7px; }
+  .roles.two { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .rrow { display:grid; grid-template-columns:auto minmax(0, 1fr) auto auto; grid-template-rows:auto auto; column-gap:12px; align-items:center; min-height:clamp(50px, 7vh, 64px);
+          padding:5px 14px 5px 6px; border-radius:14px; background:rgba(255,255,255,.05); border-left:5px solid var(--pc); }
+  .rrow .av { grid-row:1 / span 2; width:clamp(38px, 5.6vh, 50px); height:clamp(38px, 5.6vh, 50px); border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(22px, 3.3vh, 30px); }
+  .rrow b { font:800 clamp(18px, 2.5vh, 23px)/1.1 var(--font); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rrow .role { grid-column:2; grid-row:2; font-size:clamp(15px, 2.1vh, 19px); line-height:1.2; color:var(--text-2); }
+  .rrow.spy { background:rgba(255,77,100,.12); }
+  .rrow.spy .role { color:var(--spy-2); font-weight:800; letter-spacing:1px; }
+  .rrow .plus { grid-column:3; grid-row:1 / span 2; min-width:2.4em; text-align:center; padding:4px 10px; border-radius:999px; font:800 clamp(18px, 2.5vh, 23px) var(--font-display); background:rgba(63,210,139,.18); color:var(--good); }
+  .rrow .plus.zero { background:transparent; color:var(--muted); }
+  .rs-body.on .rrow .plus:not(.zero) { animation:plusIn .6s cubic-bezier(.2,1.6,.4,1) both; }
+  .rrow .tot { grid-column:4; grid-row:1 / span 2; min-width:1.6em; text-align:right; font:800 clamp(24px, 3.4vh, 32px) var(--font-display); color:var(--gold); }
+  @keyframes plusIn { from { transform:scale(0); } }
+  #end > .tag { margin-top:auto; }
+  #result .foot, #end .foot { opacity:0; transition:opacity .4s; pointer-events:none; }
+  #result .foot.on, #end .foot.on { opacity:1; pointer-events:auto; }
+
+  .podium { display:flex; align-items:flex-end; justify-content:center; gap:clamp(10px, 1.6vw, 20px); margin:clamp(10px, 2vh, 22px) 0 6px; }
+  .pp { display:flex; flex-direction:column; align-items:center; gap:6px; width:clamp(140px, 15vw, 220px); animation:ptyIn .7s var(--ease) both; }
+  .pp.p1 { animation-delay:.25s; } .pp.p2 { animation-delay:.45s; }
+  .pp .av { position:relative; width:clamp(66px, 11vh, 104px); height:clamp(66px, 11vh, 104px); border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(40px, 6.6vh, 62px);
+            box-shadow:0 0 0 5px rgba(255,255,255,.12), 0 0 40px var(--pc), inset 0 -5px 0 rgba(0,0,0,.25); }
+  .pp.r1 .av::before { content:'👑'; position:absolute; top:-.62em; left:50%; transform:translateX(-50%) rotate(-8deg); font-size:.62em; }
+  .pp.p0 .av { width:clamp(84px, 14vh, 130px); height:clamp(84px, 14vh, 130px); font-size:clamp(50px, 8.4vh, 78px); }
+  .pp b { max-width:100%; font:800 clamp(22px, 3.2vh, 30px) var(--font-display); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pp .ps { font:800 clamp(18px, 2.4vh, 22px) var(--font); color:var(--gold); }
+  .pp .blk { width:100%; display:flex; justify-content:center; padding-top:8px; border-radius:16px 16px 0 0; font-size:clamp(34px, 5.6vh, 52px);
+             background:linear-gradient(180deg, color-mix(in srgb, var(--pc) 85%, #fff), rgba(0,0,0,.2)); box-shadow:inset 0 2px 0 rgba(255,255,255,.3); }
+  .pp.p0 { order:2; } .pp.p1 { order:1; } .pp.p2 { order:3; }
+  .pp.r1 .blk { height:clamp(60px, 13vh, 160px); } .pp.r2 .blk { height:clamp(44px, 9vh, 112px); } .pp.r3 .blk { height:clamp(34px, 6vh, 80px); }
+  .ranks { display:grid; grid-template-columns:minmax(0, 1fr); gap:6px; width:min(640px, 100%); margin:8px auto 0; }
+  .ranks.two { grid-template-columns:repeat(2, minmax(0, 1fr)); width:min(1100px, 100%); }
+  .rk { display:flex; align-items:center; gap:12px; padding:5px 16px 5px 8px; border-radius:14px; background:rgba(255,255,255,.05); border-left:5px solid var(--pc); font-size:clamp(18px, 2.5vh, 22px); text-align:left; }
+  .rk .n { width:1.8em; font-family:var(--font-display); font-weight:800; color:var(--muted); text-align:right; }
+  .rk .av { width:clamp(34px, 5vh, 44px); height:clamp(34px, 5vh, 44px); border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(20px, 3vh, 26px); }
+  .rk b { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rk .s { font:800 clamp(20px, 2.8vh, 26px) var(--font-display); color:var(--gold); }
+  .en-stats { margin-top:10px; font-size:clamp(18px, 2.4vh, 22px); color:var(--text-2); }
+
+  /* ------------------------------------------------------------ Overlay */
+  .ovl { position:fixed; inset:0; z-index:700; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(3,7,11,.82); backdrop-filter:blur(8px);
+         opacity:0; pointer-events:none; transition:opacity .2s; }
+  .ovl.on { opacity:1; pointer-events:auto; }
+  .ov-box { width:min(900px, 100%); max-height:92vh; overflow:auto; padding:clamp(18px, 3.4vh, 38px) clamp(18px, 3vw, 40px); border-radius:30px; text-align:center;
+            background:linear-gradient(180deg, #102631, #0a151c); border:2px solid rgba(25,211,176,.32); box-shadow:0 30px 90px rgba(0,0,0,.7); transform:scale(.94); transition:transform .3s var(--ease); }
+  .ovl.on .ov-box { transform:none; }
+  .ov-h { margin:6px 0; font:800 clamp(30px, 5vh, 50px)/1.1 var(--font-display); }
+  .ov-p { margin:10px auto; max-width:760px; font-size:clamp(19px, 2.6vh, 25px); line-height:1.45; color:var(--text-2); }
+  .ov-p b { color:#fff; }
+  .ov-big { display:flex; align-items:center; justify-content:center; gap:22px; margin:clamp(10px, 2.4vh, 24px) 0; animation:ptyIn .6s var(--ease); }
+  .ov-big .av { width:clamp(80px, 14vh, 120px); height:clamp(80px, 14vh, 120px); flex:none; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:clamp(48px, 8.4vh, 72px);
+                box-shadow:0 0 0 6px rgba(255,255,255,.12), 0 0 50px var(--pc), inset 0 -6px 0 rgba(0,0,0,.25); }
+  .ov-big small { display:block; text-align:left; font-size:clamp(18px, 2.4vh, 22px); font-weight:700; color:var(--text-2); }
+  .ov-big b { display:block; max-width:52vw; text-align:left; font:800 clamp(48px, 9vh, 90px)/1 var(--font-display); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+              color:color-mix(in srgb, var(--pc) 65%, #fff); text-shadow:0 0 30px color-mix(in srgb, var(--pc) 60%, transparent); }
+  .ov-row { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:clamp(12px, 2.4vh, 24px); }
+  .ov-row .bbtn { min-height:clamp(62px, 8.6vh, 78px); }
+  .ov-picks { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:14px 0 4px; }
+  .ov-time { font:800 clamp(56px, 11vh, 110px)/1 var(--font-display); color:var(--accent-2); margin:8px 0; font-variant-numeric:tabular-nums; }
+
+  #fx { position:fixed; inset:0; z-index:800; pointer-events:none; }
+
+  /* ------------------------------------------------------------ Schmal / klein */
+  @media (max-width:1000px) {
+    .lb-cols { grid-template-columns:1fr; }
+    #sets { grid-template-columns:1fr; }
+    #play.on { grid-template-columns:1fr; grid-template-rows:auto auto; align-content:start; overflow:auto; }
+    .pl-left { display:grid; grid-template-columns:auto minmax(0, 1fr); align-items:center; min-height:auto; }
+    .pl-right { min-height:auto; }
+    .timer { width:150px; }
+    .t-num { font-size:44px; }
+    .t-lbl { font-size:12px; letter-spacing:2px; }
+    .acts { grid-column:1 / -1; }
+    .locs { min-height:360px; flex:none; }
+    .rs-body { grid-template-columns:1fr; }
+    .roles.two, .ranks.two { grid-template-columns:1fr; }
+  }
+  @media (max-height:800px) {
+    .cv-folder { width:96px; }
+    #lobby { gap:8px; }
+    .lb-logo { width:64px; height:64px; }
+    .lb-title { font-size:clamp(40px, 7.4vh, 60px); }
+    .lb-sub { font-size:20px; }
+    .card { padding:12px 18px 14px; }
+    .card h3 { margin-bottom:8px; }
+    .pchip { height:52px; font-size:20px; }
+    .pchip .av { width:38px; height:38px; font-size:22px; }
+    .guest { margin-top:10px; }
+    .guest .h-input, .guest .h-btn { height:48px; }
+    .hint { margin-top:8px; font-size:19px; }
+    .hint.small { display:none; }
+    #sets { gap:7px 14px; }
+    .seg button { min-height:44px; padding:3px 13px; font-size:19px; }
+    .seg button small { font-size:13px; margin-top:0; }
+    .lb-foot { padding:8px 24px 10px; }
+    .startbtn { height:64px; }
+  }
+  html.tv .sbtn { font-size:19px; }
+  html.tv .strip-h, html.tv .keys { font-size:20px; }
+</style>
+</head>
+<body>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<script src="shared/catalog5.js"></script>
+
+<div id="app">
+  <!-- ======================================================== Lobby -->
+  <section class="screen on" id="lobby">
+    <div class="lb-head">
+      <svg class="lb-logo" viewBox="0 0 120 120" aria-hidden="true">
+        <defs>
+          <radialGradient id="lgA" cx="50%" cy="42%" r="58%"><stop offset="0" stop-color="#19d3b0" stop-opacity=".6"/><stop offset="1" stop-color="#19d3b0" stop-opacity="0"/></radialGradient>
+          <linearGradient id="lgB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34495e"/><stop offset="1" stop-color="#141e29"/></linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="58" fill="url(#lgA)"/>
+        <path d="M14 120 Q18 86 42 80 L60 100 L78 80 Q102 86 106 120 Z" fill="url(#lgB)"/>
+        <path d="M42 80 L50 108 L60 100 Z M78 80 L70 108 L60 100 Z" fill="#0b131b"/>
+        <ellipse cx="60" cy="63" rx="20" ry="23" fill="#1f2d3b"/>
+        <path d="M36 84 Q37 70 43 64 L53 88 Z M84 84 Q83 70 77 64 L67 88 Z" fill="#3a5068"/>
+        <path d="M33 47 Q35 17 60 17 Q85 17 87 47 Z" fill="url(#lgB)"/>
+        <rect x="34" y="38" width="52" height="8" fill="#ff4d64"/>
+        <ellipse cx="60" cy="47.5" rx="42" ry="7.5" fill="#1a2733"/>
+        <rect x="41" y="56" width="17" height="11" rx="4.5" fill="#05090d"/>
+        <rect x="62" y="56" width="17" height="11" rx="4.5" fill="#05090d"/>
+        <path d="M58 60.5 h4" stroke="#05090d" stroke-width="2.4"/>
+        <g class="glint" stroke="#7af2dc" stroke-width="2.2" stroke-linecap="round"><path d="M44.5 59 l6 0"/><path d="M65.5 59 l6 0"/></g>
+      </svg>
+      <h1 class="lb-title">WER IST DER <em>SPION?</em></h1>
+    </div>
+    <p class="lb-sub">Alle kennen den geheimen <b>Ort</b> – nur der <b class="red">Spion</b> nicht. Stellt euch reihum knifflige Fragen und entlarvt ihn, bevor er herausfindet, wo ihr seid!</p>
+    <div class="lb-cols">
+      <div class="card">
+        <h3>Wer spielt mit?</h3>
+        <div class="pchips" id="pchips"></div>
+        <div class="guest">
+          <input class="h-input" id="guestIn" maxlength="16" placeholder="+ Gast – Name eintippen" autocomplete="off" spellcheck="false">
+          <button class="h-btn" id="guestBtn">+ Gast</button>
+        </div>
+        <p class="hint" id="lbHint"></p>
+      </div>
+      <div class="card">
+        <h3>Einstellungen</h3>
+        <div id="sets"></div>
+        <p class="hint small" id="setHint"></p>
+      </div>
+    </div>
+    <div class="lb-foot">
+      <button class="startbtn" id="startBtn"><span class="emo">🕵️</span>Einsatz starten <kbd>Enter</kbd></button>
+      <div class="keys"><kbd>1</kbd>–<kbd>8</kbd> Mitspieler an/aus · <kbd>G</kbd> Gast hinzufügen · <kbd>Enter</kbd> Start</div>
+    </div>
+  </section>
+
+  <!-- ======================================================== Sichtschutz + geheime Akte -->
+  <section class="screen" id="cover">
+    <div class="cv-top" id="cvTop"></div>
+    <div class="cv-hide" id="cvHide">
+      <svg class="cv-folder" viewBox="0 0 200 150" aria-hidden="true">
+        <path d="M10 30 Q10 20 20 20 L78 20 L94 34 L180 34 Q190 34 190 44 L190 136 Q190 146 180 146 L20 146 Q10 146 10 136 Z" fill="#b8955a"/>
+        <rect x="10" y="46" width="180" height="100" rx="10" fill="#e2c486"/>
+        <rect x="10" y="46" width="180" height="6" fill="#f0d79f"/>
+        <g transform="rotate(-9 100 98)">
+          <rect x="34" y="78" width="132" height="40" rx="7" fill="none" stroke="#c8283e" stroke-width="5"/>
+          <text x="100" y="106" text-anchor="middle" font-size="21" font-weight="900" fill="#c8283e" font-family="Bahnschrift, 'Segoe UI', sans-serif" letter-spacing="2">GEHEIM</text>
+        </g>
+      </svg>
+      <p class="cv-h">Gib die Tastatur an</p>
+      <div class="cv-who" id="cvWho"></div>
+      <p class="cv-p" id="cvOnly"></p>
+      <div class="cv-btns">
+        <button class="bbtn ghost" id="cvCancel">Abbrechen <kbd>Esc</kbd></button>
+        <button class="bbtn" id="cvShow"></button>
+      </div>
+    </div>
+    <div class="cv-card" id="cvCard" hidden>
+      <div class="dossier" id="cvDossier"></div>
+      <button class="bbtn" id="cvDone">🙈 Verstanden – verdecken <kbd>Enter</kbd></button>
+    </div>
+    <div class="cv-prog" id="cvProg"></div>
+  </section>
+
+  <!-- ======================================================== Fragerunde -->
+  <section class="screen" id="play">
+    <div class="pl-left">
+      <div class="timer" id="timer">
+        <svg viewBox="0 0 200 200"><circle class="tr-bg" cx="100" cy="100" r="88"/><circle class="tr-fg" id="trFg" cx="100" cy="100" r="88"/></svg>
+        <div class="t-mid"><div class="t-num" id="tNum">8:00</div><div class="t-lbl" id="tLbl">Restzeit</div></div>
+      </div>
+      <div class="asker" id="asker"></div>
+      <div class="acts">
+        <button class="bbtn amber" id="btnVote"><span>🗳️ Abstimmen</span><kbd>A</kbd></button>
+        <button class="bbtn red" id="btnGuess"><span>🕵️ Ich weiß den Ort!</span><kbd>S</kbd></button>
+        <div class="acts-sm">
+          <button class="sbtn" id="btnIdea">💡 Frage-Idee<kbd>F</kbd></button>
+          <button class="sbtn" id="btnPeek">👁️ Rolle ansehen<kbd>R</kbd></button>
+          <button class="sbtn" id="btnPause">⏸️ Pause<kbd>P</kbd></button>
+        </div>
+      </div>
+    </div>
+    <div class="pl-right">
+      <div class="locs-head"><h3>Mögliche Orte</h3><span id="locInfo"></span></div>
+      <div class="locs" id="locs"></div>
+      <div class="strip-h">Wer geantwortet hat, ist als Nächstes mit Fragen dran – Namen antippen oder <kbd>1</kbd>–<kbd>8</kbd>.</div>
+      <div class="pstrip" id="pstrip"></div>
+    </div>
+    <div class="tu">⏰ ZEIT UM!</div>
+  </section>
+
+  <!-- ======================================================== Abstimmung -->
+  <section class="screen" id="vote">
+    <div class="tag" id="vtTag"></div>
+    <h2 class="big-h" id="vtH"></h2>
+    <div class="count" id="vtCount"></div>
+    <p class="sub" id="vtP"></p>
+    <div class="pgrid" id="vtGrid"></div>
+    <div class="foot">
+      <button class="bbtn ghost" id="vtCancel">Keine Einigkeit – weiter fragen <kbd>Esc</kbd></button>
+      <button class="bbtn ghost" id="vtAgain">🔁 Nochmal zeigen <kbd>W</kbd></button>
+      <button class="bbtn red" id="vtOk" disabled></button>
+    </div>
+  </section>
+
+  <!-- ======================================================== Spion rät -->
+  <section class="screen" id="guess">
+    <div class="tag" style="color:var(--spy-2)">🕵️ DER SPION PACKT AUS</div>
+    <h2 class="big-h" id="gsH"></h2>
+    <p class="sub" id="gsP"></p>
+    <div class="pgrid" id="gsWho"></div>
+    <div class="locs pick" id="gsLocs" hidden></div>
+    <div class="foot">
+      <button class="bbtn ghost" id="gsBack">Zurück zur Befragung <kbd>Esc</kbd></button>
+      <button class="bbtn red" id="gsOk" disabled hidden></button>
+    </div>
+  </section>
+
+  <!-- ======================================================== Rundenergebnis -->
+  <section class="screen" id="result">
+    <div class="rs-hero" id="rsHero"></div>
+    <div class="rs-body" id="rsBody"></div>
+    <div class="foot" id="rsFoot">
+      <button class="bbtn ghost" id="rsEnd">Spiel beenden</button>
+      <button class="bbtn" id="rsNext"></button>
+    </div>
+  </section>
+
+  <!-- ======================================================== Siegerehrung -->
+  <section class="screen" id="end">
+    <div class="tag">🏆 SIEGEREHRUNG</div>
+    <h2 class="big-h" id="enH"></h2>
+    <div class="podium" id="podium"></div>
+    <div class="ranks" id="ranks"></div>
+    <div class="en-stats" id="enStats"></div>
+    <div class="foot" id="enFoot">
+      <button class="bbtn ghost" id="enLobby">⚙️ Einstellungen</button>
+      <button class="bbtn ghost" id="enHome">🏠 Zur Spielhalle</button>
+      <button class="bbtn" id="enAgain">🔁 Nochmal <kbd>Enter</kbd></button>
+    </div>
+  </section>
+</div>
+
+<div class="ovl" id="ovl"><div class="ov-box" id="ovBox"></div></div>
+<canvas id="fx"></canvas>
+
+<script>
+/* =====================================================================
+   Wer ist der Spion? – Bluff-Partyspiel für 3–8 Leute
+   Alle bis auf den Spion kennen den geheimen Ort. Fragen, bluffen, abstimmen.
+   ===================================================================== */
+Hub.init('spion');
+const bar = Hub.bar({id:'spion', title:'Wer ist der Spion?', stats:[['runde', 'Runde'], ['spieler', 'Spieler'], ['orte', 'Orte']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Wer ist der Spion?', html:`
+  <p><b>So geht’s:</b> Jeder bekommt nacheinander geheim den <b>Einsatzort</b> und eine Rolle. Nur der <b>Spion</b> 🕵️ erfährt den Ort nicht.</p>
+  <p><b>Befragung:</b> Wer dran ist, stellt irgendwem eine Frage („Wie bist du hergekommen?“). Wer antwortet, fragt als Nächstes – aber nicht gleich zurück.
+  Antwortet so, dass die anderen merken, dass ihr den Ort kennt – aber so ungenau, dass der Spion ihn nicht errät!</p>
+  <p><b>Abstimmen</b> <kbd>A</kbd>: jederzeit. Auf drei zeigt jeder auf seinen Verdächtigen – wen die meisten wählen, wird angeklagt. Ist die Zeit um, muss abgestimmt werden.</p>
+  <p><b>Ich weiß den Ort!</b> <kbd>S</kbd>: Der Spion kann sich jederzeit enttarnen und den Ort aus der Liste raten.</p>
+  <p><b>Punkte:</b> Spion entlarvt oder falsch geraten → jeder Agent +1 · Unschuldige Person angeklagt → Spion +2 · Ort richtig geraten → Spion +3.</p>
+  <p><b>Tasten:</b> <kbd>Enter</kbd>/<kbd>Leertaste</kbd> weiter · <kbd>1</kbd>–<kbd>8</kbd> Person wählen · <kbd>F</kbd> Frage-Idee · <kbd>R</kbd> Rolle nochmal ansehen · <kbd>P</kbd> Pause · <kbd>Esc</kbd> zurück</p>`}));
+
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[c]);
+const rnd = n => Math.floor(Math.random() * n);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const fmtT = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+// =====================================================================
+//  Orte: 5 Pakete, 52 Orte, je 7–8 Rollen.  „~“ = Trennstelle für lange Namen
+// =====================================================================
+const PACKS = [
+  {id:'alltag', emo:'🏠', name:'Alltag', short:'Alltag', locs:[
+    ['🛒', 'Super~markt', 'Kassiererin|Filialleiter|Regalauffüller|Kundin mit langem Einkaufszettel|Kind im Einkaufswagen|Metzger an der Fleischtheke|Ladendetektivin|Pfandautomaten-Techniker'],
+    ['🏥', 'Kranken~haus', 'Ärztin|Krankenpfleger|Patient mit Gipsbein|Besucherin mit Blumen|Chirurg|Rettungssanitäterin|Hausmeister|Koch der Krankenhausküche'],
+    ['🚉', 'Bahnhof', 'Schaffnerin|Lokführer|Pendler mit Aktentasche|Touristin mit Riesenkoffer|Kioskverkäufer|Reinigungskraft|Reisender, der seinen Zug verpasst hat|Taubenfütterin'],
+    ['💇', 'Friseur~salon', 'Friseurin|Kunde mit Lockenwicklern|Azubi mit Föhn|Salon-Chefin|Kind beim ersten Haarschnitt|Stammkundin, die alles erzählt|Barbier|Lieferant für Haarspray'],
+    ['🥐', 'Bäckerei', 'Bäckermeister|Verkäuferin|Frühaufsteher|Konditorin|Lehrling|Lieferfahrer|Stammkunde, der immer dasselbe nimmt'],
+    ['🏦', 'Bank', 'Bankberaterin|Kassierer|Filialleiterin|Kind mit Sparschwein|Wachmann|Geldtransporter-Fahrerin|Azubi|Rentner, der Kontoauszüge holt'],
+    ['🦷', 'Zahnarzt~praxis', 'Zahnärztin|Zahnarzthelfer|Patient mit Zahnschmerzen|Ängstliches Kind|Frau am Empfang|Kieferorthopäde|Vertreter für Zahnbürsten'],
+    ['📚', 'Biblio~thek', 'Bibliothekarin|Leseratte|Student vor der Prüfung|Kind bei der Vorlesestunde|Autorin bei einer Lesung|Hausmeister|Rentner mit Tageszeitung'],
+    ['🚓', 'Polizei~wache', 'Kommissarin|Streifenpolizist|Polizeihundeführerin|Bürger mit Anzeige|Praktikant|Detektiv|Frau in der Notrufzentrale|Finder einer verlorenen Geldbörse'],
+    ['🍕', 'Pizzeria', 'Pizzabäcker|Kellnerin|Lieferfahrer|Familie am großen Tisch|Geburtstagskind|Restaurantkritikerin|Tellerwäscher|Gast, der Ananas bestellt'],
+  ]},
+  {id:'urlaub', emo:'🏖️', name:'Urlaub & Reisen', short:'Urlaub', locs:[
+    ['🏖️', 'Strand', 'Rettungsschwimmerin|Eisverkäufer|Surfer|Kind beim Sandburgbauen|Sonnenanbeterin|Strandkorbvermieter|Muschelsammlerin|Beachvolleyball-Spieler'],
+    ['✈️', 'Flug~zeug', 'Pilotin|Co-Pilot|Flugbegleiter|Passagier am Fensterplatz|Passagierin mit Flugangst|Baby in der letzten Reihe|Schnarchender Sitznachbar'],
+    ['🚢', 'Kreuzfahrt~schiff', 'Kapitänin|Schiffskoch|Animateur|Matrose|Passagier im Liegestuhl|Zauberer der Abendshow|Schiffsärztin|Rentnerpaar auf Weltreise'],
+    ['🏨', 'Hotel', 'Rezeptionistin|Kofferträger|Zimmerservice|Hoteldirektor|Paar auf Hochzeitsreise|Koch am Frühstücksbuffet|Gast, der sich beschwert|Portier'],
+    ['⛺', 'Camping~platz', 'Platzwart|Familie mit Wohnwagen|Pfadfinderin|Grillmeister|Rucksackreisender|Kind mit Taschenlampe|Camper, dessen Zelt eingestürzt ist'],
+    ['⛷️', 'Ski~gebiet', 'Skilehrerin|Liftwart|Snowboarder|Anfänger am Übungshang|Pistenraupenfahrer|Bergretterin|Hüttenwirt|Skispringerin'],
+    ['🛫', 'Flug~hafen', 'Sicherheitskontrolleur|Check-in-Mitarbeiterin|Reisender mit Verspätung|Gepäckabfertiger|Zollbeamtin|Pilot auf dem Weg zum Flieger|Souvenirverkäuferin|Spürhundführer'],
+    ['🏛️', 'Museum', 'Museumswärter|Museumsführerin|Schulklasse auf Ausflug|Restauratorin|Tourist mit Audioguide|Kunststudentin mit Skizzenblock|Meisterdieb mit Plan|Dinosaurier-Forscher'],
+    ['🏔️', 'Berg~hütte', 'Hüttenwirtin|Bergführer|Wanderer mit Blasen an den Füßen|Gipfelstürmerin|Senner mit Kühen|Gleitschirmflieger|Familie beim Picknick'],
+    ['⚓', 'Hafen', 'Fischer|Hafenmeisterin|Seglerin|Kranführer|Fischbrötchen-Verkäuferin|Tourist mit Kamera|Leuchtturmwärter|Möwe, die Pommes klaut'],
+  ]},
+  {id:'abenteuer', emo:'🗺️', name:'Abenteuer & Fantasie', short:'Abenteuer', locs:[
+    ['🏴‍☠️', 'Piraten~schiff', 'Piratenkapitän|Steuermann|Schiffsjunge|Schiffskoch|Papagei|Ausguck im Krähennest|Schatzkarten-Leserin|Gefangener im Laderaum'],
+    ['🚀', 'Raum~station', 'Kommandantin|Astronaut|Wissenschaftlerin|Bordingenieur|Weltraumtourist|Außerirdischer Besucher|Roboter-Assistent|Ärztin an Bord'],
+    ['🏰', 'Ritter~burg', 'König|Königin|Ritter in Rüstung|Hofnarr|Prinzessin|Wache am Burgtor|Schmied|Burgkoch'],
+    ['🌴', 'Dschungel-Expedition', 'Expeditionsleiterin|Tierfotograf|Botanikerin|Schlangenforscher|Einheimischer Führer|Kartenzeichnerin|Tourist, der sich verlaufen hat'],
+    ['🌊', 'U-Boot', 'Kapitän|Sonar-Offizierin|Smutje|Mechaniker|Meeresbiologin|Taucher|Funker|Matrosin'],
+    ['🧙', 'Zauber~schule', 'Schulleiterin|Zaubertrank-Lehrer|Erstklässler|Besenflug-Trainerin|Schlossgespenst|Eulenpfleger|Klassensprecherin|Drachenforscher'],
+    ['🏜️', 'Pyramide', 'Archäologin|Kamelführer|Schatzsucher|Mumie|Fotograf|Grabungshelferin|Touristin mit Sonnenhut|Hieroglyphen-Expertin'],
+    ['🧊', 'Polar~station', 'Polarforscherin|Hundeschlittenführer|Stationskoch|Meteorologe|Hubschrauberpilotin|Eisbär-Beobachter|Gletscherforscherin'],
+    ['🤠', 'Wilder Westen', 'Sheriff|Cowboy|Goldsucherin|Postkutschenfahrer|Hilfssheriff|Hufschmied|Ladenbesitzerin|Pferdeflüsterer'],
+    ['🧪', 'Geheim~labor', 'Professorin|Laborassistent|Versuchsroboter|Sicherheitschef|Praktikantin|Erfinder|Laborratte|Hausmeister im Schutzanzug'],
+  ]},
+  {id:'arbeit', emo:'🏫', name:'Schule & Arbeit', short:'Schule & Job', locs:[
+    ['🏫', 'Klassen~zimmer', 'Lehrerin|Klassensprecher|Klassenclown|Neue Schülerin|Musterschüler|Hausmeister|Schulleiterin|Referendar'],
+    ['💼', 'Büro', 'Chefin|Praktikant|IT-Experte|Sekretär|Buchhalterin|Kollege an der Kaffeemaschine|Reinigungskraft|Bewerberin im Vorstellungsgespräch'],
+    ['🏗️', 'Bau~stelle', 'Bauarbeiter|Kranführerin|Architektin|Polier|Elektriker|Bauherr|Betonmischer-Fahrer|Statikerin'],
+    ['📺', 'Fernseh~studio', 'Moderatorin|Kamerafrau|Talkshow-Gast|Maskenbildner|Regisseur|Zuschauer im Publikum|Wetteransagerin|Aufnahmeleiter'],
+    ['🚜', 'Bauern~hof', 'Bäuerin|Bauer|Traktorfahrer|Erntehelferin|Tierärztin|Ferienkind|Hofhund|Hühnerflüsterer'],
+    ['🍲', 'Schul~kantine', 'Köchin|Schüler mit Tablett|Lehrer mit Aufsicht|Frau an der Essensausgabe|Spülkraft|Ernährungsberaterin|Schülerin, die Nachschlag will'],
+    ['🍫', 'Schoko~laden~fabrik', 'Chocolatier|Fließbandarbeiterin|Testesser|Fabrikbesitzer|Besucherkind|Gabelstaplerfahrerin|Verpackerin'],
+    ['📻', 'Radio~sender', 'Moderator|Tontechnikerin|Anrufer im Studio|Nachrichtensprecherin|Praktikant|Star-Gast|DJ|Verkehrsfunk-Redakteurin'],
+    ['🔧', 'Auto~werkstatt', 'Kfz-Meisterin|Mechaniker|Azubi|Kunde mit kaputtem Auto|Lackierer|Abschleppwagenfahrerin|Reifenwechsler'],
+    ['🐾', 'Tierarzt~praxis', 'Tierärztin|Tierarzthelfer|Hund mit Halskrause|Katzenbesitzerin|Kind mit Hamster|Sprechender Papagei|Frau am Empfang|Pferdewirt'],
+  ]},
+  {id:'freizeit', emo:'🎡', name:'Freizeit & Feiern', short:'Freizeit', locs:[
+    ['🎢', 'Freizeit~park', 'Kassierer|Achterbahn-Fan|Maskottchen im Kostüm|Zuckerwatte-Verkäuferin|Fahrgeschäft-Betreiber|Kind, das zu klein ist|Sanitäter|Fotografin an der Achterbahn'],
+    ['🦁', 'Zoo', 'Tierpflegerin|Zoodirektor|Besucherkind|Fotograf|Tierärztin|Eisverkäufer|Lehrer mit Schulklasse|Pinguin-Fütterin'],
+    ['🎬', 'Kino', 'Kartenabreißer|Popcorn-Verkäuferin|Filmfan|Paar beim Date|Filmvorführer|Filmkritikerin|Kind mit 3D-Brille|Zuschauer, der laut mitredet'],
+    ['⚽', 'Fußball~stadion', 'Schiedsrichterin|Torwart|Stürmer|Trainerin|Fan mit Trommel|Stadionsprecher|Würstchenverkäufer|Ordnerin'],
+    ['🏊', 'Schwimm~bad', 'Bademeister|Schwimmerin|Kind mit Schwimmflügeln|Rutschen-Fan|Kassiererin|Pommesverkäufer am Kiosk|Turmspringerin|Seepferdchen-Prüfling'],
+    ['🎪', 'Zirkus', 'Zirkusdirektorin|Clown|Akrobatin|Jongleur|Seiltänzerin|Popcornverkäufer|Zuschauer in der ersten Reihe|Zauberer'],
+    ['🎤', 'Konzert', 'Sängerin|Schlagzeuger|Tontechniker|Fan in der ersten Reihe|Security|Merch-Verkäuferin|Roadie|Gitarristin'],
+    ['🎂', 'Kinder~geburtstag', 'Geburtstagskind|Mama mit Kuchen|Zauberer|Gast, der zu spät kommt|Clown|Opa mit Kamera|Kind beim Topfschlagen|Nachbarskind'],
+    ['🎳', 'Bowling~bahn', 'Bowlingprofi|Anfängerin|Schuhverleiher|Kellnerin|Geburtstagsgruppe|Techniker an der Kegelmaschine|Kind, das mit Bande spielt'],
+    ['🎄', 'Weihnachts~markt', 'Weihnachtsmann|Maronenverkäufer|Kinderpunsch-Verkäuferin|Karussellbetreiber|Kind mit Wunschzettel|Lebkuchenbäckerin|Chorsänger|Tourist mit Bommelmütze'],
+    ['🎭', 'Theater', 'Schauspielerin|Souffleuse|Regisseur|Bühnenbildner|Zuschauerin|Garderobenfrau|Beleuchter|Kartenverkäufer'],
+    ['⛸️', 'Eishalle', 'Eiskunstläuferin|Eishockeyspieler|Anfänger am Rand|DJ|Schlittschuhverleiher|Eismaschinenfahrer|Eltern auf der Tribüne'],
+  ]},
+];
+const LOCS = [];
+PACKS.forEach(p => p.locs.forEach(([emo, name, roles]) => LOCS.push({emo, pack:p.id, name:name.replace(/~/g, ''), html:esc(name).replace(/~/g, '&shy;'), roles:roles.split('|')})));
+const packOf = id => PACKS.find(p => p.id === id);
+
+// Frage-Ideen, die zu (fast) jedem Ort passen
+const IDEAS = ['Wie bist du heute hierhergekommen?', 'Was hast du gerade an?', 'Wie riecht es hier?', 'Was hörst du gerade?', 'Würdest du hier Urlaub machen?',
+  'Bist du oft hier?', 'Mit wem bist du hier?', 'Was ist das Beste an diesem Ort?', 'Was nervt dich hier am meisten?', 'Wie lange bleibst du noch?',
+  'Ist es hier eher laut oder leise?', 'Was würdest du hier essen?', 'Braucht man hier eine Eintrittskarte?', 'Könnte man hier gut schlafen?', 'Welches Tier würde hierher passen?',
+  'Würdest du deine Oma hierher mitnehmen?', 'Was kostet ein Tag hier ungefähr?', 'Ist es hier gefährlich?', 'Was hast du in deiner Tasche?', 'Wie viele Leute sind hier ungefähr?',
+  'Um welche Uhrzeit ist hier am meisten los?', 'Was machst du, wenn dir hier langweilig ist?', 'Welche Farbe sieht man hier am häufigsten?', 'Gibt es hier besondere Regeln?',
+  'Was würde ein Kind hier am liebsten machen?', 'Würdest du hier gern arbeiten?', 'Braucht man hier besondere Kleidung?', 'Was hast du hier heute schon erlebt?',
+  'Ist es hier warm oder kalt?', 'Wer hat hier das Sagen?', 'Was würdest du hier fotografieren?', 'Würdest du hier deinen Geburtstag feiern?', 'Welches Geräusch hört man hier ständig?',
+  'Wann warst du zuletzt hier?', 'Was darf man hier auf keinen Fall machen?', 'Welcher Promi könnte hier auftauchen?', 'Was würdest du hier als Andenken mitnehmen?',
+  'Muss man hier lange warten?', 'Was würdest du hier gern verändern?', 'Kann man hier auch im Winter hin?', 'Wie fühlst du dich gerade?', 'Warum bist du eigentlich hier?'];
+
+// =====================================================================
+//  Einstellungen
+// =====================================================================
+const SKEY = 'spion_v1';
+const cfg = Object.assign({time:8, rounds:3, spies:1, list:24, packs:PACKS.map(p => p.id)}, Hub.read(SKEY, {}));
+cfg.packs = (Array.isArray(cfg.packs) ? cfg.packs : []).filter(id => packOf(id));
+if (!cfg.packs.length) cfg.packs = PACKS.map(p => p.id);
+if (![16, 24, 32, 40].includes(cfg.list)) cfg.list = 24;
+const saveCfg = () => Hub.write(SKEY, cfg);
+const SETS = [
+  {k:'time', label:'Rundenzeit', opts:[[5, '5 min'], [8, '8 min'], [10, '10 min']]},
+  {k:'rounds', label:'Runden', opts:[[3, '3'], [5, '5'], [8, '8']]},
+  {k:'spies', label:'Spione', opts:[[1, '1 Spion'], [2, '2 Spione', 'ab 7 Leuten']]},
+  {k:'list', label:'Ortsliste', opts:[[16, '16 Orte', 'leicht'], [24, '24 Orte', 'mittel'], [32, '32 Orte', 'schwer'], [40, '40 Orte', 'Profi']]},
+  {k:'packs', label:'Ortspakete', multi:true, opts:PACKS.map(p => [p.id, p.emo + ' ' + p.short, p.locs.length + ' Orte'])},
+];
+const pool = () => LOCS.map((l, i) => i).filter(i => cfg.packs.includes(LOCS[i].pack));
+const spiesFor = n => cfg.spies === 2 && n >= 7 ? 2 : 1;
+
+// =====================================================================
+//  Zustand
+// =====================================================================
+let phase = 'lobby';          // lobby | cover | play | timeup | vote | guess | result | end
+let roster = [];              // Mitspieler in der Lobby (inkl. Gäste)
+let G = null;                 // laufendes Spiel
+let R = null;                 // laufende Runde
+let V = null;                 // Abstimmung
+let GS = null;                // Spion rät
+let CV = null;                // Sichtschutz/Akte
+let OV = null;                // offenes Overlay (Tasten-Handler)
+let lockUntil = 0, seq = 0, tmr = 0;
+const locked = () => performance.now() < lockUntil;
+const lock = ms => { lockUntil = performance.now() + (ms || 300); };
+function show(id){ seq++; document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+function later(ms, fn){ const s = seq; setTimeout(() => { if (s === seq) fn(); }, ms); }
+
+// ---------- Töne
+const SND = {
+  fanfare(){ [523, 659, 784, 1047].forEach((f, k) => Hub.tone(f, .22, 'triangle', .06, k * .11)); Hub.tone(1319, .55, 'triangle', .05, .46); },
+  spy(){ [196, 233, 220, 196, 147].forEach((f, k) => Hub.tone(f, .22, 'sawtooth', .032, k * .15)); Hub.tone(392, .6, 'triangle', .045, .8, 370); },
+  drum(sec){ let t = 0, d = .17; while (t < sec){ Hub.tone(85 + Math.random() * 40, .07, 'triangle', .08, t); t += d; d = Math.max(.045, d * .9); } },
+  stamp(){ Hub.tone(130, .16, 'square', .05); Hub.tone(70, .3, 'sine', .09, .02); },
+  reveal(){ Hub.tone(520, .1, 'triangle', .04); Hub.tone(780, .14, 'triangle', .035, .07); },
+};
+
+// =====================================================================
+//  Lobby
+// =====================================================================
+function initRoster(){
+  roster = Hub.party.active().map(p => ({name:p.name.trim().slice(0, 16), color:p.color, avatar:p.avatar, guest:false, on:true}));
+}
+const activeRoster = () => roster.filter(p => p.on);
+function addGuest(){
+  const inp = $('guestIn'), name = inp.value.trim().replace(/\s+/g, ' ').slice(0, 16);
+  if (!name){ inp.focus(); return; }
+  if (roster.length >= 12){ Hub.toast('Liste ist voll', 'Mehr als 12 Namen passen nicht – schließ jemanden aus.', 'user'); Hub.sfx('bad'); return; }
+  if (roster.some(p => p.name.toLowerCase() === name.toLowerCase())){ Hub.toast('Name schon dabei', `„${name}“ steht schon in der Liste.`, 'user'); Hub.sfx('bad'); return; }
+  const C = Hub.party.COLORS, A = Hub.party.AVATARS;
+  const usedC = roster.map(p => p.color), usedA = roster.map(p => p.avatar);
+  const color = C.find(c => !usedC.includes(c)) || C[roster.length % C.length];
+  const avatar = A.find(a => !usedA.includes(a)) || A[roster.length % A.length];
+  roster.push({name, color, avatar, guest:true, on:true});
+  inp.value = ''; Hub.sfx('ok'); renderLobby();
+}
+function toggleRoster(i){
+  if (!roster[i]) return;
+  roster[i].on = !roster[i].on; Hub.sfx('click'); renderLobby();
+}
+function renderLobby(){
+  const n = activeRoster().length, el = $('pchips');
+  el.classList.toggle('many', roster.length > 6);
+  el.innerHTML = roster.map((p, i) => `<button class="pchip ${p.on ? '' : 'off'}" style="--pc:${p.color}" data-i="${i}" title="Antippen: für dieses Spiel aus-/einschließen">
+      <span class="av">${p.avatar}</span><span class="nm">${esc(p.name)}</span>${p.guest ? '<span class="gst">Gast</span>' : ''}${i < 9 ? `<kbd>${i + 1}</kbd>` : ''}${p.guest ? `<span class="rm" data-rm="${i}" title="Gast entfernen">×</span>` : ''}</button>`).join('');
+  el.querySelectorAll('.pchip').forEach(b => b.onclick = e => {
+    const rm = e.target.closest('[data-rm]');
+    if (rm){ roster.splice(+rm.dataset.rm, 1); Hub.sfx('click'); renderLobby(); return; }
+    toggleRoster(+b.dataset.i);
+  });
+  const h = $('lbHint');
+  if (!roster.length){ h.className = 'hint warn'; h.textContent = 'Noch niemand dabei – trag unten Namen als Gäste ein (oder lege im Launcher unter „Wer spielt mit?“ eure Runde fest).'; }
+  else if (n < 3){ h.className = 'hint warn'; h.textContent = `Ihr seid erst ${n} – „Wer ist der Spion?“ braucht mindestens 3 Leute. Füge noch ${3 - n} ${3 - n === 1 ? 'Gast' : 'Gäste'} hinzu!`; }
+  else if (n > 8){ h.className = 'hint warn'; h.textContent = `Ihr seid ${n} – höchstens 8 können mitspielen. Tippe Namen an, um jemanden auszusetzen.`; }
+  else { h.className = 'hint'; h.textContent = `${n} Agenten bereit. Namen antippen schließt jemanden für dieses Spiel aus oder wieder ein.`; }
+  renderSets();
+  $('startBtn').classList.toggle('dim', n < 3 || n > 8);
+  bar.set('spieler', n); bar.set('runde', '–'); bar.set('orte', pool().length);
+}
+function renderSets(){
+  const n = activeRoster().length;
+  $('sets').innerHTML = SETS.map(s => `<div class="set-row"><label>${s.label}</label><div class="seg">${s.opts.map(([v, l, sub]) => {
+      const on = s.multi ? cfg.packs.includes(v) : s.k === 'spies' ? spiesFor(n) === v : cfg[s.k] === v;
+      const dis = s.k === 'spies' && v === 2 && n < 7;
+      return `<button data-k="${s.k}" data-v="${v}" class="${on ? 'on' : ''}" ${dis ? 'disabled title="Erst ab 7 Leuten"' : ''}>${l}${sub ? `<small>${sub}</small>` : ''}</button>`;
+    }).join('')}</div></div>`).join('');
+  $('sets').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === 'packs'){
+      const v = b.dataset.v, has = cfg.packs.includes(v);
+      if (has && cfg.packs.length === 1){ Hub.toast('Mindestens ein Paket', 'Ohne Orte gibt es nichts zu erraten.', 'info'); Hub.sfx('bad'); return; }
+      cfg.packs = has ? cfg.packs.filter(x => x !== v) : PACKS.map(p => p.id).filter(id => id === v || cfg.packs.includes(id));
+    } else cfg[k] = +b.dataset.v;
+    saveCfg(); Hub.sfx('click'); renderLobby();
+  });
+  const P = pool().length, L = cfg.list && cfg.list < P ? cfg.list : P;
+  $('setHint').innerHTML = `${P} Orte im Spiel · Pro Runde stehen <b>${L}</b> davon zur Auswahl – je mehr, desto schwerer hat es der Spion.`;
+}
+function showLobby(){
+  stopTimer(); closeOverlay(); G = R = V = GS = CV = null;
+  phase = 'lobby'; show('lobby'); renderLobby();
+}
+
+// =====================================================================
+//  Spiel & Runde
+// =====================================================================
+function startGame(){
+  if (locked()) return;
+  const act = activeRoster();
+  if (act.length < 3){ Hub.toast('Zu wenige Agenten', 'Mindestens 3 Leute müssen mitspielen.', 'user'); Hub.sfx('bad'); $('guestIn').focus(); return; }
+  if (act.length > 8){ Hub.toast('Zu viele Leute', 'Höchstens 8 – tippe Namen an, um jemanden auszusetzen.', 'user'); Hub.sfx('bad'); return; }
+  lock(500); Hub.sfx('launch');
+  G = {players:act.map(p => ({name:p.name, color:p.color, avatar:p.avatar, score:0})), round:0, rounds:cfg.rounds, time:cfg.time,
+       spies:spiesFor(act.length), listN:cfg.list, used:[], history:[]};
+  nextRound();
+}
+function nextRound(){
+  G.round++;
+  const P = pool();
+  let avail = P.filter(i => !G.used.includes(i));
+  if (!avail.length){ G.used = []; avail = P.slice(); }
+  const loc = avail[rnd(avail.length)];
+  G.used.push(loc);
+  const n = G.listN && G.listN < P.length ? G.listN : P.length;
+  const list = [loc].concat(shuffle(P.filter(i => i !== loc)).slice(0, n - 1)).sort((a, b) => LOCS[a].name.localeCompare(LOCS[b].name, 'de'));
+  const spies = shuffle(G.players.map((p, i) => i)).slice(0, G.spies);
+  const roles = shuffle(LOCS[loc].roles.slice());
+  let r = 0;
+  const role = G.players.map((p, i) => spies.includes(i) ? null : roles[r++ % roles.length]);
+  const starter = rnd(G.players.length);
+  R = {loc, list, spies, role, starter, asker:starter, prev:-1, total:G.time * 60, left:G.time * 60, running:false, last:0, warned:false, tick:-1, idea:'', started:false, ready:false};
+  bar.set('runde', G.round + '/' + G.rounds); bar.set('spieler', G.players.length); bar.set('orte', list.length);
+  CV = {mode:'deal', i:0};
+  coverHide();
+}
+
+// ---------- Sichtschutz & geheime Akte
+function coverHide(){
+  const p = G.players[CV.i];
+  phase = 'cover'; CV.state = 'hide';
+  show('cover');
+  $('cvHide').hidden = false; $('cvCard').hidden = true;
+  $('cvTop').textContent = CV.mode === 'deal' ? `RUNDE ${G.round} VON ${G.rounds} · GEHEIME AKTE ${CV.i + 1} VON ${G.players.length}` : '👁️ ROLLE NOCHMAL ANSEHEN';
+  const who = $('cvWho'); who.style.setProperty('--pc', p.color);
+  who.innerHTML = `<span class="av">${p.avatar}</span><span>${esc(p.name)}</span>`;
+  $('cvOnly').innerHTML = `– nur <b class="lt" style="--pc:${p.color}">${esc(p.name)}</b> schaut hin! Alle anderen: wegschauen 🙈`;
+  $('cvShow').innerHTML = `👁️ Ich bin ${esc(p.name)} – zeigen <kbd>Enter</kbd>`;
+  $('cvCancel').hidden = CV.mode !== 'peek';
+  const prog = $('cvProg');
+  prog.hidden = CV.mode !== 'deal';
+  prog.innerHTML = G.players.map((q, j) => `<span class="${j < CV.i ? 'done' : j === CV.i ? 'cur' : ''}" style="--pc:${q.color}" title="${esc(q.name)}">${q.avatar}</span>`).join('');
+  lock(400);
+}
+function coverShow(){
+  if (locked() || !CV || CV.state !== 'hide') return;
+  lock(500); CV.state = 'show';
+  const i = CV.i, spy = R.spies.includes(i), L = LOCS[R.loc];
+  const d = $('cvDossier');
+  d.className = 'dossier' + (spy ? ' spy' : '');
+  d.innerHTML = spy
+    ? `<div class="ds-tab">AKTE · ${esc(G.players[i].name)}</div><div class="ds-stamp">SPION</div>
+       <div class="ds-label">DEIN AUFTRAG</div><div class="ds-emo">🕵️</div><div class="ds-loc">DU BIST ${G.spies > 1 ? 'EIN' : 'DER'} SPION</div>
+       <div class="ds-sep"></div><div class="ds-label">DEIN ZIEL</div><div class="ds-role">Finde heraus, wo ihr seid!</div>
+       <div class="ds-tip">Hör genau zu, bluffe geschickt und lass dich nicht erwischen. Bist du dir sicher: „Ich weiß den Ort!“ drücken.${G.spies > 1 ? '<br><b>Es gibt noch einen zweiten Spion – ihr kennt euch nicht.</b>' : ''}</div>`
+    : `<div class="ds-tab">AKTE · ${esc(G.players[i].name)}</div><div class="ds-stamp">GEHEIM</div>
+       <div class="ds-label">EINSATZORT</div><div class="ds-emo">${L.emo}</div><div class="ds-loc">${L.html}</div>
+       <div class="ds-sep"></div><div class="ds-label">DEINE ROLLE</div><div class="ds-role">${esc(R.role[i])}</div>
+       <div class="ds-tip">Stell Fragen, die zeigen, dass du den Ort kennst – aber verrate ihn nicht. ${G.spies > 1 ? 'Zwei' : 'Einer'} von euch ${G.spies > 1 ? 'sind Spione' : 'ist der Spion'}!</div>`;
+  $('cvHide').hidden = true; $('cvCard').hidden = false;
+  SND.reveal();
+}
+function coverDone(){
+  if (locked() || !CV || CV.state !== 'show') return;
+  lock(450); Hub.sfx('click');
+  if (CV.mode === 'peek'){ CV = null; backToPlay(); return; }
+  CV.i++;
+  if (CV.i < G.players.length) coverHide();
+  else { CV = null; beginQuestioning(); }
+}
+function coverCancel(){
+  if (!CV || CV.mode !== 'peek' || CV.state !== 'hide') return;
+  CV = null; Hub.sfx('click'); backToPlay();
+}
+
+// ---------- Fragerunde
+function enterPlay(){
+  phase = 'play'; show('play');
+  $('play').classList.remove('timeup');
+  renderLocs(); renderStrip(); renderAsker(); drawTimer();
+}
+function beginQuestioning(){
+  enterPlay();
+  if (G.spies > 1) Hub.achieve('spion', 'doppel', 'Doppelagenten', 'Spiele eine Runde mit zwei Spionen');
+  const p = G.players[R.starter];
+  overlay(`<div class="tag">RUNDE ${G.round} VON ${G.rounds} · ALLE SIND EINGEWEIHT</div>
+    <h2 class="ov-h">Die Befragung beginnt!</h2>
+    <div class="ov-big" style="--pc:${p.color}"><span class="av">${p.avatar}</span><div><small>Die erste Frage stellt</small><b>${esc(p.name)}</b></div></div>
+    <p class="ov-p">Frag irgendwen etwas zum Ort – wer antwortet, fragt als Nächstes.<br>${G.spies > 1 ? 'Achtung: Diesmal sind <b>zwei Spione</b> unter euch!' : 'Einer von euch ist der <b>Spion</b> …'} Ihr habt <b>${G.time} Minuten</b>.</p>
+    <div class="ov-row"><button class="bbtn" data-ov="enter">⏱️ Uhr starten <kbd>Enter</kbd></button></div>`,
+    {enter(){ closeOverlay(); R.started = true; startTimer(); Hub.sfx('launch'); }});
+}
+function backToPlay(){
+  enterPlay();
+  if (R.left <= 0) timeUp(); else startTimer();
+}
+function renderLocs(){
+  const el = $('locs');
+  el.innerHTML = R.list.map((li, k) => `<div class="loc" style="animation-delay:${Math.min(k * 14, 400)}ms"><span class="le">${LOCS[li].emo}</span><span class="ln">${LOCS[li].html}</span></div>`).join('');
+  $('locInfo').textContent = `${R.list.length} Orte – einer davon ist es. Der Spion muss ihn finden!`;
+  fitLocs(el);
+}
+function renderStrip(){
+  const el = $('pstrip');
+  el.innerHTML = G.players.map((p, i) => `<button class="sc ${i === R.asker ? 'cur' : ''}" style="--pc:${p.color}" data-i="${i}" title="${esc(p.name)} fragt jetzt">
+      <kbd>${i + 1}</kbd><span class="av">${p.avatar}</span><span class="nm">${esc(p.name)}</span><span class="pts">${p.score}</span></button>`).join('');
+  el.querySelectorAll('.sc').forEach(b => b.onclick = () => setAsker(+b.dataset.i));
+}
+function renderAsker(pop){
+  const p = G.players[R.asker], el = $('asker');
+  el.style.setProperty('--pc', p.color);
+  const prev = R.prev >= 0 && R.prev !== R.asker ? G.players[R.prev] : null;
+  el.innerHTML = `<small>🎤 Fragt gerade</small>
+    <div class="ak-row ${pop ? 'pop' : ''}"><span class="av">${p.avatar}</span><b class="lt" style="--pc:${p.color}">${esc(p.name)}</b></div>
+    <div class="ak-hint">${prev ? `Stell irgendwem eine Frage – nur nicht gleich zurück an <b class="lt" style="--pc:${prev.color}">${esc(prev.name)}</b>.` : 'Stell irgendwem eine Frage. Wer antwortet, fragt als Nächstes.'}</div>
+    ${R.idea ? `<div class="ak-idea">💡 „${esc(R.idea)}“</div>` : ''}`;
+}
+function setAsker(i){
+  if (phase !== 'play' || OV || !G.players[i] || i === R.asker) return;
+  R.prev = R.asker; R.asker = i; R.idea = '';
+  Hub.tone(740, .06, 'triangle', .04); renderAsker(true); renderStrip();
+}
+function newIdea(){
+  if (phase !== 'play' || OV) return;
+  let q; do { q = IDEAS[rnd(IDEAS.length)]; } while (q === R.idea);
+  R.idea = q; Hub.sfx('click'); renderAsker();
+}
+// Ortsliste so aufteilen, dass alles ohne Scrollen möglichst groß passt
+function fitLocs(el){
+  const n = el.children.length; if (!n) return;
+  const W = el.clientWidth, H = el.clientHeight, gap = 8;
+  if (!W || !H) return;
+  const cand = [];
+  for (let c = 1; c <= 8; c++){
+    const w = (W - gap * (c - 1)) / c;
+    if (w < 150 && c > 1) break;
+    const rows = Math.ceil(n / c), h = (H - gap * (rows - 1)) / rows;
+    const th = Math.min(h, 150), fs = Math.min(th * .36, w / 9.5, 34);
+    cand.push({c, th, fs});
+  }
+  const top = Math.max.apply(null, cand.map(x => x.fs));
+  const best = cand.filter(x => x.fs >= top - .5).pop();     // gleich große Schrift → mehr Spalten, wirkt aufgeräumter
+  el.style.gridTemplateColumns = `repeat(${best.c}, minmax(0, 1fr))`;
+  el.style.setProperty('--th', Math.max(best.th, 46) + 'px');
+  el.style.setProperty('--fs', Math.max(best.fs, 16).toFixed(1) + 'px');
+  el.dataset.cols = best.c;
+}
+const ro = new ResizeObserver(es => es.forEach(e => fitLocs(e.target)));
+ro.observe($('locs')); ro.observe($('gsLocs'));
+
+// ---------- Uhr
+function startTimer(){
+  if (!R || R.running || R.left <= 0) return;
+  R.running = true; R.last = performance.now();
+  clearInterval(tmr); tmr = setInterval(timerTick, 200); drawTimer();
+}
+function stopTimer(){
+  clearInterval(tmr);
+  if (!R) return;
+  if (R.running) R.left = Math.max(0, R.left - (performance.now() - R.last) / 1000);
+  R.running = false; drawTimer();
+}
+function timerTick(){
+  if (!R || !R.running){ clearInterval(tmr); return; }
+  const now = performance.now();
+  R.left = Math.max(0, R.left - (now - R.last) / 1000); R.last = now;
+  const s = Math.ceil(R.left);
+  if (!R.warned && R.left <= 60){ R.warned = true; Hub.toast('Noch 1 Minute!', 'Gleich muss abgestimmt werden.', 'clock'); Hub.tone(880, .12, 'triangle', .05); Hub.tone(880, .12, 'triangle', .05, .2); }
+  if (s <= 10 && s > 0 && s !== R.tick){ R.tick = s; Hub.tone(s <= 3 ? 1250 : 900, .08, 'square', .035); }
+  drawTimer();
+  if (R.left <= 0) timeUp();
+}
+function drawTimer(){
+  if (!R) return;
+  $('tNum').textContent = fmtT(R.left);
+  const C = 2 * Math.PI * 88, fg = $('trFg');
+  fg.style.strokeDasharray = C.toFixed(1);
+  fg.style.strokeDashoffset = (C * (1 - R.left / R.total)).toFixed(1);
+  const t = $('timer');
+  t.classList.toggle('warn', R.left <= 60 && R.left > 10);
+  t.classList.toggle('crit', R.left <= 10 && R.left > 0 && R.running);
+  $('tLbl').textContent = R.running ? 'Restzeit' : R.left <= 0 ? 'Zeit um' : R.started ? 'Pausiert' : 'Bereit';
+}
+function timeUp(){
+  stopTimer(); R.left = 0; drawTimer();
+  if (phase !== 'play') return;
+  closeOverlay();
+  phase = 'timeup';
+  $('play').classList.add('timeup');
+  Hub.tone(440, .3, 'sawtooth', .05); Hub.tone(349, .3, 'sawtooth', .05, .28); Hub.tone(262, .7, 'sawtooth', .05, .56);
+  later(1700, () => openVote(true));
+}
+
+// ---------- Overlay (Start der Befragung, Pause, Rolle ansehen)
+function overlay(html, handlers){
+  $('ovBox').innerHTML = html;
+  $('ovl').classList.add('on');
+  OV = handlers || {};
+  $('ovBox').querySelectorAll('[data-ov]').forEach(b => b.onclick = () => {
+    if (locked() || !OV) return;
+    const a = b.dataset.ov;
+    if (a === 'num' && OV.num) OV.num(+b.dataset.i); else if (OV[a]) OV[a]();
+  });
+  lock(300);
+}
+function closeOverlay(){ $('ovl').classList.remove('on'); OV = null; }
+function openPause(){
+  if (phase !== 'play' || OV || !R.running) return;
+  stopTimer(); Hub.sfx('click');
+  const resume = () => { closeOverlay(); startTimer(); Hub.sfx('click'); };
+  overlay(`<div class="tag">⏸️ PAUSE</div><h2 class="ov-h">Kurze Verschnaufpause</h2>
+    <div class="ov-time">${fmtT(R.left)}</div><p class="ov-p">Die Uhr ist angehalten.</p>
+    <div class="ov-row"><button class="bbtn" data-ov="enter">▶️ Weiter <kbd>Enter</kbd></button></div>`, {enter:resume, esc:resume, p:resume});
+}
+function openPeek(){
+  if (phase !== 'play' || OV) return;
+  const wasRunning = R.running;
+  stopTimer(); Hub.sfx('click');
+  overlay(`<div class="tag">👁️ ROLLE NOCHMAL ANSEHEN</div><h2 class="ov-h">Wer hat seine Rolle vergessen?</h2>
+    <p class="ov-p">Solange ist die Uhr angehalten.</p>
+    <div class="ov-picks">${G.players.map((p, i) => `<button class="pchip" style="--pc:${p.color}" data-ov="num" data-i="${i}"><span class="av">${p.avatar}</span><span class="nm">${esc(p.name)}</span><kbd>${i + 1}</kbd></button>`).join('')}</div>
+    <div class="ov-row"><button class="bbtn ghost" data-ov="esc">Abbrechen <kbd>Esc</kbd></button></div>`,
+    {num(i){ if (!G.players[i]) return; closeOverlay(); CV = {mode:'peek', i}; coverHide(); },
+     esc(){ closeOverlay(); if (wasRunning || R.started) startTimer(); }});
+}
+
+// ---------- Abstimmung
+function openVote(forced){
+  if (!R) return;
+  if (!forced && (phase !== 'play' || OV || locked())) return;
+  if (forced && phase !== 'timeup') return;
+  lock(450); stopTimer();
+  phase = 'vote'; V = {forced, sel:-1, tok:0};
+  show('vote');
+  $('vtTag').textContent = forced ? '⏰ ZEIT UM – PFLICHTABSTIMMUNG' : '🗳️ ABSTIMMUNG';
+  $('vtTag').style.color = forced ? 'var(--spy-2)' : '';
+  $('vtH').textContent = G.spies > 1 ? 'Wer ist ein Spion?' : 'Wer ist der Spion?';
+  $('vtCancel').hidden = forced;
+  renderVote(); runCountdown();
+}
+function runCountdown(){
+  if (!V) return;
+  const tok = ++V.tok, el = $('vtCount'), steps = ['3', '2', '1', 'ZEIGT!'];
+  let k = 0;
+  $('vtP').innerHTML = 'Auf drei zeigt jeder gleichzeitig mit dem Finger auf seinen Verdächtigen …';
+  const step = () => {
+    if (!V || V.tok !== tok || phase !== 'vote') return;
+    if (k < steps.length){
+      el.textContent = steps[k]; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+      Hub.tone(k < 3 ? 660 : 1320, k < 3 ? .12 : .4, 'triangle', .06);
+      k++; setTimeout(step, 850);
+    } else {
+      el.textContent = '👉';
+      $('vtP').innerHTML = V.forced
+        ? 'Auf wen zeigen die meisten? <b>Klickt ihn an.</b> <span class="warn">Gleichstand?</span> Kurz diskutieren und nochmal zeigen.'
+        : 'Auf wen zeigen die meisten? <b>Klickt ihn an.</b> Keine klare Mehrheit? Dann weiter fragen.';
+    }
+  };
+  step();
+}
+function pcardsHTML(sel){
+  return G.players.map((p, i) => `<button class="pcard ${sel === i ? 'sel' : ''}" style="--pc:${p.color}" data-i="${i}"><kbd>${i + 1}</kbd><span class="av">${p.avatar}</span><b>${esc(p.name)}</b></button>`).join('');
+}
+function renderVote(){
+  const g = $('vtGrid');
+  g.innerHTML = pcardsHTML(V.sel);
+  g.classList.toggle('dim', V.sel >= 0);
+  g.querySelectorAll('.pcard').forEach(b => b.onclick = () => voteSel(+b.dataset.i));
+  const ok = $('vtOk');
+  ok.disabled = V.sel < 0;
+  ok.innerHTML = V.sel < 0 ? '🎯 Verdächtigen anklicken' : `⚖️ ${esc(G.players[V.sel].name)} anklagen <kbd>Enter</kbd>`;
+}
+function voteSel(i){
+  if (phase !== 'vote' || !G.players[i]) return;
+  V.sel = V.sel === i ? -1 : i; Hub.sfx('click'); renderVote();
+}
+function voteOk(){
+  if (phase !== 'vote' || V.sel < 0 || locked()) return;
+  lock(700); finishRound(R.spies.includes(V.sel) ? 'caught' : 'wrong', {accused:V.sel});
+}
+function voteCancel(){
+  if (phase !== 'vote' || V.forced || locked()) return;
+  lock(350); V = null; Hub.sfx('click'); backToPlay();
+}
+function voteAgain(){ if (phase === 'vote' && !locked()){ lock(300); V.sel = -1; renderVote(); runCountdown(); } }
+
+// ---------- Spion rät den Ort
+function openGuess(){
+  if (phase !== 'play' || OV || locked()) return;
+  lock(450); stopTimer();
+  phase = 'guess'; GS = {step:'who', who:-1, sel:-1, msg:''};
+  show('guess'); renderGuess();
+  Hub.tone(220, .3, 'sawtooth', .035); Hub.tone(330, .4, 'triangle', .04, .15);
+}
+function renderGuess(){
+  const ok = $('gsOk');
+  if (GS.step === 'who'){
+    $('gsH').textContent = G.spies > 1 ? 'Spion, zeig dich! Wer von euch rät?' : 'Spion, zeig dich!';
+    $('gsP').innerHTML = GS.msg || 'Nur der Spion darf den Ort raten – und enttarnt sich damit. <b>Klick auf deinen Namen.</b>';
+    $('gsWho').hidden = false; $('gsLocs').hidden = true; ok.hidden = true;
+    $('gsWho').innerHTML = pcardsHTML(-1);
+    $('gsWho').querySelectorAll('.pcard').forEach(b => b.onclick = () => pickWho(+b.dataset.i));
+  } else {
+    const p = G.players[GS.who];
+    $('gsH').innerHTML = `<span class="emo">${p.avatar}</span> <span class="lt" style="--pc:${p.color}">${esc(p.name)}</span>, wo sind wir?`;
+    $('gsP').innerHTML = 'Wähle den geheimen Ort (Klick oder <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd>). Richtig geraten: Du gewinnst die Runde – sonst die Agenten!';
+    $('gsWho').hidden = true; $('gsLocs').hidden = false; ok.hidden = false;
+    const el = $('gsLocs');
+    el.innerHTML = R.list.map((li, k) => `<button class="loc ${k === GS.sel ? 'sel' : ''}" data-k="${k}" style="animation:none"><span class="le">${LOCS[li].emo}</span><span class="ln">${LOCS[li].html}</span></button>`).join('');
+    el.querySelectorAll('.loc').forEach(b => b.onclick = () => guessSel(+b.dataset.k));
+    fitLocs(el);
+    ok.disabled = GS.sel < 0;
+    ok.innerHTML = GS.sel < 0 ? '🎯 Ort anklicken' : `🎯 Mein Tipp: ${esc(LOCS[R.list[GS.sel]].name)} <kbd>Enter</kbd>`;
+  }
+}
+function pickWho(i){
+  if (phase !== 'guess' || GS.step !== 'who' || !G.players[i] || locked()) return;
+  if (R.spies.includes(i)){ lock(350); GS.who = i; GS.step = 'loc'; GS.sel = -1; Hub.sfx('ok'); renderGuess(); }
+  else {
+    GS.msg = `<span class="warn">🙅 ${esc(G.players[i].name)} ist gar kein Spion!</span> Nur der Spion darf raten – oder zurück zur Befragung.`;
+    Hub.sfx('bad'); renderGuess();
+    const c = $('gsWho').querySelector(`[data-i="${i}"]`); if (c) c.classList.add('no');
+  }
+}
+function guessSel(k){
+  if (phase !== 'guess' || GS.step !== 'loc' || k < 0 || k >= R.list.length) return;
+  GS.sel = k; Hub.sfx('click');
+  $('gsLocs').querySelectorAll('.loc').forEach((b, j) => b.classList.toggle('sel', j === k));
+  const ok = $('gsOk'); ok.disabled = false;
+  ok.innerHTML = `🎯 Mein Tipp: ${esc(LOCS[R.list[k]].name)} <kbd>Enter</kbd>`;
+}
+function guessMove(dx, dy){
+  const cols = +$('gsLocs').dataset.cols || 1, n = R.list.length;
+  let k = GS.sel < 0 ? 0 : GS.sel + dx + dy * cols;
+  if (GS.sel >= 0 && (k < 0 || k >= n)) k = GS.sel;
+  guessSel(Math.max(0, Math.min(n - 1, k)));
+}
+function guessOk(){
+  if (phase !== 'guess' || GS.step !== 'loc' || GS.sel < 0 || locked()) return;
+  lock(700);
+  const li = R.list[GS.sel];
+  finishRound(li === R.loc ? 'guessRight' : 'guessWrong', {who:GS.who, guess:li});
+}
+function guessBack(){
+  if (phase !== 'guess' || locked()) return;
+  lock(350); GS = null; Hub.sfx('click'); backToPlay();
+}
+
+// =====================================================================
+//  Rundenende
+// =====================================================================
+function finishRound(outcome, info){
+  stopTimer();
+  phase = 'result';
+  const agentsWin = outcome === 'caught' || outcome === 'guessWrong';
+  const pts = G.players.map((p, i) => {
+    const spy = R.spies.includes(i);
+    if (agentsWin) return spy ? 0 : 1;
+    if (outcome === 'wrong') return spy ? 2 : 0;
+    return spy ? 3 : 0;
+  });
+  pts.forEach((v, i) => { G.players[i].score += v; });
+  R.result = {outcome, info, pts, agentsWin, elapsed:R.total - R.left};
+  G.history.push({agentsWin, outcome});
+  renderResult();
+}
+function renderResult(){
+  show('result');
+  const res = R.result, L = LOCS[R.loc], hero = $('rsHero'), body = $('rsBody'), foot = $('rsFoot');
+  const ein = G.spies > 1 ? 'ein' : 'der';
+  body.classList.remove('on'); foot.classList.remove('on'); hero.className = 'rs-hero wait';
+  if (res.outcome === 'caught' || res.outcome === 'wrong'){
+    const p = G.players[res.info.accused];
+    hero.innerHTML = `<div class="tag">⚖️ DIE ANKLAGE · RUNDE ${G.round}</div>
+      <div class="rs-sus" style="--pc:${p.color}"><span class="av">${p.avatar}</span><div class="rs-q">Ist <span class="lt" style="--pc:${p.color}">${esc(p.name)}</span> ${ein} Spion?</div></div>
+      <div id="rsStamp"></div><div id="rsWin"></div>`;
+  } else {
+    const p = G.players[res.info.who], g = LOCS[res.info.guess];
+    hero.innerHTML = `<div class="tag" style="color:var(--spy-2)">🕵️ DER SPION RÄT · RUNDE ${G.round}</div>
+      <div class="rs-sus" style="--pc:${p.color}"><span class="av">${p.avatar}</span><div class="rs-q"><span class="lt" style="--pc:${p.color}">${esc(p.name)}</span> tippt auf <span class="pick">${g.emo} ${esc(g.name)}</span></div></div>
+      <div id="rsStamp"></div><div id="rsWin"></div>`;
+  }
+  // Rollen & Punkte (wird nach der Spannung eingeblendet)
+  const spyNames = R.spies.map(i => esc(G.players[i].name)).join(' & ');
+  const why = {
+    caught:`${esc(G.players[res.info.accused === undefined ? 0 : res.info.accused].name)} wurde entlarvt. Jeder Agent bekommt +1.`,
+    wrong:`${esc(G.players[res.info.accused === undefined ? 0 : res.info.accused].name)} war unschuldig. ${G.spies > 1 ? 'Die Spione bekommen je' : 'Der Spion bekommt'} +2.`,
+    guessRight:`${spyNames} ${G.spies > 1 ? 'kassieren' : 'kassiert'} +3 für den richtigen Tipp.`,
+    guessWrong:`Falsch geraten! Jeder Agent bekommt +1.`,
+  }[res.outcome];
+  body.innerHTML = `<div class="rs-left">
+      <div class="mdos"><div class="ds-label">DER ORT WAR</div><div class="md-emo">${L.emo}</div><div class="md-name">${L.html}</div><div class="md-pack">${packOf(L.pack).emo} ${esc(packOf(L.pack).name)}</div></div>
+      <p class="rs-why" style="margin:12px 4px 0">${why}<br>⏱️ Gespielt: ${fmtT(res.elapsed)} min</p>
+    </div>
+    <div class="rs-right"><h3>Rollen &amp; Punkte</h3>
+      <div class="roles ${G.players.length > 5 ? 'two' : ''}">${G.players.map((p, i) => {
+        const spy = R.spies.includes(i);
+        return `<div class="rrow ${spy ? 'spy' : ''}" style="--pc:${p.color}"><span class="av">${p.avatar}</span><b>${esc(p.name)}</b>
+          <span class="role">${spy ? '🕵️ SPION' : esc(R.role[i])}</span>
+          <span class="plus ${res.pts[i] ? '' : 'zero'}" style="animation-delay:${.15 + i * .07}s">${res.pts[i] ? '+' + res.pts[i] : '±0'}</span><span class="tot">${p.score}</span></div>`;
+      }).join('')}</div></div>`;
+  const last = G.round >= G.rounds;
+  $('rsNext').innerHTML = last ? '🏆 Zur Siegerehrung <kbd>Enter</kbd>' : `Nächste Runde (${G.round + 1}/${G.rounds}) ➜ <kbd>Enter</kbd>`;
+  $('rsEnd').hidden = last;
+  SND.drum(2);
+  later(2150, () => {
+    hero.className = 'rs-hero done';
+    let stamp, cls, line;
+    if (res.outcome === 'caught'){ stamp = 'ERWISCHT!'; cls = 'good'; line = `🕵️ ${esc(G.players[res.info.accused].name)} ist ${ein} Spion!`; }
+    else if (res.outcome === 'wrong'){ stamp = 'UNSCHULDIG!'; cls = 'bad'; line = `${G.spies > 1 ? 'Die Spione waren' : 'Der Spion war'}: ${spyNames}`; }
+    else if (res.outcome === 'guessRight'){ stamp = 'RICHTIG!'; cls = 'bad'; line = `Der Ort war wirklich ${L.emo} ${esc(L.name)}!`; }
+    else { stamp = 'DANEBEN!'; cls = 'good'; line = `Der Ort war ${L.emo} ${esc(L.name)}.`; }
+    $('rsStamp').innerHTML = `<div class="stamp ${cls}">${stamp}</div>`;
+    $('rsWin').innerHTML = `<div class="rs-win">${res.agentsWin ? '🔎 Die Agenten gewinnen die Runde!' : (G.spies > 1 ? '🕵️ Die Spione gewinnen die Runde!' : '🕵️ Der Spion gewinnt die Runde!')}</div><div class="rs-why">${line}</div>`;
+    SND.stamp();
+    setTimeout(() => res.agentsWin ? SND.fanfare() : SND.spy(), 180);
+    later(900, () => {
+      body.classList.add('on'); foot.classList.add('on'); R.ready = true;
+      const winners = G.players.filter((p, i) => res.pts[i] > 0).map(p => p.color);
+      confetti(winners.length ? winners : Hub.party.COLORS, 70);
+      Hub.achieve('spion', 'einsatz', 'Erster Einsatz', 'Spiele eine Runde „Wer ist der Spion?“ zu Ende');
+      if (res.outcome === 'guessRight') Hub.achieve('spion', 'meister', 'Meisterspion', 'Errate als Spion den geheimen Ort');
+      if (res.outcome === 'caught' && res.elapsed < 120) Hub.achieve('spion', 'adlerauge', 'Adlerauge', 'Entlarve den Spion in weniger als 2 Minuten');
+    });
+  });
+}
+function resultNext(){
+  if (phase !== 'result' || !R || !R.ready || locked()) return;
+  lock(600); Hub.sfx('click');
+  if (G.round >= G.rounds) showEnd(); else nextRound();
+}
+async function resultEnd(){
+  if (phase !== 'result' || !R || !R.ready || locked()) return;
+  lock(400);
+  const v = await Hub.dialog({title:'Spiel beenden?', html:'<p>Dann gibt es sofort die Siegerehrung mit dem aktuellen Punktestand.</p>', center:true,
+    buttons:[{label:'Weiterspielen', value:false}, {label:'Beenden', primary:true, value:true}]});
+  if (v && phase === 'result') showEnd();
+}
+
+// =====================================================================
+//  Siegerehrung
+// =====================================================================
+function showEnd(){
+  stopTimer(); phase = 'end'; show('end');
+  const ranked = G.players.map(p => Object.assign({}, p)).sort((a, b) => b.score - a.score);
+  ranked.forEach(r => { r.rank = 1 + ranked.filter(x => x.score > r.score).length; });
+  const top = ranked.filter(r => r.rank === 1);
+  const names = top.map(t => esc(t.name));
+  $('enH').innerHTML = top.length > 1
+    ? `Gleichstand! ${names.slice(0, -1).join(', ')} &amp; ${names[names.length - 1]} teilen sich den Sieg`
+    : `<span class="emo">${top[0].avatar}</span> <span class="lt" style="--pc:${top[0].color}">${names[0]}</span> gewinnt!`;
+  const med = ['🥇', '🥈', '🥉'];
+  $('podium').innerHTML = ranked.slice(0, 3).map((r, i) => `<div class="pp p${i} r${Math.min(r.rank, 3)}" style="--pc:${r.color}">
+      <span class="av">${r.avatar}</span><b>${esc(r.name)}</b><span class="ps">${r.score} ${r.score === 1 ? 'Punkt' : 'Punkte'}</span><div class="blk">${med[Math.min(r.rank, 3) - 1]}</div></div>`).join('');
+  $('ranks').classList.toggle('two', ranked.length > 6);
+  $('ranks').innerHTML = ranked.length > 3 ? ranked.slice(3).map(r => `<div class="rk" style="--pc:${r.color}"><span class="n">${r.rank}.</span><span class="av">${r.avatar}</span><b>${esc(r.name)}</b><span class="s">${r.score}</span></div>`).join('') : '';
+  const aw = G.history.filter(h => h.agentsWin).length, sw = G.history.length - aw;
+  $('enStats').innerHTML = `${G.history.length} ${G.history.length === 1 ? 'Runde' : 'Runden'} gespielt · 🔎 Agenten gewannen ${aw}× · 🕵️ ${G.spies > 1 ? 'Spione gewannen' : 'Spion gewann'} ${sw}×`;
+  $('enFoot').classList.remove('on');
+  bar.set('runde', 'Ende');
+  SND.fanfare(); setTimeout(() => Hub.sfx('ach'), 700);
+  confetti(top.map(t => t.color).concat(Hub.party.COLORS), 220);
+  later(700, () => $('enFoot').classList.add('on'));
+  Hub.score('spion', top[0].score, {label:'Punkte', silent:true});
+}
+function againGame(){ if (phase === 'end' && !locked()){ startGame(); } }
+
+// =====================================================================
+//  Konfetti
+// =====================================================================
+const fx = $('fx'), fxc = fx.getContext('2d');
+let parts = [], fxRaf = 0;
+function confetti(colors, n){
+  if (Hub.settings.reduceMotion) return;
+  fx.width = innerWidth; fx.height = innerHeight;
+  for (let k = 0; k < n; k++) parts.push({x:Math.random() * fx.width, y:-20 - Math.random() * fx.height * .6, vx:(Math.random() - .5) * 3, vy:2 + Math.random() * 4,
+    r:Math.random() * 6.3, vr:(Math.random() - .5) * .3, w:7 + Math.random() * 7, h:10 + Math.random() * 9, c:colors[k % colors.length], t:Math.random() * 6});
+  if (!fxRaf) fxRaf = requestAnimationFrame(fxLoop);
+}
+function fxLoop(){
+  fxc.clearRect(0, 0, fx.width, fx.height);
+  parts = parts.filter(p => p.y < fx.height + 30);
+  parts.forEach(p => {
+    p.t += .05; p.x += p.vx + Math.sin(p.t) * .8; p.y += p.vy; p.vy = Math.min(p.vy + .03, 6); p.r += p.vr;
+    fxc.save(); fxc.translate(p.x, p.y); fxc.rotate(p.r); fxc.scale(1, Math.cos(p.t * 1.6));
+    fxc.fillStyle = p.c; fxc.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fxc.restore();
+  });
+  fxRaf = parts.length ? requestAnimationFrame(fxLoop) : 0;
+  if (!fxRaf) fxc.clearRect(0, 0, fx.width, fx.height);
+}
+
+// =====================================================================
+//  Bedienung
+// =====================================================================
+$('guestBtn').onclick = addGuest;
+$('startBtn').onclick = startGame;
+$('cvShow').onclick = coverShow;
+$('cvDone').onclick = coverDone;
+$('cvCancel').onclick = coverCancel;
+$('btnVote').onclick = () => openVote(false);
+$('btnGuess').onclick = openGuess;
+$('btnIdea').onclick = newIdea;
+$('btnPeek').onclick = openPeek;
+$('btnPause').onclick = openPause;
+$('vtOk').onclick = voteOk;
+$('vtCancel').onclick = voteCancel;
+$('vtAgain').onclick = voteAgain;
+$('gsOk').onclick = guessOk;
+$('gsBack').onclick = guessBack;
+$('rsNext').onclick = resultNext;
+$('rsEnd').onclick = resultEnd;
+$('enAgain').onclick = againGame;
+$('enLobby').onclick = () => { if (!locked()){ Hub.sfx('click'); showLobby(); } };
+$('enHome').onclick = () => { location.href = '../Launcher.html'; };
+// Knöpfe nicht per Maus fokussieren – sonst löst Enter sie zusätzlich aus
+document.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+
+addEventListener('keydown', e => {
+  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+  const t = e.target;
+  if (t && t.tagName === 'INPUT'){
+    if (e.key === 'Enter'){ e.preventDefault(); addGuest(); }
+    else if (e.key === 'Escape') t.blur();
+    return;
+  }
+  if (document.querySelector('.h-overlay.on')) return;            // Hilfe-Dialog offen
+  const k = e.key, kl = k.length === 1 ? k.toLowerCase() : k;
+  const num = /^[1-9]$/.test(k) ? +k - 1 : -1;
+  const go = k === 'Enter' || k === ' ';
+  let used = true;
+  if (OV){
+    if (go && OV.enter) OV.enter();
+    else if (k === 'Escape' && OV.esc) OV.esc();
+    else if (kl === 'p' && OV.p) OV.p();
+    else if (num >= 0 && OV.num) OV.num(num);
+    else used = go || k === 'Escape';
+  } else switch (phase){
+    case 'lobby':
+      if (go) startGame();
+      else if (num >= 0) toggleRoster(num);
+      else if (kl === 'g') setTimeout(() => $('guestIn').focus(), 0);   // erst nach dem Tastendruck, sonst landet das „g“ im Feld
+      else used = false;
+      break;
+    case 'cover':
+      if (go) CV && CV.state === 'show' ? coverDone() : coverShow();
+      else if (k === 'Escape') coverCancel();
+      else used = false;
+      break;
+    case 'play':
+      if (kl === 'a') openVote(false);
+      else if (kl === 's') openGuess();
+      else if (kl === 'p') openPause();
+      else if (kl === 'f') newIdea();
+      else if (kl === 'r') openPeek();
+      else if (num >= 0) setAsker(num);
+      else used = go;
+      break;
+    case 'vote':
+      if (num >= 0) voteSel(num);
+      else if (go) voteOk();
+      else if (k === 'Escape') voteCancel();
+      else if (kl === 'w') voteAgain();
+      else used = false;
+      break;
+    case 'guess':
+      if (k === 'Escape') guessBack();
+      else if (GS.step === 'who'){ if (num >= 0) pickWho(num); else used = go; }
+      else if (go) guessOk();
+      else if (k === 'ArrowLeft') guessMove(-1, 0);
+      else if (k === 'ArrowRight') guessMove(1, 0);
+      else if (k === 'ArrowUp') guessMove(0, -1);
+      else if (k === 'ArrowDown') guessMove(0, 1);
+      else used = false;
+      break;
+    case 'result':
+      if (go) resultNext(); else used = false;
+      break;
+    case 'end':
+      if (go) againGame(); else used = false;
+      break;
+    default: used = go;
+  }
+  if (used){
+    e.preventDefault();
+    const a = document.activeElement;
+    if (a && a.tagName === 'BUTTON') a.blur();
+  }
+});
+
+initRoster();
+renderLobby();
+</script>
+</body>
+</html>
