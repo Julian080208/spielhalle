@@ -1,12 +1,18 @@
-# Baut die Spielhalle auf einem Windows-Rechner von GitHub und legt das Release an,
-# sobald auf main eine neue Version in installer/version.txt ankommt
-# (Neuigkeiten aus installer/neu.txt). Gibt es das Release schon – etwa weil
-# veroeffentlichen.ps1 es angelegt hat – passiert nichts.
+# Jede Änderung an der Spielhalle auf main wird automatisch eine neue Version:
+# Versionsnummer hochzählen, auf einem Windows-Rechner von GitHub bauen und als
+# Release veröffentlichen. Die installierten Spielhallen holen sich das Update dann selbst.
+#
+# Versionsnummer: letzte veröffentlichte Version + 1 (z. B. 1.0.4 -> 1.0.5).
+#   Für einen größeren Sprung (z. B. 1.1.0) die Nummer in installer/version.txt eintragen.
+# Neuigkeiten: installer/neu.txt, wenn sie seit der letzten Version geändert wurde,
+#   sonst die Commit-Titel seit der letzten Version.
+# Von einem anderen Branch aus gestartet (Actions -> Veröffentlichen -> Run workflow)
+#   wird nur zur Probe gebaut, nichts veröffentlicht.
 name: Veröffentlichen
 on:
   push:
     branches: [main]
-    paths: [installer/version.txt]
+    paths: ['Launcher.html', 'spiele/**', 'installer/**', '.github/workflows/veroeffentlichen.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -19,10 +25,54 @@ jobs:
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Einrichtungs-Datei prüfen
+        shell: powershell
+        run: |
+          $f = (Resolve-Path 'Spielhalle einrichten.cmd').Path
+          $fehler = $null
+          [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$null, [ref]$fehler) | Out-Null
+          if ($fehler) { $fehler | ForEach-Object { "Zeile $($_.Extent.StartLineNumber): $($_.Message)" }; throw 'Spielhalle einrichten.cmd hat Fehler' }
+          'Spielhalle einrichten.cmd: OK'
+      - name: Version und Neuigkeiten
+        id: v
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'   # gh/git schreiben Hinweise nach stderr
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
+          $utf8 = New-Object Text.UTF8Encoding $false
+          $tag = gh release view --json tagName --jq .tagName 2>$null
+          if ($LASTEXITCODE -or -not $tag) { $tag = '' }
+          if ($tag -and (git rev-list -n 1 $tag) -eq (git rev-parse HEAD)) {
+            "Dieser Stand ist schon als $tag veröffentlicht"
+            [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "skip=1`n")
+            exit 0
+          }
+          $datei = [version](([IO.File]::ReadAllText('installer\version.txt')).Trim())
+          $neu = $datei
+          if ($tag) {
+            $letzte = [version]$tag.TrimStart('v')
+            if ($datei -le $letzte) { $neu = New-Object Version $letzte.Major, $letzte.Minor, ([Math]::Max(0, $letzte.Build) + 1) }
+          }
+          if ($tag -and (git diff --name-only $tag HEAD -- installer/neu.txt)) {
+            $notiz = ([IO.File]::ReadAllText('installer\neu.txt', [Text.Encoding]::UTF8)).Trim()
+          } else {
+            $range = if ($tag) { "$tag..HEAD" } else { 'HEAD' }
+            $zeilen = git log --no-merges --format=%s $range | Where-Object { $_ -and $_ -notmatch '^Spielhalle \d' } | Select-Object -First 6
+            $notiz = ($zeilen -join " $([char]0xB7) ").Trim()
+          }
+          if (-not $notiz) { $notiz = 'Verbesserungen und Fehlerbehebungen' }
+          [IO.File]::WriteAllText("$pwd\installer\version.txt", "$neu", $utf8)
+          [IO.File]::WriteAllText("$pwd\installer\neu.txt", $notiz, $utf8)
+          "Version $neu (vorher: $(if ($tag) { $tag } else { 'keine' }))"
+          "Neu: $notiz"
       - name: Bauen
+        if: steps.v.outputs.skip != '1'
         shell: powershell
         run: .\installer\build.ps1
       - name: Release anlegen
+        if: steps.v.outputs.skip != '1' && github.ref == 'refs/heads/main'
         shell: powershell
         run: |
           $ErrorActionPreference = 'Continue'   # gh schreibt "release not found" nach stderr
