@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dame</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%}
+body{display:flex;flex-direction:column;background:radial-gradient(1200px 800px at 50% 30%,#2a1d12,#0b0805 70%)}
+main{flex:1;min-height:0;display:flex;gap:28px;align-items:center;justify-content:center;padding:20px;flex-wrap:wrap;overflow:auto}
+.boardWrap{position:relative;padding:18px;border-radius:20px;background:linear-gradient(145deg,#6b4224,#3a2312);box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 2px 0 rgba(255,220,180,.25)}
+#board{--s:min(9.4vh,72px);position:relative;display:grid;grid-template-columns:repeat(8,var(--s));grid-template-rows:repeat(8,var(--s));border-radius:6px;overflow:hidden;box-shadow:0 0 0 3px #2a180b}
+.sq{position:relative}
+.sq.l{background:#ecd6b0}
+.sq.d{background:#8a5a34;background-image:linear-gradient(135deg,rgba(255,255,255,.05),rgba(0,0,0,.08))}
+.sq.tgt{cursor:pointer}
+.sq.tgt::after{content:'';position:absolute;inset:34%;border-radius:50%;background:rgba(90,255,150,.55);box-shadow:0 0 14px rgba(90,255,150,.8)}
+.sq.last{box-shadow:inset 0 0 0 100px rgba(255,210,63,.18)}
+.sq.must{box-shadow:inset 0 0 0 3px rgba(255,93,108,.8)}
+.pc{position:absolute;width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;transition:transform .2s ease;pointer-events:none;z-index:2}
+.pc i{width:78%;height:78%;border-radius:50%;position:relative;box-shadow:0 5px 0 rgba(0,0,0,.35),0 8px 14px rgba(0,0,0,.4)}
+.pc.w i{background:radial-gradient(circle at 35% 30%,#fffdf6,#e8dcc6 60%,#c9b796);border:2px solid #b8a27c}
+.pc.b i{background:radial-gradient(circle at 35% 30%,#5a4a40,#2a1f19 60%,#140e0a);border:2px solid #0a0705}
+.pc i::before{content:'';position:absolute;inset:16%;border-radius:50%;border:2px solid rgba(0,0,0,.15)}
+.pc.b i::before{border-color:rgba(255,255,255,.1)}
+.pc.k i::after{content:'♛';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(var(--s) * .38);color:#d9a520;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.pc.sel i{box-shadow:0 0 0 4px #5aff96,0 8px 14px rgba(0,0,0,.4)}
+.pc.cap{animation:capt .35s ease forwards}
+@keyframes capt{to{opacity:0;transform:scale(.3)}}
+.pc.mov{z-index:5}
+.panel{width:280px;display:flex;flex-direction:column;gap:14px}
+.card{background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--border-2);border-radius:18px;padding:16px}
+.card h3{margin:0 0 10px;font-family:var(--font-display);font-weight:600;font-size:16px}
+.turn{font-family:var(--font-display);font-size:20px;display:flex;align-items:center;gap:10px}
+.dot{width:18px;height:18px;border-radius:50%;flex:none}
+.dot.w{background:#efe3cc;border:2px solid #b8a27c}.dot.b{background:#2a1f19;border:2px solid #000}
+.cnt{display:flex;justify-content:space-between;margin-top:10px;color:var(--text-2);font-size:14px}
+.seg{display:flex;gap:3px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:8px}
+.seg button{flex:1;height:32px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+.row{display:flex;gap:8px}
+.row .h-btn{flex:1}
+.hint{font-size:13px;color:var(--text-2);line-height:1.5;margin:0}
+.think{display:none;align-items:center;gap:8px;color:var(--text-2);font-size:13px;margin-top:8px}
+.think.on{display:flex}
+.think i{width:14px;height:14px;border:2px solid var(--text-2);border-top-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<main>
+  <div class="boardWrap"><div id="board"></div></div>
+  <div class="panel">
+    <div class="card"><div class="turn" id="turn"><span class="dot w"></span>Weiß ist am Zug</div>
+      <div class="think" id="think"><i></i>Der Computer denkt nach …</div>
+      <div class="cnt"><span id="cW">Weiß: 12</span><span id="cB">Schwarz: 12</span></div></div>
+    <div class="card"><h3>Spiel</h3>
+      <div class="seg" id="mode"><button data-m="ai">Gegen KI</button><button data-m="pvp">2 Spieler</button></div>
+      <div class="seg" id="lvl"><button data-l="1">Leicht</button><button data-l="2">Mittel</button><button data-l="3">Schwer</button></div>
+      <div class="row"><button class="h-btn sm" id="undo">Rückgängig</button><button class="h-btn sm primary" id="new">Neues Spiel</button></div></div>
+    <div class="card"><p class="hint">Steine ziehen schräg nach vorn. <b>Schlagen ist Pflicht</b> – vorwärts wie rückwärts, auch mehrfach hintereinander. Wer die gegnerische Grundlinie erreicht, wird zur <b>Dame</b> und darf beliebig weit ziehen.</p></div>
+  </div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('dame');
+const bar = Hub.bar({id:'dame', title:'Dame', stats:[['wins', 'Siege'], ['loss', 'Niederlagen']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Dame – Regeln', html:'<p>Gespielt wird nur auf den dunklen Feldern. Normale Steine ziehen ein Feld <b>schräg vorwärts</b>.</p><p><b>Schlagen ist Pflicht:</b> Steht ein gegnerischer Stein schräg neben dir und dahinter ist frei, musst du ihn überspringen – auch rückwärts. Danach geht es weiter, solange noch etwas geschlagen werden kann.</p><p>Erreicht ein Stein die gegnerische Grundlinie, wird er zur <b>Dame</b>: Sie zieht und schlägt beliebig weit schräg in alle Richtungen.</p><p>Wer keine Steine oder keine Züge mehr hat, verliert.</p>'}));
+
+const $ = id => document.getElementById(id);
+const opts = Object.assign({mode:'ai', lvl:2}, Hub.read('dame_opts', {}));
+const stats = Object.assign({wins:0, loss:0}, Hub.read('dame_stats', {}));
+const DIRS = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+let B, side, sel = null, partial = [], legal = [], history = [], lastMove = null, busy = false, over = false, gen = 0, noCapCount = 0;
+
+const idx = (r, c) => r * 8 + c, rc = i => [i >> 3, i & 7], on = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
+function initial(){ const b = Array(64).fill(0); for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1){ if (r < 3) b[idx(r, c)] = -1; else if (r > 4) b[idx(r, c)] = 1; } return b; }
+
+// ---------- Zuggenerator ----------
+function genMoves(b, s){
+  const caps = [], quiet = [];
+  for (let i = 0; i < 64; i++){
+    const p = b[i]; if (!p || Math.sign(p) !== s) continue;
+    const king = Math.abs(p) === 2, [r, c] = rc(i);
+    capDFS(b, s, king, i, r, c, [i], [], caps);
+    if (caps.length) continue;
+    for (const [dr, dc] of DIRS){
+      if (!king && dr !== -s) continue;
+      let nr = r + dr, nc = c + dc;
+      while (on(nr, nc) && !b[idx(nr, nc)]){ quiet.push({from:i, to:idx(nr, nc), path:[i, idx(nr, nc)], caps:[]}); if (!king) break; nr += dr; nc += dc; }
+    }
+  }
+  return caps.length ? caps : quiet;
+}
+function capDFS(b, s, king, start, r, c, path, capd, out){
+  let found = false;
+  for (const [dr, dc] of DIRS){
+    if (king){
+      let nr = r + dr, nc = c + dc;
+      while (on(nr, nc) && (!b[idx(nr, nc)] || idx(nr, nc) === start)){ nr += dr; nc += dc; }
+      if (!on(nr, nc)) continue;
+      const ci = idx(nr, nc);
+      if (Math.sign(b[ci]) !== -s || capd.includes(ci)) continue;
+      let lr = nr + dr, lc = nc + dc;
+      while (on(lr, lc) && (!b[idx(lr, lc)] || idx(lr, lc) === start)){
+        found = true;
+        capDFS(b, s, king, start, lr, lc, [...path, idx(lr, lc)], [...capd, ci], out);
+        lr += dr; lc += dc;
+      }
+    } else {
+      const mr = r + dr, mc = c + dc, lr = r + 2 * dr, lc = c + 2 * dc;
+      if (!on(lr, lc)) continue;
+      const mi = idx(mr, mc), li = idx(lr, lc);
+      if (Math.sign(b[mi]) !== -s || capd.includes(mi) || (b[li] && li !== start)) continue;
+      found = true;
+      capDFS(b, s, king, start, lr, lc, [...path, li], [...capd, mi], out);
+    }
+  }
+  if (!found && capd.length) out.push({from:start, to:path[path.length - 1], path, caps:capd});
+}
+function apply(b, m){
+  const nb = b.slice(), p = nb[m.from];
+  nb[m.from] = 0; m.caps.forEach(i => nb[i] = 0);
+  const [r] = rc(m.to);
+  nb[m.to] = (Math.abs(p) === 1 && ((p > 0 && r === 0) || (p < 0 && r === 7))) ? p * 2 : p;
+  return nb;
+}
+
+// ---------- KI ----------
+function evaluate(b, s){
+  let v = 0;
+  for (let i = 0; i < 64; i++){
+    const p = b[i]; if (!p) continue;
+    const [r, c] = rc(i), sg = Math.sign(p);
+    let x = Math.abs(p) === 2 ? 320 : 100;
+    if (Math.abs(p) === 1) x += (sg > 0 ? 7 - r : r) * 6 + ((sg > 0 && r === 7) || (sg < 0 && r === 0) ? 8 : 0);
+    if (c >= 2 && c <= 5 && r >= 2 && r <= 5) x += 6;
+    v += sg * x;
+  }
+  return v * s;
+}
+let nodes = 0, deadline = Infinity;
+const TIMEOUT = {};
+function negamax(b, s, d, a, be){
+  if ((++nodes & 1023) === 0 && performance.now() > deadline) throw TIMEOUT;
+  const ms = genMoves(b, s);
+  if (!ms.length) return -100000 - d;
+  if (d <= 0 && !ms[0].caps.length) return evaluate(b, s);
+  if (d <= -6) return evaluate(b, s);
+  ms.sort((x, y) => y.caps.length - x.caps.length);
+  let best = -Infinity;
+  for (const m of ms){
+    const v = -negamax(apply(b, m), -s, d - 1, -be, -a);
+    if (v > best) best = v;
+    if (v > a) a = v;
+    if (a >= be) break;
+  }
+  return best;
+}
+function aiMove(b, s){
+  const ms = genMoves(b, s); if (!ms.length) return null;
+  const maxDepth = [0, 2, 4, 12][opts.lvl];
+  if (opts.lvl === 1 && Math.random() < .35) return ms[Math.floor(Math.random() * ms.length)];
+  if (ms.length === 1) return ms[0];
+  deadline = performance.now() + (opts.lvl === 3 ? 1200 : 600);
+  let pick = ms[0], order = ms.slice();
+  for (let depth = 1; depth <= maxDepth; depth++){
+    let best = -Infinity, bm = null; const scored = [];
+    try {
+      for (const m of order){
+        const v = -negamax(apply(b, m), -s, depth - 1, -Infinity, Infinity) + Math.random() * (opts.lvl === 3 ? 1 : 8);
+        scored.push([v, m]);
+        if (v > best){ best = v; bm = m; }
+      }
+    } catch (e){ if (e !== TIMEOUT) throw e; break; }
+    pick = bm; order = scored.sort((x, y) => y[0] - x[0]).map(x => x[1]);
+    if (best > 90000) break;
+  }
+  deadline = Infinity;
+  return pick;
+}
+
+// ---------- Darstellung ----------
+function build(){
+  const bd = $('board'); bd.innerHTML = '';
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++){
+    const d = document.createElement('div'); d.className = 'sq ' + ((r + c) % 2 ? 'd' : 'l'); d.dataset.i = idx(r, c); bd.appendChild(d);
+  }
+}
+function render(){
+  const bd = $('board'), s = bd.querySelector('.sq').offsetWidth;
+  bd.querySelectorAll('.pc').forEach(e => e.remove());
+  for (let i = 0; i < 64; i++){
+    const p = B[i]; if (!p) continue;
+    const [r, c] = rc(i), el = document.createElement('div');
+    el.className = 'pc ' + (p > 0 ? 'w' : 'b') + (Math.abs(p) === 2 ? ' k' : '') + (sel === i ? ' sel' : '');
+    el.dataset.i = i; el.style.transform = `translate(${c * s}px,${r * s}px)`; el.innerHTML = '<i></i>';
+    bd.appendChild(el);
+  }
+  const tg = targets();
+  const mustFrom = new Set(legal.filter(m => m.caps.length).map(m => m.from));
+  bd.querySelectorAll('.sq').forEach(q => {
+    const i = +q.dataset.i;
+    q.classList.toggle('tgt', tg.has(i));
+    q.classList.toggle('last', !!lastMove && (lastMove.from === i || lastMove.to === i));
+    q.classList.toggle('must', sel == null && mustFrom.has(i) && humanTurn());
+  });
+  const w = B.filter(p => p > 0).length, bl = B.filter(p => p < 0).length;
+  $('cW').textContent = `Weiß: ${w}`; $('cB').textContent = `Schwarz: ${bl}`;
+  $('turn').innerHTML = over ? $('turn').innerHTML : `<span class="dot ${side > 0 ? 'w' : 'b'}"></span>${side > 0 ? 'Weiß' : 'Schwarz'} ist am Zug`;
+  bar.set('wins', stats.wins); bar.set('loss', stats.loss);
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === opts.mode));
+  document.querySelectorAll('#lvl button').forEach(b => b.classList.toggle('on', +b.dataset.l === opts.lvl));
+  $('lvl').style.display = opts.mode === 'ai' ? '' : 'none';
+}
+function targets(){
+  const s = new Set();
+  if (sel == null) return s;
+  legal.filter(m => m.from === sel && partial.every((p, k) => m.path[k] === p)).forEach(m => { if (m.path[partial.length] != null) s.add(m.path[partial.length]); });
+  return s;
+}
+const humanTurn = () => !over && !busy && (opts.mode === 'pvp' || side === 1);
+
+// ---------- Ablauf ----------
+async function animate(m){
+  const bd = $('board'), s = bd.querySelector('.sq').offsetWidth;
+  const el = bd.querySelector(`.pc[data-i="${m.from}"]`);
+  if (el){
+    el.classList.add('mov');
+    for (let k = 1; k < m.path.length; k++){
+      const [r, c] = rc(m.path[k]); el.style.transform = `translate(${c * s}px,${r * s}px)`;
+      Hub.tone(m.caps.length ? 420 + k * 60 : 520, .06, 'triangle', .045);
+      await new Promise(res => setTimeout(res, 210));
+    }
+  }
+  m.caps.forEach(i => { const e = bd.querySelector(`.pc[data-i="${i}"]`); if (e) e.classList.add('cap'); });
+  if (m.caps.length){ Hub.tone(200, .12, 'square', .035); await new Promise(res => setTimeout(res, 260)); }
+}
+async function doMove(m){
+  busy = true; const g = gen;
+  history.push({B:B.slice(), side, lastMove, noCapCount});
+  sel = null; partial = []; render();
+  await animate(m); if (g !== gen) return;
+  const wasMan = Math.abs(B[m.from]) === 1;
+  B = apply(B, m); lastMove = m;
+  if (wasMan && Math.abs(B[m.to]) === 2){ Hub.sfx('ok'); if ((opts.mode === 'pvp' || side === 1)) Hub.achieve('dame', 'king', 'Gekrönt', 'Mache einen Stein zur Dame'); }
+  if (m.caps.length >= 3 && (opts.mode === 'pvp' || side === 1)) Hub.achieve('dame', 'triple', 'Dreifachsprung', 'Schlage drei Steine mit einem Zug');
+  noCapCount = m.caps.length || wasMan ? 0 : noCapCount + 1;
+  side = -side; legal = genMoves(B, side); busy = false;
+  if (!legal.length) return finish(-side);
+  if (noCapCount >= 40) return finish(0);
+  render();
+  if (opts.mode === 'ai' && side === -1) aiTurn();
+}
+async function aiTurn(){
+  const g = gen; busy = true; render(); $('think').classList.add('on');
+  await new Promise(r => setTimeout(r, 350));
+  const t0 = performance.now(); nodes = 0;
+  const m = aiMove(B, side);
+  const wait = Math.max(0, 450 - (performance.now() - t0));
+  await new Promise(r => setTimeout(r, wait));
+  $('think').classList.remove('on');
+  if (g !== gen) return;
+  busy = false;
+  if (m) doMove(m);
+}
+async function finish(winner){
+  over = true; render();
+  let title;
+  if (winner === 0) title = 'Remis';
+  else if (opts.mode === 'ai'){
+    if (winner === 1){ title = 'Gewonnen!'; stats.wins++; Hub.sfx('ach'); Hub.score('dame', B.filter(p => p > 0).length, {label:'Verbliebene Steine', silent:true});
+      Hub.achieve('dame', 'win', 'Erster Sieg', 'Besiege den Computer in Dame');
+      if (opts.lvl === 3) Hub.achieve('dame', 'hard', 'Großmeister der Dame', 'Besiege den Computer auf Schwer');
+      if (B.filter(p => p > 0).length >= 8) Hub.achieve('dame', 'dom', 'Überlegen', 'Gewinne mit mindestens 8 verbliebenen Steinen');
+    } else { title = 'Verloren'; stats.loss++; Hub.sfx('bad'); }
+  } else { title = (winner > 0 ? 'Weiß' : 'Schwarz') + ' gewinnt!'; Hub.sfx('ach'); }
+  Hub.write('dame_stats', stats); render();
+  $('turn').innerHTML = title;
+  const r = await Hub.dialog({title, center:true, html:`<p>${winner === 0 ? '40 Züge ohne Schlagen – unentschieden.' : 'Der Gegner hat keine Züge mehr.'}</p>`, buttons:[{label:'Brett ansehen'}, {label:'Neues Spiel', primary:true, value:'new'}]});
+  if (r === 'new') newGame();
+}
+function newGame(){
+  gen++; B = initial(); side = 1; sel = null; partial = []; history = []; lastMove = null; busy = false; over = false; noCapCount = 0;
+  legal = genMoves(B, side); $('think').classList.remove('on'); render();
+}
+$('board').addEventListener('click', e => {
+  const q = e.target.closest('.sq'); if (!q || !humanTurn()) return;
+  const i = +q.dataset.i;
+  if (B[i] && Math.sign(B[i]) === side && partial.length <= 1){
+    if (legal.some(m => m.from === i)){ sel = i; partial = [i]; Hub.sfx('click'); }
+    else if (legal.some(m => m.caps.length)) { Hub.sfx('bad'); Hub.toast('Schlagpflicht!', 'Ein anderer Stein muss schlagen.', 'alert'); }
+    render(); return;
+  }
+  if (sel == null || !targets().has(i)) return;
+  partial.push(i);
+  const done = legal.filter(m => m.from === sel && m.path.length === partial.length && m.path.every((p, k) => p === partial[k]));
+  const more = legal.filter(m => m.from === sel && m.path.length > partial.length && partial.every((p, k) => m.path[k] === p));
+  if (done.length && !more.length) doMove(done[0]);
+  else render();
+});
+$('undo').onclick = () => {
+  if (busy || !history.length) return;
+  gen++;
+  let h = history.pop();
+  if (opts.mode === 'ai' && h.side === -1 && history.length) h = history.pop();
+  B = h.B; side = h.side; lastMove = h.lastMove; noCapCount = h.noCapCount; over = false; sel = null; partial = []; busy = false;
+  legal = genMoves(B, side); $('think').classList.remove('on'); render();
+  if (opts.mode === 'ai' && side === -1) aiTurn();
+};
+$('new').onclick = newGame;
+$('mode').onclick = e => { const m = e.target.dataset.m; if (!m) return; opts.mode = m; Hub.write('dame_opts', opts); newGame(); };
+$('lvl').onclick = e => { const l = +e.target.dataset.l; if (!l) return; opts.lvl = l; Hub.write('dame_opts', opts); render(); };
+addEventListener('resize', () => render());
+build(); newGame();
+</script>
+</body>
+</html>

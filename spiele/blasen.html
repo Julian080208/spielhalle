@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blasenzauber</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden;background:#0d0820}
+body{display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px}
+#cv{height:100%;max-width:100%;aspect-ratio:640/940;border-radius:18px;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.7);touch-action:none;cursor:crosshair}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:rgba(12,6,30,.66);backdrop-filter:blur(4px)}
+.ov.hide{display:none}
+.ov h1{margin:0;font-family:var(--font-display);font-size:60px;letter-spacing:2px;background:linear-gradient(90deg,#ff7ad9,#7ab8ff,#7affc4);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 22px rgba(200,120,255,.4))}
+.ov p{color:var(--text-2);margin:0;max-width:420px}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="640" height="940"></canvas>
+  <div class="ov" id="ov"><h1>BLASENZAUBER</h1><p id="ovText">Triff drei oder mehr gleichfarbige Blasen – und lass die Decke nicht bis nach unten kommen.</p>
+    <p style="font-size:13px">Maus zielen · Klick schießen · <kbd>Leertaste</kbd> / Rechtsklick tauscht die Blase</p>
+    <button class="h-btn primary lg" id="go">Spiel starten</button></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('blasen');
+const bar = Hub.bar({id:'blasen', title:'Blasenzauber', stats:[['score', 'Punkte'], ['best', 'Rekord'], ['lvl', 'Stufe']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Blasenzauber', html:'<p>Schieße Blasen nach oben. Berühren sich <b>drei oder mehr gleicher Farbe</b>, platzen sie. Blasen, die danach keinen Halt mehr zur Decke haben, <b>fallen herunter</b> und geben viele Bonuspunkte.</p><p>Die Punkte unten zeigen, wie viele Fehlschüsse noch erlaubt sind, bevor eine neue Reihe von oben nachrutscht. Erreicht eine Blase die gestrichelte Linie, ist das Spiel vorbei.</p><p><b>Bombe</b> 💣: sprengt alles im Umkreis. <b>Regenbogen</b> 🌈: passt zu jeder Farbe. Spiele dein Feld leer für einen großen Bonus!</p>'}));
+
+const $ = id => document.getElementById(id), cv = $('cv'), ctx = cv.getContext('2d');
+const W = 640, H = 940, R = 25, D = R * 2, RH = R * Math.sqrt(3), MX = 20, TOP = 60, DEAD = 760, SX = W / 2, SY = 850, SPEED = 1500;
+const COLS_ = [['#ff4d6d', '#b0153a'], ['#ffc53d', '#c77a00'], ['#3fd28b', '#108a52'], ['#4f9dff', '#1a4fc0'], ['#c77bff', '#7a2fc9'], ['#ff8a3d', '#c04a0a'], ['#3fe6ff', '#0a8aa8']];
+let rows, shot, cur, next, aim = -Math.PI / 2, score, best = Hub.best('blasen') || 0, lvl, misses, missMax, state = 'menu', pops, falls, parts, texts, lastT = 0, t = 0, combo = 0, shotsFired = 0, bigDrop = 0;
+
+const nCols = row => row.off ? 11 : 12;
+const cx = (row, c) => MX + R + c * D + (row.off ? R : 0);
+const cy = i => TOP + R + i * RH;
+function newRow(off, colors){ const r = {off, c:[]}; for (let k = 0; k < (off ? 11 : 12); k++) r.c.push(Math.floor(Math.random() * colors)); return r; }
+function colorsFor(l){ return Math.min(7, 4 + Math.floor((l - 1) / 2)); }
+function reset(){
+  lvl = 1; score = 0; combo = 0; shotsFired = 0; startLevel();
+}
+function startLevel(){
+  rows = []; const nc = colorsFor(lvl);
+  for (let i = 0; i < 6 + Math.min(4, lvl); i++) rows.push(newRow(i % 2 === 1, nc));
+  missMax = Math.max(3, 7 - Math.floor(lvl / 2)); misses = 0;
+  pops = []; falls = []; parts = []; texts = []; shot = null;
+  cur = pickBall(); next = pickBall();
+  texts.push({x:W / 2, y:H / 2, txt:`Stufe ${lvl}`, t:1.6, size:46});
+  updBar();
+}
+function present(){ const s = new Set(); rows.forEach(r => r.c.forEach(v => v != null && v >= 0 && s.add(v))); return [...s]; }
+function pickBall(){
+  const p = present(); const r = Math.random();
+  if (r < .035 && shotsFired > 4) return {c:'bomb'};
+  if (r < .07 && shotsFired > 4) return {c:'rain'};
+  const pool = p.length ? p : [0, 1, 2, 3];
+  return {c:pool[Math.floor(Math.random() * pool.length)]};
+}
+function updBar(){ bar.set('score', Hub.fmt(score)); bar.set('best', Hub.fmt(Math.max(best, score))); bar.set('lvl', lvl); }
+function cell(i, c){ return rows[i] && rows[i].c[c] != null ? rows[i].c[c] : null; }
+function neighbors(i, c){
+  const r = rows[i], off = r ? r.off : (rows[0].off ? (i % 2 === 0) : (i % 2 === 1));
+  const out = [[i, c - 1], [i, c + 1]];
+  const d = off ? [c, c + 1] : [c - 1, c];
+  d.forEach(cc => { out.push([i - 1, cc]); out.push([i + 1, cc]); });
+  return out.filter(([a, b]) => a >= 0 && rows[a] && b >= 0 && b < nCols(rows[a]));
+}
+function rowOff(i){ return rows[0].off ? (i % 2 === 0) : (i % 2 === 1); }
+function ensureRow(i){ while (rows.length <= i) rows.push({off:rowOff(rows.length), c:Array(rowOff(rows.length) ? 11 : 12).fill(null)}); }
+
+// ---------- Schießen ----------
+function fire(){
+  if (state !== 'play' || shot) return;
+  const a = Math.max(-Math.PI + .12, Math.min(-.12, aim));
+  shot = {x:SX, y:SY, vx:Math.cos(a) * SPEED, vy:Math.sin(a) * SPEED, c:cur.c};
+  cur = next; next = pickBall(); shotsFired++;
+  Hub.tone(520, .06, 'triangle', .04, 0, 900);
+}
+function swap(){ if (state !== 'play' || shot) return; [cur, next] = [next, cur]; Hub.tone(700, .04, 'sine', .04); }
+function stepShot(dt){
+  let dist = SPEED * dt; const n = Math.ceil(dist / (R / 3));
+  for (let k = 0; k < n; k++){
+    shot.x += shot.vx * dt / n; shot.y += shot.vy * dt / n;
+    if (shot.x < MX + R){ shot.x = MX + R; shot.vx = Math.abs(shot.vx); Hub.tone(300, .03, 'sine', .03); }
+    if (shot.x > W - MX - R){ shot.x = W - MX - R; shot.vx = -Math.abs(shot.vx); Hub.tone(300, .03, 'sine', .03); }
+    if (shot.y <= TOP + R) return land();
+    for (let i = 0; i < rows.length; i++) for (let c = 0; c < rows[i].c.length; c++){
+      if (rows[i].c[c] == null) continue;
+      if (Math.hypot(shot.x - cx(rows[i], c), shot.y - cy(i)) < D * .86) return land();
+    }
+  }
+}
+function land(){
+  // nächste freie Zelle suchen
+  const ri = Math.max(0, Math.round((shot.y - TOP - R) / RH));
+  let bi = -1, bc = -1, bd = 1e9;
+  for (let i = Math.max(0, ri - 1); i <= ri + 1; i++){
+    ensureRow(i);
+    const row = rows[i];
+    for (let c = 0; c < nCols(row); c++){
+      if (row.c[c] != null) continue;
+      const attached = i === 0 || neighbors(i, c).some(([a, b]) => cell(a, b) != null);
+      if (!attached) continue;
+      const d = Math.hypot(shot.x - cx(row, c), shot.y - cy(i));
+      if (d < bd){ bd = d; bi = i; bc = c; }
+    }
+  }
+  const sc = shot.c; shot = null;
+  if (bi < 0){ misses++; afterShot(false); return; }
+  ensureRow(bi);
+  if (sc === 'bomb'){
+    const px = cx(rows[bi], bc), py = cy(bi); let n = 0;
+    rows.forEach((row, i) => row.c.forEach((v, c) => { if (v != null && Math.hypot(cx(row, c) - px, cy(i) - py) < D * 2.1){ popAt(i, c); n++; } }));
+    Hub.tone(90, .5, 'sawtooth', .06, 0, 30); Hub.tone(200, .3, 'square', .04, .02, 40);
+    for (let k = 0; k < 40; k++){ const a = Math.random() * 6.283, s = 100 + Math.random() * 400; parts.push({x:px, y:py, vx:Math.cos(a) * s, vy:Math.sin(a) * s, t:.7, col:k % 2 ? '#ffb02e' : '#ff4d2e', r:4}); }
+    addScore(n * 15, px, py); dropFloating(); afterShot(true); return;
+  }
+  let col = sc;
+  if (sc === 'rain'){
+    // passende Farbe des größten Nachbarclusters
+    const cnt = {}; neighbors(bi, bc).forEach(([a, b]) => { const v = cell(a, b); if (v != null && v >= 0) cnt[v] = (cnt[v] || 0) + 1; });
+    let bv = -1, bn = 0; for (const k in cnt) if (cnt[k] > bn){ bn = cnt[k]; bv = +k; }
+    col = bv >= 0 ? bv : 0;
+  }
+  rows[bi].c[bc] = col;
+  Hub.tone(330, .05, 'triangle', .04);
+  // Cluster
+  const cl = flood(bi, bc, v => v === col);
+  if (cl.length >= 3){
+    combo++;
+    cl.forEach(([i, c], k) => popAt(i, c, k * .03));
+    const pts = cl.length * 10 * Math.min(5, combo);
+    addScore(pts, cx(rows[bi], bc), cy(bi));
+    [0, 1, 2].forEach(k => Hub.tone(600 + combo * 60 + k * 180, .08, 'triangle', .04, k * .05));
+    dropFloating(); afterShot(true);
+    if (cl.length >= 7) Hub.achieve('blasen', 'big', 'Blasen-Lawine', 'Lass 7 Blasen auf einmal platzen');
+  } else { combo = 0; misses++; afterShot(false); }
+}
+function flood(i, c, pred){
+  const seen = new Set([i + ',' + c]), out = [[i, c]], st = [[i, c]];
+  while (st.length){ const [a, b] = st.pop(); neighbors(a, b).forEach(([x, y]) => { const k = x + ',' + y, v = cell(x, y); if (!seen.has(k) && v != null && pred(v)){ seen.add(k); out.push([x, y]); st.push([x, y]); } }); }
+  return out;
+}
+function popAt(i, c, delay = 0){
+  const v = rows[i].c[c]; rows[i].c[c] = null;
+  pops.push({x:cx(rows[i], c), y:cy(i), col:v, t:-delay});
+}
+function dropFloating(){
+  const keep = new Set();
+  if (rows.length) rows[0].c.forEach((v, c) => { if (v != null) flood(0, c, () => true).forEach(([a, b]) => keep.add(a + ',' + b)); });
+  let n = 0;
+  rows.forEach((row, i) => row.c.forEach((v, c) => { if (v != null && !keep.has(i + ',' + c)){ falls.push({x:cx(row, c), y:cy(i), vx:(Math.random() - .5) * 160, vy:-Math.random() * 200, col:v}); row.c[c] = null; n++; } }));
+  if (n){
+    const pts = 20 * n * n; addScore(pts, W / 2, DEAD - 60, true);
+    Hub.tone(880, .12, 'sine', .05, .1, 220);
+    if (n >= 10) Hub.achieve('blasen', 'drop10', 'Erdrutsch', 'Lass 10 Blasen auf einmal abstürzen');
+  }
+  // leere Zeilen unten entfernen
+  while (rows.length && rows[rows.length - 1].c.every(v => v == null)) rows.pop();
+}
+function afterShot(hit){
+  if (!rows.length || rows.every(r => r.c.every(v => v == null))){
+    addScore(1000 * lvl, W / 2, H / 2, true); Hub.sfx('ach');
+    Hub.achieve('blasen', 'clear', 'Blitzblank', 'Räume das komplette Spielfeld leer');
+    lvl++; if (lvl >= 5) Hub.achieve('blasen', 'lvl5', 'Blasenmeister', 'Erreiche Stufe 5 in Blasenzauber');
+    setTimeout(startLevel, 900); state = 'wait'; setTimeout(() => state = 'play', 900); return;
+  }
+  if (!hit && misses >= missMax){
+    misses = 0;
+    const off = !rows[0].off;
+    rows.unshift(newRow(off, Math.min(colorsFor(lvl), Math.max(2, present().length))));
+    Hub.tone(160, .25, 'square', .04, 0, 90);
+    rows.forEach(r => r.shift = RH);
+  }
+  // Farben der Vorschau an Brett anpassen
+  const p = present();
+  if (typeof cur.c === 'number' && !p.includes(cur.c) && p.length) cur = {c:p[Math.floor(Math.random() * p.length)]};
+  if (typeof next.c === 'number' && !p.includes(next.c) && p.length) next = {c:p[Math.floor(Math.random() * p.length)]};
+  // Verloren?
+  for (let i = 0; i < rows.length; i++) if (rows[i].c.some(v => v != null) && cy(i) + R > DEAD) return gameOver();
+}
+function addScore(v, x, y, big){ score += v; texts.push({x, y, txt:'+' + Hub.fmt(v), t:1.1, size:big ? 34 : 22}); updBar();
+  if (score >= 10000) Hub.achieve('blasen', 's10k', 'Blubber-Profi', 'Erreiche 10 000 Punkte in Blasenzauber'); }
+function gameOver(){
+  state = 'over';
+  rows.forEach((row, i) => row.c.forEach((v, c) => { if (v != null) falls.push({x:cx(row, c), y:cy(i), vx:(Math.random() - .5) * 200, vy:-Math.random() * 300, col:v}); }));
+  rows = [];
+  const rec = Hub.score('blasen', score, {label:'Punkte'}); best = Math.max(best, score); updBar();
+  Hub.sfx('bad');
+  setTimeout(() => {
+    $('ovText').innerHTML = `Die Blasen haben gewonnen – <b>${Hub.fmt(score)}</b> Punkte, Stufe ${lvl}.${rec.record && score > 0 ? '<br><b style="color:#ffd23f">Neuer Rekord!</b>' : ''}`;
+    $('go').textContent = 'Nochmal'; $('ov').classList.remove('hide');
+  }, 1200);
+}
+
+// ---------- Zeichnen ----------
+function bubble(x, y, c, s = 1){
+  if (c === 'bomb'){
+    ctx.fillStyle = '#22222c'; ctx.beginPath(); ctx.arc(x, y, R * s, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ffb02e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + R * .4 * s, y - R * .6 * s); ctx.quadraticCurveTo(x + R * .9 * s, y - R * 1.2 * s, x + R * .5 * s, y - R * 1.3 * s); ctx.stroke();
+    ctx.fillStyle = Math.sin(t * 20) > 0 ? '#fff6b0' : '#ff5d2e'; ctx.beginPath(); ctx.arc(x + R * .5 * s, y - R * 1.3 * s, 4, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.arc(x - R * .35 * s, y - R * .35 * s, R * .25 * s, 0, 7); ctx.fill(); return;
+  }
+  let g;
+  if (c === 'rain'){
+    g = ctx.createConicGradient ? ctx.createConicGradient(t * 2, x, y) : null;
+    if (g){ ['#ff4d6d', '#ffc53d', '#3fd28b', '#4f9dff', '#c77bff', '#ff4d6d'].forEach((col, k) => g.addColorStop(k / 5, col)); } else g = '#fff';
+  } else {
+    const [a, b] = COLS_[c]; g = ctx.createRadialGradient(x - R * .35 * s, y - R * .4 * s, R * .1 * s, x, y, R * s); g.addColorStop(0, '#fff'); g.addColorStop(.25, a); g.addColorStop(1, b);
+  }
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R * s - 1, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(x - R * .35 * s, y - R * .42 * s, R * .28 * s, R * .17 * s, -.6, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, R * s - 1, 0, 7); ctx.stroke();
+}
+function aimPath(){
+  const a = Math.max(-Math.PI + .12, Math.min(-.12, aim));
+  let x = SX, y = SY, vx = Math.cos(a), vy = Math.sin(a), pts = [[x, y]], len = 0;
+  for (let k = 0; k < 900 && len < 1400; k++){
+    x += vx * 4; y += vy * 4; len += 4;
+    if (x < MX + R || x > W - MX - R){ vx = -vx; pts.push([x, y]); }
+    if (y <= TOP + R) break;
+    let hit = false;
+    for (let i = 0; i < rows.length && !hit; i++) for (let c = 0; c < rows[i].c.length; c++) if (rows[i].c[c] != null && Math.hypot(x - cx(rows[i], c), y - cy(i)) < D * .86){ hit = true; break; }
+    if (hit) break;
+  }
+  pts.push([x, y]); return pts;
+}
+function draw(){
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1a0f3a'); g.addColorStop(1, '#0a0618'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (let k = 0; k < 40; k++){ const x = (k * 97) % W, y = (k * 173 + t * 12 * (1 + k % 3)) % H; ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.beginPath(); ctx.arc(x, H - y, 3 + k % 5, 0, 7); ctx.fill(); }
+  // Rahmen & Decke
+  ctx.fillStyle = 'rgba(255,255,255,.04)'; ctx.fillRect(MX, TOP, W - MX * 2, DEAD - TOP);
+  ctx.fillStyle = '#2a1a5a'; ctx.fillRect(0, 0, W, TOP); ctx.fillStyle = '#7a5cff'; ctx.fillRect(0, TOP - 4, W, 4);
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '600 15px Bahnschrift'; ctx.textAlign = 'left'; ctx.fillText(`Stufe ${lvl || 1}`, 20, 36);
+  ctx.textAlign = 'right'; ctx.fillText(`${Hub.fmt(score || 0)} Punkte`, W - 20, 36);
+  // Todeslinie
+  ctx.strokeStyle = 'rgba(255,93,108,.55)'; ctx.setLineDash([10, 10]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(MX, DEAD); ctx.lineTo(W - MX, DEAD); ctx.stroke(); ctx.setLineDash([]);
+  // Blasen
+  rows && rows.forEach((row, i) => {
+    if (row.shift) row.shift = Math.max(0, row.shift - RH * .12);
+    row.c.forEach((v, c) => v != null && bubble(cx(row, c), cy(i) - (row.shift || 0), v));
+  });
+  // Ziellinie
+  if (state === 'play' && !shot){
+    const pts = aimPath();
+    ctx.save(); ctx.setLineDash([3, 12]); ctx.lineCap = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.beginPath(); pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.restore();
+  }
+  // Fallende / platzende
+  falls.forEach(f => bubble(f.x, f.y, f.col, .95));
+  pops.forEach(p => { if (p.t < 0) return bubble(p.x, p.y, p.col); const s = 1 + p.t * 3; ctx.globalAlpha = Math.max(0, 1 - p.t * 5); bubble(p.x, p.y, p.col, s); ctx.globalAlpha = 1; });
+  parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.t / .7); ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }); ctx.globalAlpha = 1;
+  // Kanone
+  const a = Math.max(-Math.PI + .12, Math.min(-.12, aim));
+  ctx.save(); ctx.translate(SX, SY); ctx.rotate(a + Math.PI / 2);
+  ctx.fillStyle = '#3a2a7a'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-16, -78, 32, 70, 10) : ctx.rect(-16, -78, 32, 70); ctx.fill();
+  ctx.fillStyle = '#7a5cff'; ctx.fillRect(-16, -78, 32, 8); ctx.restore();
+  ctx.fillStyle = '#2a1a5a'; ctx.beginPath(); ctx.arc(SX, SY, 44, 0, 7); ctx.fill(); ctx.strokeStyle = '#7a5cff'; ctx.lineWidth = 3; ctx.stroke();
+  if (cur && !shot && state === 'play') bubble(SX, SY, cur.c);
+  if (shot) bubble(shot.x, shot.y, shot.c);
+  // Nächste
+  if (next){ ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '600 13px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('NÄCHSTE', SX - 120, SY - 34); bubble(SX - 120, SY, next.c, .75); }
+  // Fehlschuss-Anzeige
+  for (let k = 0; k < (missMax || 0); k++){ ctx.fillStyle = k < missMax - misses ? '#7affc4' : 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.arc(SX + 90 + k * 18, SY, 6, 0, 7); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '600 13px Bahnschrift'; ctx.textAlign = 'left'; ctx.fillText('BIS ZUR NÄCHSTEN REIHE', SX + 82, SY - 18);
+  // Texte
+  texts.forEach(x => { ctx.globalAlpha = Math.min(1, x.t * 2); ctx.fillStyle = '#fff'; ctx.font = `700 ${x.size}px Bahnschrift`; ctx.textAlign = 'center'; ctx.shadowColor = 'rgba(160,100,255,.8)'; ctx.shadowBlur = 14; ctx.fillText(x.txt, x.x, x.y - (1.1 - x.t) * 40); ctx.shadowBlur = 0; }); ctx.globalAlpha = 1;
+}
+function loop(now){
+  const dt = Math.min(.033, (now - lastT) / 1000 || 0); lastT = now; t += dt;
+  if (state === 'play' && shot) stepShot(dt);
+  pops.forEach(p => p.t += dt); pops = pops.filter(p => p.t < .25);
+  falls.forEach(f => { f.vy += 1600 * dt; f.x += f.vx * dt; f.y += f.vy * dt; }); falls = falls.filter(f => f.y < H + 40);
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; p.t -= dt; }); parts = parts.filter(p => p.t > 0);
+  texts.forEach(x => x.t -= dt); texts = texts.filter(x => x.t > 0);
+  if (rows) draw();
+  requestAnimationFrame(loop);
+}
+const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; };
+cv.addEventListener('pointermove', e => { const [x, y] = pos(e); aim = Math.atan2(Math.min(y, SY - 10) - SY, x - SX); });
+cv.addEventListener('pointerdown', e => { if (e.button === 2) return; const [x, y] = pos(e); aim = Math.atan2(Math.min(y, SY - 10) - SY, x - SX); if (Math.hypot(x - (SX - 120), y - SY) < 30) swap(); else fire(); });
+cv.addEventListener('contextmenu', e => { e.preventDefault(); swap(); });
+addEventListener('keydown', e => {
+  if (e.code === 'Space'){ e.preventDefault(); if (!$('ov').classList.contains('hide')) $('go').click(); else swap(); }
+  if (e.code === 'ArrowLeft') aim -= .05; if (e.code === 'ArrowRight') aim += .05; if (e.code === 'ArrowUp') fire();
+});
+$('go').onclick = () => { $('ov').classList.add('hide'); reset(); state = 'play'; Hub.sfx('click'); };
+reset(); state = 'menu';
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

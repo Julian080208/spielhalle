@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flatter-Vogel</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0d1b2a;color:#fff;font-family:system-ui,"Segoe UI",Roboto,sans-serif;user-select:none;overflow:hidden;touch-action:none}
+.bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(0,0,0,.35);border-bottom:1px solid #24405e}
+.back{color:#fff;text-decoration:none;background:#16304a;border:1px solid #24405e;border-radius:10px;padding:7px 12px;font-weight:700}
+h1{font-size:20px;margin:0}
+main{display:flex;justify-content:center;align-items:center;height:calc(100vh - 58px);padding:10px}
+#cv{height:100%;aspect-ratio:2/3;max-width:100%;border-radius:16px;border:2px solid #24405e;cursor:pointer;display:block}
+</style>
+</head>
+<body>
+<main><canvas id="cv" width="480" height="720"></canvas></main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('flatter');
+const hbar = Hub.bar({id:'flatter', title:'Flatter-Vogel', actions:['help', 'sound', 'full']});
+hbar.on('help', () => Hub.dialog({title:'Flatter-Vogel', html:`<p>Klicke, tippe oder drücke die <b>Leertaste</b>, um zu flattern. Flieg durch die Lücken zwischen den Röhren – jede Röhre gibt einen Punkt, Münzen geben zwei.</p><p>Medaillen: 🥉 10 · 🥈 20 · 🥇 30 · 💎 50</p>`}));
+
+
+const W = 480, H = 720, GROUND = 640;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+function getHS(){ try { return (JSON.parse(localStorage.getItem('arcade_hs')) || {}).flatter || 0; } catch(e){ return 0; } }
+function setHS(v){ try { const d = JSON.parse(localStorage.getItem('arcade_hs')) || {}; if (v > (d.flatter || 0)){ d.flatter = v; localStorage.setItem('arcade_hs', JSON.stringify(d)); return true; } } catch(e){} return false; }
+let ac;
+function beep(f, d = .08, type = 'sine', v = .05, delay = 0, f2){
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+    g.gain.setValueAtTime(Math.max(1e-4, v * Hub.vol()), t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d); } catch(e){}
+}
+const BIRDS = ['🐤','🐦','🦜','🐧','🦉'];
+let bird, pipes, coins, score, state = 'ready', t = 0, spawnT, speed, best = getHS(), flash = 0, parts = [], night = false, birdIcon = BIRDS[0], newRec = false;
+const clouds = Array.from({length:6}, () => ({x:Math.random() * W, y:40 + Math.random() * 200, s:.6 + Math.random() * .8}));
+const city = Array.from({length:16}, (_, k) => ({x:k * 34, h:40 + Math.random() * 90, w:28 + Math.random() * 10}));
+function reset(){
+  bird = {x:140, y:320, vy:0, r:16};
+  pipes = []; coins = []; score = 0; spawnT = .8; speed = 170; state = 'ready'; newRec = false;
+  night = Math.random() < .35; birdIcon = BIRDS[Math.floor(Math.random() * BIRDS.length)];
+}
+function flap(){
+  if (state === 'dead'){ if (t > .6) reset(); return; }
+  if (state === 'ready') state = 'play';
+  bird.vy = -430;
+  beep(600, .08, 'triangle', .04, 0, 900);
+  for (let k = 0; k < 5; k++) parts.push({x:bird.x - 10, y:bird.y + 6, vx:-60 - Math.random() * 60, vy:Math.random() * 80, life:.4, c:'#fff'});
+}
+function die(){
+  if (state === 'dead') return;
+  state = 'dead'; t = 0; flash = 1;
+  beep(200, .3, 'sawtooth', .06, 0, 60);
+  newRec = setHS(score); best = Math.max(best, score);
+  Hub.score('flatter', score, {label:'Punkte', silent:true});
+  if (score >= 10) Hub.achieve('flatter', 'b', 'Bronzeflügel', 'Schaffe 10 Punkte');
+  if (score >= 30) Hub.achieve('flatter', 'g', 'Goldflügel', 'Schaffe 30 Punkte');
+  for (let k = 0; k < 25; k++) parts.push({x:bird.x, y:bird.y, vx:(Math.random() - .5) * 400, vy:(Math.random() - .7) * 400, life:.8, c:'#ffd34d'});
+}
+function update(dt){
+  t += dt;
+  for (const c of clouds){ c.x -= 12 * c.s * dt; if (c.x < -80) c.x = W + 80; }
+  if (state === 'ready'){ bird.y = 320 + Math.sin(t * 4) * 10; return; }
+  bird.vy += 1450 * dt; bird.y += bird.vy * dt;
+  if (bird.y > GROUND - bird.r){ bird.y = GROUND - bird.r; die(); }
+  if (bird.y < bird.r){ bird.y = bird.r; bird.vy = 0; }
+  if (state !== 'play') return;
+  for (const c of city){ c.x -= speed * .25 * dt; if (c.x < -40) c.x += 16 * 34; }
+  spawnT -= dt;
+  if (spawnT <= 0){
+    const gap = Math.max(132, 180 - score * 1.6);
+    const gy = 120 + Math.random() * (GROUND - 240 - gap) + gap / 2;
+    const moving = score > 10 && Math.random() < .35;
+    pipes.push({x:W + 40, gy, gap, scored:false, moving, ph:Math.random() * 6});
+    if (Math.random() < .4) coins.push({x:W + 40 + 120, y:gy + (Math.random() - .5) * gap * .5, got:false});
+    spawnT = Math.max(1.05, 1.45 - score * .01);
+  }
+  speed = 170 + Math.min(80, score * 2);
+  for (const p of pipes){
+    p.x -= speed * dt;
+    if (p.moving) p.gy += Math.sin(t * 2 + p.ph) * 40 * dt;
+    if (!p.scored && p.x + 35 < bird.x){ p.scored = true; score++; beep(880, .07, 'square', .03); beep(1320, .1, 'square', .03, .07); }
+    const top = p.gy - p.gap / 2, bot = p.gy + p.gap / 2;
+    if (bird.x + bird.r - 4 > p.x - 35 && bird.x - bird.r + 4 < p.x + 35 && (bird.y - bird.r + 4 < top || bird.y + bird.r - 4 > bot)) die();
+  }
+  for (const c of coins){
+    c.x -= speed * dt;
+    if (!c.got && Math.hypot(c.x - bird.x, c.y - bird.y) < 26){ c.got = true; score += 2; beep(1500, .12, 'sine', .05); for (let k = 0; k < 10; k++) parts.push({x:c.x, y:c.y, vx:(Math.random() - .5) * 200, vy:(Math.random() - .5) * 200, life:.5, c:'#ffd34d'}); }
+  }
+  pipes = pipes.filter(p => p.x > -60); coins = coins.filter(c => c.x > -30 && !c.got);
+}
+function drawPipe(x, y0, y1, cap){
+  const g = ctx.createLinearGradient(x - 35, 0, x + 35, 0);
+  g.addColorStop(0, '#3a9d3a'); g.addColorStop(.4, '#7fe07f'); g.addColorStop(1, '#2a7a2a');
+  ctx.fillStyle = g; ctx.fillRect(x - 32, y0, 64, y1 - y0);
+  ctx.fillRect(x - 38, cap - 14, 76, 28);
+  ctx.strokeStyle = '#1d5a1d'; ctx.lineWidth = 3; ctx.strokeRect(x - 32, y0, 64, y1 - y0); ctx.strokeRect(x - 38, cap - 14, 76, 28);
+}
+function draw(){
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND);
+  if (night){ g.addColorStop(0, '#0b1030'); g.addColorStop(1, '#3a2a6a'); } else { g.addColorStop(0, '#4ec0f5'); g.addColorStop(1, '#c9efff'); }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (night){ ctx.fillStyle = '#fff'; for (let k = 0; k < 40; k++) ctx.fillRect((k * 97) % W, (k * 53) % 400, 2, 2); ctx.fillStyle = '#f5f0c8'; ctx.beginPath(); ctx.arc(390, 90, 30, 0, 7); ctx.fill(); }
+  else { ctx.fillStyle = '#fff5a8'; ctx.beginPath(); ctx.arc(390, 90, 34, 0, 7); ctx.fill(); }
+  ctx.fillStyle = night ? 'rgba(200,200,255,.25)' : 'rgba(255,255,255,.9)';
+  for (const c of clouds){ const s = 22 * c.s; ctx.beginPath(); ctx.arc(c.x, c.y, s, 0, 7); ctx.arc(c.x + s, c.y + 5, s * .8, 0, 7); ctx.arc(c.x - s, c.y + 6, s * .7, 0, 7); ctx.fill(); }
+  for (const c of city){
+    ctx.fillStyle = night ? '#1d1f45' : '#9fd3c7'; ctx.fillRect(c.x, GROUND - c.h, c.w, c.h);
+    ctx.fillStyle = night ? '#ffd86b' : 'rgba(255,255,255,.5)';
+    for (let y = GROUND - c.h + 8; y < GROUND - 8; y += 12) for (let x = c.x + 5; x < c.x + c.w - 5; x += 9) if ((x * 7 + y) % 3) ctx.fillRect(x, y, 4, 5);
+  }
+  for (const p of pipes){ drawPipe(p.x, 0, p.gy - p.gap / 2, p.gy - p.gap / 2); drawPipe(p.x, p.gy + p.gap / 2, GROUND, p.gy + p.gap / 2); }
+  ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const c of coins){ ctx.save(); ctx.translate(c.x, c.y); ctx.scale(Math.cos(t * 5), 1); ctx.fillText('🪙', 0, 0); ctx.restore(); }
+  // Boden
+  ctx.fillStyle = '#ded895'; ctx.fillRect(0, GROUND, W, H - GROUND);
+  ctx.fillStyle = '#5ec04a'; ctx.fillRect(0, GROUND, W, 14);
+  ctx.fillStyle = '#4aa83a';
+  const off = state === 'play' ? (t * speed) % 28 : 0;
+  for (let x = -off; x < W; x += 28){ ctx.beginPath(); ctx.moveTo(x, GROUND + 14); ctx.lineTo(x + 14, GROUND); ctx.lineTo(x + 28, GROUND + 14); ctx.fill(); }
+  // Vogel
+  ctx.save(); ctx.translate(bird.x, bird.y);
+  ctx.rotate(Math.max(-.5, Math.min(1.3, bird.vy / 600)));
+  ctx.scale(-1, 1);
+  ctx.font = '40px serif'; ctx.fillText(birdIcon, 0, 2); ctx.restore();
+  for (const p of parts){ ctx.globalAlpha = Math.max(0, p.life * 2); ctx.fillStyle = p.c; ctx.fillRect(p.x - 3, p.y - 3, 6, 6); }
+  ctx.globalAlpha = 1;
+  // Anzeige
+  ctx.font = 'bold 64px system-ui'; ctx.lineWidth = 8; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+  if (state !== 'ready'){ ctx.strokeText(score, W / 2, 90); ctx.fillText(score, W / 2, 90); }
+  if (state === 'ready'){
+    panel(150, 360);
+    ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#ffd34d'; ctx.strokeText('Flatter-Vogel', W / 2, 200); ctx.fillText('Flatter-Vogel', W / 2, 200);
+    ctx.font = 'bold 22px system-ui'; ctx.fillStyle = '#fff'; ctx.lineWidth = 5;
+    ctx.strokeText('Klick zum Flattern!', W / 2, 260); ctx.fillText('Klick zum Flattern!', W / 2, 260);
+    ctx.font = '18px system-ui'; ctx.strokeText(`Rekord: ${best}`, W / 2, 470); ctx.fillText(`Rekord: ${best}`, W / 2, 470);
+    ctx.strokeText('🪙 = +2 Punkte', W / 2, 500); ctx.fillText('🪙 = +2 Punkte', W / 2, 500);
+  }
+  if (state === 'dead' && t > .4){
+    panel(200, 300);
+    ctx.font = 'bold 44px system-ui'; ctx.fillStyle = '#ff7a5a'; ctx.lineWidth = 8; ctx.strokeText('Game Over', W / 2, 230); ctx.fillText('Game Over', W / 2, 230);
+    const medal = score >= 50 ? '💎' : score >= 30 ? '🥇' : score >= 20 ? '🥈' : score >= 10 ? '🥉' : '';
+    ctx.font = 'bold 26px system-ui'; ctx.fillStyle = '#fff'; ctx.lineWidth = 6;
+    ctx.strokeText(`Punkte: ${score}`, W / 2, 300); ctx.fillText(`Punkte: ${score}`, W / 2, 300);
+    ctx.strokeText(`Rekord: ${best}`, W / 2, 340); ctx.fillText(`Rekord: ${best}`, W / 2, 340);
+    if (medal){ ctx.font = '60px serif'; ctx.fillText(medal, W / 2, 410); }
+    if (newRec){ ctx.font = 'bold 22px system-ui'; ctx.fillStyle = '#ffd34d'; ctx.strokeText('🏆 NEUER REKORD!', W / 2, 460); ctx.fillText('🏆 NEUER REKORD!', W / 2, 460); }
+    ctx.font = 'bold 18px system-ui'; ctx.fillStyle = '#fff'; ctx.strokeText('Klick = nochmal', W / 2, 520); ctx.fillText('Klick = nochmal', W / 2, 520);
+  }
+  if (flash > 0){ ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); }
+}
+function panel(y, h){ ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(60, y, W - 120, h, 20) : ctx.rect(60, y, W - 120, h); ctx.fill(); }
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.033, (now - last) / 1000); last = now;
+  update(dt);
+  flash = Math.max(0, flash - dt * 3);
+  for (const p of parts){ p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; }
+  parts = parts.filter(p => p.life > 0);
+  draw();
+  requestAnimationFrame(frame);
+}
+cv.addEventListener('pointerdown', e => { e.preventDefault(); flap(); });
+addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'ArrowUp' || e.key.toLowerCase() === 'w'){ e.preventDefault(); if (!e.repeat) flap(); } });
+reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

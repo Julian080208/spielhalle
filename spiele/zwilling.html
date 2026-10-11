@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zwillingsblitz</title>
+<link rel="stylesheet" href="shared/hub.css">
+</head>
+<body>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<script src="shared/slots.js"></script>
+<script>
+Hub.init('zwilling'); Hub.casinoInit();
+const bar = Hub.bar({id:'zwilling', title:'Zwillingsblitz', actions:['help', 'sound', 'full']});
+const RULES = 'Bei jedem Dreh sind mindestens <b>zwei benachbarte Walzen Zwillinge</b> und zeigen exakt dieselben Symbole – manchmal wachsen sie zu Drillingen, Vierlingen oder sogar <b>fünf identischen Walzen</b>! Gewinne zahlen auf <b>243 Wegen</b> von links nach rechts. 3 <b>Blitze</b> (auf Walze 1, 3 und 5) starten 10 Freispiele mit garantiert großen Zwillingswalzen.';
+bar.on('help', () => Hub.dialog({title:'Zwillingsblitz', html:`<p>${RULES}</p><p><kbd>Leertaste</kbd> dreht. <i>Gespielt wird nur mit Spielgeld-Chips.</i></p>`}));
+const neon = (txt, a, b, fs = .5) => ({txt, col:[a, b], fs, stroke:'rgba(0,0,0,.85)'});
+const symbols = {
+  bolt:{name:'Blitz', scatter:true, emoji:'⚡', scatterPays:{3:3, 4:20, 5:100}, plate:['rgba(80,200,255,.25)', 'rgba(0,0,0,0)']},
+  seven:{name:'Sieben', ...neon('7', '#ff9ab0', '#ff1f4f', .72), pays:{3:9, 4:45, 5:175}, plate:['rgba(255,40,90,.18)', 'rgba(0,0,0,0)']},
+  bar:{name:'BAR', ...neon('BAR', '#fff', '#9aa6c0', .32), pays:{3:7, 4:26, 5:110}, plate:['rgba(255,255,255,.12)', 'rgba(0,0,0,0)']},
+  dia:{name:'Diamant', emoji:'💎', pays:{3:4, 4:18, 5:65}},
+  bell:{name:'Glocke', emoji:'🔔', pays:{3:4, 4:13, 5:45}},
+  cherry:{name:'Kirschen', emoji:'🍒', pays:{3:3, 4:9, 5:33}},
+  A:{name:'Ass', ...neon('A', '#ffe08a', '#ff9a1f'), pays:{3:2, 4:4, 5:18}},
+  K:{name:'König', ...neon('K', '#9fe8ff', '#1fb0ff'), pays:{3:2, 4:4, 5:18}},
+  Q:{name:'Dame', ...neon('Q', '#ffb0f0', '#e81fc4'), pays:{3:1, 4:4, 5:11}},
+  J:{name:'Bube', ...neon('J', '#b0ffb8', '#1fd14a'), pays:{3:1, 4:4, 5:11}},
+  T:{name:'Zehn', ...neon('10', '#d8c0ff', '#8a4fff', .42), pays:{3:1, 4:3, 5:9}},
+};
+const mk = o => Object.entries(o).flatMap(([k, n]) => Array(n).fill(k));
+const sh = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const strip = b => sh(mk({bolt:b, seven:2, bar:3, dia:3, bell:4, cherry:4, A:6, K:6, Q:7, J:7, T:8}));
+window.slot = HubSlot({
+  id:'zwilling', title:'Zwillingsblitz', logoText:'⚡ ZWILLINGSBLITZ ⚡', gamble:true, feature:'twin', twinFree:10, ways:true, waysDiv:25, rules:RULES,
+  theme:{bg:'radial-gradient(1200px 700px at 50% 30%,#14244a,#04060f 70%)', frame:'#3fe6ff', frameBg:'linear-gradient(180deg,#5a7aff,#1a1a5a)', accent:'#7af0ff', glow:'rgba(63,230,255,.55)', reelBg:'#060a18'},
+  symbols, bets:[25, 50, 100, 250, 500, 1000],
+  strips:[strip(1), strip(0), strip(1), strip(0), strip(1)],
+  drawBg(c, w, h, t){ c.strokeStyle = 'rgba(63,230,255,.06)'; c.lineWidth = 1; for (let x = 0; x < w; x += 30){ c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); } for (let y = (t * 20) % 30; y < h; y += 30){ c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); } },
+});
+</script>
+</body>
+</html>

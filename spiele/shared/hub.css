@@ -1,0 +1,166 @@
+/* =====================================================================
+   Spielhalle – gemeinsames Design-System
+   ===================================================================== */
+:root{
+  --font: "Segoe UI Variable Text","Segoe UI Variable","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --font-display: "Bahnschrift","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --bg:#08090d; --bg-2:#0d0f15;
+  --surface:#12141b; --surface-2:#181b24; --surface-3:#1f2330;
+  --border:rgba(255,255,255,.07); --border-2:rgba(255,255,255,.12);
+  --text:#eceef4; --text-2:#b4b9c8; --muted:#7c8294;
+  --accent:#7c6cff; --accent-2:#a594ff; --accent-rgb:124,108,255;
+  --good:#3fd28b; --warn:#ffb547; --bad:#ff5d6c; --gold:#ffcc4d;
+  --r-s:8px; --r:12px; --r-l:18px; --r-xl:26px;
+  --sh-1:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.25);
+  --sh-2:0 10px 40px rgba(0,0,0,.55);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body{margin:0;font-family:var(--font);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+::selection{background:rgba(var(--accent-rgb),.45)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2);background-clip:padding-box;border:2px solid transparent}
+::-webkit-scrollbar-track{background:transparent}
+button{font:inherit;color:inherit}
+.reduce-motion *{animation:none!important;transition:none!important}
+
+/* ---------- Icons ---------- */
+.ico{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico.f{fill:currentColor;stroke:none}
+
+/* ---------- Buttons ---------- */
+.h-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 16px;border-radius:10px;border:1px solid var(--border-2);
+  background:var(--surface-2);color:var(--text);font-weight:600;font-size:14px;cursor:pointer;transition:background .15s,border-color .15s,transform .1s,box-shadow .15s;white-space:nowrap;text-decoration:none}
+.h-btn:hover{background:var(--surface-3);border-color:rgba(255,255,255,.18)}
+.h-btn:active{transform:translateY(1px)}
+.h-btn:disabled{opacity:.45;cursor:not-allowed}
+.h-btn.primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));border-color:transparent;color:#fff;box-shadow:0 6px 22px rgba(var(--accent-rgb),.35),inset 0 1px 0 rgba(255,255,255,.25)}
+.h-btn.primary:hover{filter:brightness(1.08)}
+.h-btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.h-btn.ghost:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.h-btn.lg{height:48px;padding:0 24px;font-size:16px;border-radius:12px}
+.h-btn.sm{height:30px;padding:0 11px;font-size:13px;border-radius:8px}
+.h-btn.icon{width:38px;padding:0}
+.h-btn.icon.sm{width:30px}
+.h-btn.danger{color:var(--bad)}
+.h-btn.good{background:linear-gradient(180deg,#58e3a0,#22b66f);color:#04210f;border-color:transparent}
+
+/* ---------- Chips / Badges ---------- */
+.h-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:999px;border:1px solid var(--border-2);background:var(--surface);color:var(--text-2);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.h-chip:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
+.h-chip.on{background:var(--text);color:#0b0c10;border-color:transparent}
+.h-badge{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px;background:rgba(255,255,255,.08);color:var(--text-2);text-transform:uppercase}
+.h-badge.accent{background:rgba(var(--accent-rgb),.18);color:var(--accent-2)}
+.h-badge.new{background:linear-gradient(90deg,#ff5d8f,#ff8a4c);color:#fff}
+
+/* ---------- Karten / Panels ---------- */
+.h-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-l)}
+.h-label{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.h-num{font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:.2px}
+
+/* ---------- Spiel-Kopfzeile (für alle Spiele) ---------- */
+.h-bar{position:relative;z-index:50;display:flex;align-items:center;gap:12px;height:56px;padding:0 14px;background:rgba(10,11,16,.82);backdrop-filter:blur(14px) saturate(140%);
+  border-bottom:1px solid var(--border);font-family:var(--font)}
+.h-bar .h-back{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 8px;border-radius:10px;color:var(--text-2);text-decoration:none;font-weight:600;font-size:14px;transition:.15s;border:1px solid transparent}
+.h-bar .h-back:hover{background:rgba(255,255,255,.06);color:var(--text);border-color:var(--border)}
+.h-bar .h-title{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-size:18px;font-weight:600;letter-spacing:.3px}
+.h-bar .h-title .h-logo{width:30px;height:30px;border-radius:8px;overflow:hidden;flex:none;box-shadow:0 0 0 1px var(--border-2)}
+.h-bar .h-title .h-logo svg{width:100%;height:100%;display:block}
+.h-bar .h-sep{width:1px;height:24px;background:var(--border-2)}
+.h-bar .h-stats{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;overflow:auto}
+.h-stat{display:flex;flex-direction:column;justify-content:center;min-width:72px;height:40px;padding:0 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border)}
+.h-stat small{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);line-height:1}
+.h-stat b{font-family:var(--font-display);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25}
+.h-bar .h-grow{flex:1}
+.h-bar .h-actions{display:flex;gap:4px}
+
+/* ---------- Overlays ---------- */
+.h-overlay{position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,5,8,.66);backdrop-filter:blur(10px);
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.h-overlay.on{opacity:1;pointer-events:auto}
+.h-dialog{width:min(460px,100%);max-height:92vh;overflow:auto;background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--border-2);border-radius:var(--r-xl);
+  box-shadow:var(--sh-2);padding:28px;transform:translateY(10px) scale(.98);transition:transform .25s var(--ease)}
+.h-overlay.on .h-dialog{transform:none}
+.h-dialog h2{margin:0 0 6px;font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:.2px}
+.h-dialog p{color:var(--text-2);line-height:1.55;margin:0 0 14px}
+.h-dialog .h-row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.h-dialog.center{text-align:center}
+.h-dialog.center .h-row{justify-content:center}
+
+/* ---------- Toasts ---------- */
+#h-toasts{position:fixed;right:18px;bottom:18px;z-index:1000;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}
+.h-toast{display:flex;align-items:center;gap:12px;min-width:260px;max-width:380px;padding:12px 16px 12px 12px;border-radius:14px;background:rgba(22,24,32,.92);backdrop-filter:blur(12px);
+  border:1px solid var(--border-2);box-shadow:var(--sh-2);animation:h-tin .35s var(--ease);pointer-events:auto}
+.h-toast.out{animation:h-tout .3s ease forwards}
+.h-toast .ti{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(var(--accent-rgb),.2);color:var(--accent-2)}
+.h-toast.ach .ti{background:linear-gradient(135deg,#ffd76a,#f0a020);color:#3a2400}
+.h-toast b{display:block;font-size:14px}
+.h-toast span{font-size:13px;color:var(--text-2)}
+@keyframes h-tin{from{transform:translateX(30px);opacity:0}}
+@keyframes h-tout{to{transform:translateX(30px);opacity:0}}
+
+/* ---------- Spielstart-Übergang ---------- */
+.h-fade{position:fixed;inset:0;z-index:2000;background:var(--bg);pointer-events:none;animation:h-fadeout .45s ease forwards}
+@keyframes h-fadeout{to{opacity:0}}
+
+/* ---------- Formulare ---------- */
+.h-range{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;background:var(--surface-3);outline:none}
+.h-range::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(var(--accent-rgb),.35);cursor:pointer}
+.h-switch{position:relative;width:42px;height:24px;border-radius:24px;background:var(--surface-3);border:1px solid var(--border-2);cursor:pointer;transition:.2s;flex:none}
+.h-switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s var(--ease)}
+.h-switch.on{background:var(--accent)}
+.h-switch.on::after{left:20px}
+.h-input{height:40px;border-radius:10px;border:1px solid var(--border-2);background:var(--surface);color:var(--text);padding:0 12px;font:inherit;outline:none;transition:.15s}
+.h-input:focus{border-color:rgba(var(--accent-rgb),.7);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.2)}
+kbd{font-family:var(--font);font-size:11px;font-weight:700;padding:2px 6px;border-radius:5px;background:var(--surface-3);border:1px solid var(--border-2);border-bottom-width:2px;color:var(--text-2)}
+
+/* ---------- Party-Modus (Spieleabend) ---------- */
+.h-overlay.pty{z-index:1500;background:rgba(4,5,10,.85)}
+.pty-box{width:min(620px,100%);max-height:92vh;overflow:auto;text-align:center;padding:26px 26px 22px;border-radius:28px;background:linear-gradient(180deg,#1d2130,#12141b);border:1px solid var(--border-2);box-shadow:0 30px 90px rgba(0,0,0,.7);transform:translateY(16px) scale(.96);transition:transform .3s var(--ease)}
+.h-overlay.on .pty-box{transform:none}
+.pty-tag{font-size:12px;font-weight:800;letter-spacing:2px;color:#ffd23f}
+.pty-hint{color:var(--text-2);font-size:15px;line-height:1.5;margin:10px 0}
+.pty-av{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--pc,#555);font-size:20px;font-family:'Segoe UI Emoji';box-shadow:inset 0 -3px 0 rgba(0,0,0,.25);flex:none}
+.pty-av.xl{width:96px;height:96px;font-size:58px;box-shadow:0 0 0 6px rgba(255,255,255,.12),0 0 50px var(--pc),inset 0 -6px 0 rgba(0,0,0,.25)}
+.pty-big{display:flex;align-items:center;justify-content:center;gap:22px;margin:18px 0 6px;animation:ptyIn .6s var(--ease)}
+.pty-big small{display:block;text-align:left;color:var(--text-2);font-size:16px;font-weight:600}
+.pty-big b{display:block;font-family:var(--font-display);font-size:64px;line-height:1;color:var(--pc);text-shadow:0 0 30px var(--pc)}
+@keyframes ptyIn{from{transform:scale(.6);opacity:0}}
+.pty-res{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0;font-size:22px}
+.pty-res b{color:var(--pc);font-family:var(--font-display);font-size:28px}
+.pty-res span:last-child{font-family:var(--font-display);font-weight:700}
+.pty-next{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;font-size:20px;font-weight:600}
+.pty-next b{color:var(--pc);font-family:var(--font-display);font-size:28px}
+.pty-tab{display:flex;flex-direction:column;gap:5px;margin:12px auto 4px;max-width:440px}
+.pty-tab div{display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:12px;background:rgba(255,255,255,.05);border-left:4px solid var(--pc);font-size:16px}
+.pty-tab .pty-av{width:28px;height:28px;font-size:16px}
+.pty-tab .pty-sc{margin-left:auto;font-family:var(--font-display);font-weight:700}
+.pty-row{display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+.pty-pick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0}
+.pty-pick label{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 8px;border-radius:999px;background:rgba(255,255,255,.05);border:2px solid var(--border-2);cursor:pointer;font-weight:700;font-size:16px}
+.pty-pick label:has(input:checked){border-color:var(--pc);background:color-mix(in srgb,var(--pc) 22%,transparent)}
+.pty-pick input{display:none}
+.pty-rounds{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--text-2);font-weight:600}
+.pty-rounds button{width:38px;height:34px;border-radius:9px;border:1px solid var(--border-2);background:var(--surface);color:var(--text);font-weight:800;cursor:pointer}
+.pty-rounds button.on{background:var(--accent);border-color:transparent;color:#fff}
+.pty-podium{display:flex;align-items:flex-end;justify-content:center;gap:12px;margin:18px 0 8px}
+.pty-podium .pp{display:flex;flex-direction:column;align-items:center;gap:6px;width:150px}
+.pty-podium .pp b{font-family:var(--font-display);font-size:22px;color:var(--pc)}
+.pty-podium .pp>span:nth-of-type(2){font-family:var(--font-display);font-weight:700;font-size:18px}
+.pty-podium .blk{width:100%;border-radius:12px 12px 0 0;background:linear-gradient(180deg,var(--pc),rgba(0,0,0,.2));display:flex;align-items:flex-start;justify-content:center;font-size:34px;padding-top:6px}
+.pty-podium .p0{order:2}.pty-podium .p0 .blk{height:110px}
+.pty-podium .p1{order:1}.pty-podium .p1 .blk{height:76px}
+.pty-podium .p2{order:3}.pty-podium .p2 .blk{height:54px}
+.pty-podium .p0 .pty-av.xl{width:110px;height:110px;font-size:66px}
+/* Fernseher-Modus: alles gut lesbar vom Sofa aus */
+html.tv .h-bar{height:68px}
+html.tv .h-bar .h-title{font-size:23px}
+html.tv .h-stat{height:50px;min-width:90px}
+html.tv .h-stat small{font-size:12px}
+html.tv .h-stat b{font-size:22px}
+html.tv .h-dialog,html.tv .pty-box{zoom:var(--tvz,1.3)}
+html.tv .h-dialog{max-height:calc(90vh / var(--tvz,1.3))}
+html.tv .pty-box{max-height:calc(92vh / var(--tvz,1.3))}
+html.tv #h-toasts{zoom:1.3}

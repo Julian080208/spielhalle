@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon-Snake</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+:root{--bg:#070a14;--panel:#121833;--line:#243063;--text:#eef0ff;--muted:#8d93c4}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:radial-gradient(circle at 50% 0%,#14204a,#070a14 65%);color:var(--text);font-family:system-ui,"Segoe UI",Roboto,sans-serif;user-select:none;overflow:hidden;touch-action:none}
+.bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.back{color:var(--text);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-weight:700}
+h1{font-size:20px;margin:0}
+.st{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px 12px;text-align:center}
+.st small{display:block;font-size:10px;color:var(--muted);font-weight:800;letter-spacing:1px}
+.st b{font-size:18px;font-variant-numeric:tabular-nums}
+main{display:flex;justify-content:center;align-items:center;height:calc(100vh - 60px);padding:12px}
+#wrap{position:relative;height:100%;aspect-ratio:1;max-width:100%}
+#cv{width:100%;height:100%;display:block;border-radius:16px;border:2px solid #2a3a80;box-shadow:0 0 40px rgba(60,120,255,.25)}
+#wrap.shake{animation:shake .4s}
+@keyframes shake{25%{transform:translate(-8px,3px)}50%{transform:translate(6px,-4px)}75%{transform:translate(-4px,4px)}}
+.ov{position:absolute;inset:0;background:rgba(5,6,15,.8);display:flex;align-items:center;justify-content:center;border-radius:16px;text-align:center}
+.ov.hide{display:none}
+.ov h2{font-size:34px;margin:0 0 8px;color:#7cf;text-shadow:0 0 18px #39f}
+.ov p{color:var(--muted)}
+.btn{border:0;border-radius:12px;padding:12px 22px;font-weight:800;font-size:16px;background:linear-gradient(180deg,#5ef0a0,#1fae63);color:#03240f;cursor:pointer;margin:4px}
+.legend{font-size:14px;line-height:1.9}
+</style>
+</head>
+<body>
+<main><div id="wrap"><canvas id="cv" width="720" height="720"></canvas>
+  <div class="ov" id="ov"><div id="ovc"></div></div></div></main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('snake');
+const hbar = Hub.bar({id:'snake', title:'Neon-Snake', stats:[['score', 'Punkte'], ['best', 'Rekord'], ['len', 'Länge'], ['pwrT', 'Power']], actions:['help', 'sound', 'full']});
+hbar.on('help', () => Hub.dialog({title:'Neon-Snake', html:`<p>Steuere die Schlange mit den <b>Pfeiltasten</b>, WASD oder durch Wischen. Friss Früchte, werde länger – und beiß dir nicht in den Schwanz!</p><p>🍎 +1 · 🍒 +3 · ⭐ +10 · 🐢 Zeitlupe · 👻 Geist-Modus · ✂️ kürzer. Jeder 6. Happen lässt einen Felsen erscheinen.</p>`}));
+hbar.el.querySelectorAll('.h-stat').forEach(st => st.querySelector('b').id = st.dataset.k);
+{ const p = hbar.el.querySelector('[data-k="pwrT"]'); p.id = 'pwr'; p.style.display = 'none'; }
+
+const N = 24, S = 720 / N;
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+function getHS(){ try { return (JSON.parse(localStorage.getItem('arcade_hs')) || {}).snake || 0; } catch(e){ return 0; } }
+function setHS(v){ try { const d = JSON.parse(localStorage.getItem('arcade_hs')) || {}; if (v > (d.snake || 0)){ d.snake = v; localStorage.setItem('arcade_hs', JSON.stringify(d)); return true; } } catch(e){} return false; }
+let ac;
+function beep(f, d = .08, type = 'square', v = .04, delay = 0){
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = f; g.gain.setValueAtTime(Math.max(1e-4, v * Hub.vol()), t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d); } catch(e){}
+}
+const FOODS = {
+  apple:{icon:'🍎', pts:1, grow:1, w:70},
+  cherry:{icon:'🍒', pts:3, grow:2, w:15},
+  star:{icon:'⭐', pts:10, grow:1, w:5, life:7},
+  slow:{icon:'🐢', pts:2, grow:0, w:5, life:8, power:'slow'},
+  ghost:{icon:'👻', pts:2, grow:0, w:4, life:8, power:'ghost'},
+  scissors:{icon:'✂️', pts:2, grow:-4, w:4, life:8},
+};
+let snake, prev, dir, queue, foods, rocks, score, alive, running, stepMs, acc, eaten, parts, power, powerT, hue = 0, popups;
+function reset(){
+  snake = [{x:8, y:12}, {x:7, y:12}, {x:6, y:12}]; prev = snake.map(s => ({...s}));
+  dir = {x:1, y:0}; queue = []; foods = []; rocks = []; parts = []; popups = [];
+  score = 0; alive = true; running = true; stepMs = 130; acc = 0; eaten = 0; power = null; powerT = 0;
+  spawnFood('apple'); spawnFood('apple');
+  $('ov').classList.add('hide'); upd();
+}
+function free(x, y){
+  return !snake.some(s => s.x === x && s.y === y) && !rocks.some(r => r.x === x && r.y === y) && !foods.some(f => f.x === x && f.y === y);
+}
+function randFree(){
+  for (let k = 0; k < 500; k++){ const x = Math.floor(Math.random() * N), y = Math.floor(Math.random() * N); if (free(x, y) && Math.hypot(x - snake[0].x, y - snake[0].y) > 3) return {x, y}; }
+  return null;
+}
+function spawnFood(type){
+  if (!type){ const ks = Object.keys(FOODS); let r = Math.random() * ks.reduce((a, k) => a + FOODS[k].w, 0); type = ks.find(k => (r -= FOODS[k].w) < 0) || 'apple'; }
+  const p = randFree(); if (!p) return;
+  foods.push({...p, type, t:0, life:FOODS[type].life || 0});
+}
+function upd(){
+  $('score').textContent = score; $('best').textContent = Math.max(getHS(), score); $('len').textContent = snake.length;
+  $('pwr').style.display = power ? '' : 'none';
+  if (power) $('pwrT').textContent = (power === 'slow' ? '🐢 ' : '👻 ') + Math.ceil(powerT) + 's';
+}
+function step(){
+  if (queue.length) dir = queue.shift();
+  prev = snake.map(s => ({...s}));
+  const h = {x:snake[0].x + dir.x, y:snake[0].y + dir.y};
+  if (power === 'ghost'){ h.x = (h.x + N) % N; h.y = (h.y + N) % N; }
+  const hitWall = h.x < 0 || h.y < 0 || h.x >= N || h.y >= N;
+  const hitSelf = snake.slice(0, -1).some(s => s.x === h.x && s.y === h.y) && power !== 'ghost';
+  const hitRock = rocks.some(r => r.x === h.x && r.y === h.y) && power !== 'ghost';
+  if (hitWall || hitSelf || hitRock) return die();
+  snake.unshift(h);
+  const fi = foods.findIndex(f => f.x === h.x && f.y === h.y);
+  let grow = 0;
+  if (fi >= 0){
+    const f = foods.splice(fi, 1)[0], F = FOODS[f.type];
+    score += F.pts; grow = F.grow; eaten++;
+    popups.push({x:h.x, y:h.y, t:0, txt:'+' + F.pts});
+    for (let k = 0; k < 14; k++) parts.push({x:h.x * S + S / 2, y:h.y * S + S / 2, vx:(Math.random() - .5) * 300, vy:(Math.random() - .5) * 300, life:.6, h:hue});
+    if (F.power){ power = F.power; powerT = 8; beep(300, .3, 'sine', .05, 0); beep(600, .3, 'sine', .05, .1); }
+    else beep(520 + Math.min(eaten, 30) * 15, .07, 'square', .04);
+    if (f.type === 'star'){ [659, 784, 1047].forEach((q, k) => beep(q, .1, 'triangle', .05, k * .06)); }
+    if (f.type === 'apple' || f.type === 'cherry') spawnFood('apple');
+    if (Math.random() < .35) spawnFood();
+    stepMs = Math.max(55, stepMs - 1.5);
+    if (eaten % 6 === 0){ const p = randFree(); if (p) rocks.push(p); }
+  }
+  if (grow > 0){ for (let k = 1; k < grow; k++) snake.push({...snake[snake.length - 1]}); }
+  else if (grow < 0){ const cut = Math.min(-grow + 1, snake.length - 3); snake.splice(snake.length - cut, cut); }
+  else snake.pop();
+  // jedes Segment gleitet von seiner alten Position (prev[i]) zur neuen
+  while (prev.length < snake.length) prev.push({...prev[prev.length - 1]});
+  prev.length = snake.length;
+  upd();
+}
+function die(){
+  alive = false; running = false;
+  snake.forEach(s => { for (let k = 0; k < 4; k++) parts.push({x:s.x * S + S / 2, y:s.y * S + S / 2, vx:(Math.random() - .5) * 500, vy:(Math.random() - .5) * 500, life:1, h:hue}); });
+  $('wrap').classList.remove('shake'); void $('wrap').offsetWidth; $('wrap').classList.add('shake');
+  beep(200, .4, 'sawtooth', .06); beep(120, .5, 'sawtooth', .06, .2);
+  const rec = setHS(score);
+  Hub.score('snake', score, {label:'Punkte', silent:true});
+  if (score >= 50) Hub.achieve('snake', 's50', 'Nimmersatt', 'Erziele 50 Punkte');
+  if (snake.length >= 30) Hub.achieve('snake', 'len30', 'Riesenschlange', 'Werde 30 Felder lang');
+  setTimeout(() => showOv(`<h2>Autsch!</h2><p>Punkte: <b style="color:#fff">${score}</b> · Länge: ${snake.length}</p>${rec ? '<p style="color:#ffc940;font-weight:800">🏆 NEUER REKORD!</p>' : ''}<button class="btn" onclick="reset()">Nochmal (Leertaste)</button>`), 700);
+  upd();
+}
+function showOv(h){ $('ovc').innerHTML = h; $('ov').classList.remove('hide'); }
+function turn(x, y){
+  const last = queue.length ? queue[queue.length - 1] : dir;
+  if ((x === -last.x && y === -last.y) || (x === last.x && y === last.y)) return;
+  if (queue.length < 3) queue.push({x, y});
+}
+function draw(t){
+  ctx.fillStyle = '#060912'; ctx.fillRect(0, 0, 720, 720);
+  ctx.strokeStyle = 'rgba(80,120,255,.07)'; ctx.lineWidth = 1;
+  for (let k = 1; k < N; k++){ ctx.beginPath(); ctx.moveTo(k * S, 0); ctx.lineTo(k * S, 720); ctx.moveTo(0, k * S); ctx.lineTo(720, k * S); ctx.stroke(); }
+  if (power === 'ghost'){ ctx.strokeStyle = 'rgba(200,160,255,.5)'; ctx.setLineDash([8, 8]); ctx.lineWidth = 4; ctx.strokeRect(2, 2, 716, 716); ctx.setLineDash([]); }
+  for (const r of rocks){ ctx.fillStyle = '#3a4060'; ctx.fillRect(r.x * S + 3, r.y * S + 3, S - 6, S - 6); ctx.fillStyle = '#5a6290'; ctx.fillRect(r.x * S + 5, r.y * S + 5, S - 12, 4); }
+  ctx.font = `${S * .8}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of foods){
+    const b = 1 + Math.sin(performance.now() / 200 + f.x) * .08;
+    if (f.life && f.life - f.t < 2 && Math.floor(performance.now() / 120) % 2) continue;
+    ctx.save(); ctx.translate(f.x * S + S / 2, f.y * S + S / 2); ctx.scale(b, b);
+    ctx.shadowColor = '#fff'; ctx.shadowBlur = 12; ctx.fillText(FOODS[f.type].icon, 0, 2); ctx.restore();
+  }
+  // Schlange (weich interpoliert)
+  const k = running ? Math.min(1, acc / curStep()) : 1;
+  const pts = snake.map((s, i) => { const p = prev[i] || s; let dx = s.x - p.x, dy = s.y - p.y; if (Math.abs(dx) > 1 || Math.abs(dy) > 1){ dx = 0; dy = 0; } return {x:(p.x + dx * k) * S + S / 2, y:(p.y + dy * k) * S + S / 2}; });
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let i = pts.length - 1; i > 0; i--){
+    const a = pts[i], b = pts[i - 1];
+    if (Math.hypot(a.x - b.x, a.y - b.y) > S * 1.5) continue;
+    const col = `hsl(${(hue + i * 8) % 360},90%,${power === 'ghost' ? 75 : 58}%)`;
+    ctx.strokeStyle = col; ctx.lineWidth = S * (0.78 - i / pts.length * 0.3);
+    ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.globalAlpha = power === 'ghost' ? .55 : 1;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  const h = pts[0];
+  ctx.fillStyle = `hsl(${hue % 360},90%,62%)`; ctx.beginPath(); ctx.arc(h.x, h.y, S * .45, 0, 7); ctx.fill();
+  for (const sgn of [-1, 1]){
+    const ex = h.x + dir.x * S * .15 + -dir.y * sgn * S * .2, ey = h.y + dir.y * S * .15 + dir.x * sgn * S * .2;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, S * .13, 0, 7); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(ex + dir.x * 2, ey + dir.y * 2, S * .07, 0, 7); ctx.fill();
+  }
+  for (const p of parts){ ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = `hsl(${p.h},90%,65%)`; ctx.fillRect(p.x - 3, p.y - 3, 6, 6); }
+  ctx.globalAlpha = 1;
+  ctx.font = 'bold 22px system-ui';
+  for (const p of popups){ ctx.globalAlpha = 1 - p.t; ctx.fillStyle = '#fff'; ctx.fillText(p.txt, p.x * S + S / 2, p.y * S - p.t * 40); }
+  ctx.globalAlpha = 1;
+}
+const curStep = () => stepMs * (power === 'slow' ? 1.8 : 1);
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  hue += dt * 40;
+  if (running){
+    acc += dt * 1000;
+    while (acc >= curStep() && running){ acc -= curStep(); step(); }
+    if (power){ powerT -= dt; if (powerT <= 0){ power = null; upd(); } else if (Math.random() < .1) upd(); }
+    for (const f of foods) f.t += dt;
+    foods = foods.filter(f => !f.life || f.t < f.life);
+    if (!foods.some(f => f.type === 'apple')) spawnFood('apple');
+  }
+  for (const p of parts){ p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .95; p.vy *= .95; }
+  parts = parts.filter(p => p.life > 0);
+  for (const p of popups) p.t += dt * 1.2;
+  popups = popups.filter(p => p.t < 1);
+  draw(now);
+  requestAnimationFrame(frame);
+}
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  const m = {arrowup:[0,-1], w:[0,-1], arrowdown:[0,1], s:[0,1], arrowleft:[-1,0], a:[-1,0], arrowright:[1,0], d:[1,0]}[k];
+  if (m){ e.preventDefault(); if (running) turn(...m); }
+  if (k === ' '){ e.preventDefault(); if (!running) reset(); }
+});
+let ts = null;
+cv.addEventListener('pointerdown', e => { ts = {x:e.clientX, y:e.clientY}; });
+cv.addEventListener('pointermove', e => {
+  if (!ts || !running) return;
+  const dx = e.clientX - ts.x, dy = e.clientY - ts.y;
+  if (Math.hypot(dx, dy) < 24) return;
+  Math.abs(dx) > Math.abs(dy) ? turn(Math.sign(dx), 0) : turn(0, Math.sign(dy));
+  ts = {x:e.clientX, y:e.clientY};
+});
+cv.addEventListener('pointerup', () => ts = null);
+snake = [{x:8, y:12}, {x:7, y:12}, {x:6, y:12}]; prev = snake; dir = {x:1, y:0}; foods = []; rocks = []; parts = []; popups = []; score = 0;
+upd();
+showOv(`<h2>🐍 Neon-Snake</h2><p>Steuerung: Pfeiltasten / WASD oder wischen</p>
+  <div class="legend">🍎 +1 · 🍒 +3 · ⭐ +10<br>🐢 Zeitlupe · 👻 Geist (durch alles durch) · ✂️ kürzer</div>
+  <p>Achtung: Mit jedem 6. Happen erscheint ein Felsen!</p><button class="btn" onclick="reset()">▶ Start (Leertaste)</button>`);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

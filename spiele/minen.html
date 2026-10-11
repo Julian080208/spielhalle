@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minensucher</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+:root{--panel:#16222e;--line:#2a4054;--text:#eef5ff;--muted:#8fa6bd}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% 0%,#1d3a52,#0b141c 65%);color:var(--text);font-family:system-ui,"Segoe UI",Roboto,sans-serif;user-select:none}
+.bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.back{color:var(--text);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-weight:700}
+h1{font-size:20px;margin:0}
+.diff{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+.diff button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:800;padding:6px 12px;border-radius:7px;cursor:pointer}
+.diff button.on{background:#3b7fe0;color:#fff}
+main{display:flex;flex-direction:column;align-items:center;padding:16px;gap:12px}
+.hud{display:flex;align-items:center;gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 16px}
+.hud .n{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:900;color:#ff5c5c;background:#000;border-radius:8px;padding:2px 10px;min-width:72px;text-align:center}
+#face{font-size:34px;background:none;border:0;cursor:pointer;transition:transform .1s}
+#face:active{transform:scale(.9)}
+#grid{display:grid;gap:2px;background:var(--line);padding:2px;border-radius:10px;touch-action:manipulation}
+.c{width:var(--s);height:var(--s);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:calc(var(--s) * .55);border-radius:4px;cursor:pointer;
+  background:linear-gradient(180deg,#4f7ea8,#3a6488);box-shadow:inset 0 2px 0 rgba(255,255,255,.25)}
+.c:hover{filter:brightness(1.15)}
+.c.o{background:#1a2a38;box-shadow:none;cursor:default;animation:rev .2s ease-out}
+@keyframes rev{from{transform:scale(.6);opacity:.3}}
+.c.boom{background:#ff4d4d!important}
+.c.wrong{background:#6a2a2a!important}
+.n1{color:#5aa9ff}.n2{color:#3ddc84}.n3{color:#ff5c5c}.n4{color:#c084fc}.n5{color:#ff9f2e}.n6{color:#2ee6d6}.n7{color:#fff}.n8{color:#aaa}
+.info{color:var(--muted);font-size:13px;text-align:center}
+.best{color:#ffc940;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+  <div class="hud"><div class="n" id="mines">010</div><button id="face" title="Neues Spiel">🙂</button><div class="n" id="time">000</div></div>
+  <div id="grid"></div>
+  <div class="info">Linksklick = aufdecken · Rechtsklick / langes Tippen = Fahne 🚩 · Klick auf Zahl = Umgebung aufdecken<br>Der erste Klick ist immer sicher. <span class="best" id="best"></span></div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('minen');
+const hbar = Hub.bar({id:'minen', title:'Minensucher', actions:['help', 'sound', 'full']});
+hbar.on('help', () => Hub.dialog({title:'Minensucher', html:`<p>Decke alle Felder ohne Mine auf. Die Zahlen zeigen, wie viele Minen in den <b>acht Nachbarfeldern</b> liegen.</p><p><b>Linksklick</b> aufdecken · <b>Rechtsklick</b> Fahne · Klick auf eine Zahl mit passend vielen Fahnen deckt die Nachbarn auf. Der erste Klick ist immer sicher.</p>`}));
+{ const d = document.createElement('div'); d.className = 'diff'; d.id = 'diff'; d.innerHTML = '<button data-d="easy" class="on">Leicht</button><button data-d="mid">Mittel</button><button data-d="hard">Schwer</button>'; hbar.el.insertBefore(d, hbar.el.querySelector('.h-grow')); }
+
+const D = {easy:{w:9, h:9, m:10, name:'Leicht'}, mid:{w:16, h:16, m:40, name:'Mittel'}, hard:{w:30, h:16, m:99, name:'Schwer'}};
+const $ = id => document.getElementById(id);
+let diff = 'easy', cells, w, h, m, started, over, flags, opened, t0, timer;
+let ac;
+function beep(f, d = .06, type = 'square', v = .03, delay = 0){
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = f; g.gain.setValueAtTime(Math.max(1e-4, v * Hub.vol()), t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d); } catch(e){}
+}
+function bestTimes(){ try { return JSON.parse(localStorage.getItem('arcade_minen')) || {}; } catch(e){ return {}; } }
+function saveBest(sec){ const b = bestTimes(); if (!b[diff] || sec < b[diff]){ b[diff] = sec; try { localStorage.setItem('arcade_minen', JSON.stringify(b)); } catch(e){} return true; } return false; }
+function showBest(){ const b = bestTimes()[diff]; $('best').textContent = b ? `Bestzeit (${D[diff].name}): ${b} s` : ''; }
+function newGame(){
+  ({w, h, m} = D[diff]);
+  started = false; over = false; flags = 0; opened = 0; clearInterval(timer); $('time').textContent = '000';
+  const s = Math.max(22, Math.min(40, Math.floor(Math.min((innerWidth - 40) / w, (innerHeight - 260) / h)) - 2));
+  const g = $('grid'); g.style.setProperty('--s', s + 'px'); g.style.gridTemplateColumns = `repeat(${w}, ${s}px)`;
+  g.innerHTML = '';
+  cells = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const el = document.createElement('div'); el.className = 'c';
+    const c = {x, y, mine:false, n:0, open:false, flag:false, el};
+    cells.push(c); g.appendChild(el);
+    el.addEventListener('mousedown', e => { if (!over && e.button === 0) $('face').textContent = '😮'; });
+    el.addEventListener('mouseup', e => { if (!over) $('face').textContent = '🙂'; if (e.button === 0) click(c); });
+    el.addEventListener('contextmenu', e => { e.preventDefault(); flag(c); });
+    let lp;
+    el.addEventListener('touchstart', e => { lp = setTimeout(() => { lp = null; flag(c); navigator.vibrate && navigator.vibrate(30); }, 380); }, {passive:true});
+    el.addEventListener('touchend', e => { if (lp){ clearTimeout(lp); } else e.preventDefault(); });
+  }
+  $('face').textContent = '🙂'; updMines(); showBest();
+}
+const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? null : cells[y * w + x];
+const nb = c => { const r = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){ if (!dx && !dy) continue; const o = at(c.x + dx, c.y + dy); if (o) r.push(o); } return r; };
+function placeMines(safe){
+  const forbid = new Set([safe, ...nb(safe)]);
+  const pool = cells.filter(c => !forbid.has(c));
+  for (let k = 0; k < m && pool.length; k++){ const i = Math.floor(Math.random() * pool.length); pool.splice(i, 1)[0].mine = true; }
+  cells.forEach(c => c.n = nb(c).filter(o => o.mine).length);
+}
+function click(c){
+  if (over || c.flag) return;
+  if (!started){ started = true; placeMines(c); t0 = Date.now(); timer = setInterval(() => $('time').textContent = String(Math.min(999, Math.floor((Date.now() - t0) / 1000))).padStart(3, '0'), 250); }
+  if (c.open){
+    // Akkord: Zahl mit genügend Fahnen -> Nachbarn öffnen
+    const n = nb(c);
+    if (c.n && n.filter(o => o.flag).length === c.n) n.forEach(o => { if (!o.open && !o.flag) open(o); });
+    checkWin(); return;
+  }
+  open(c); checkWin();
+}
+function open(c){
+  if (c.open || c.flag || over) return;
+  if (c.mine){ lose(c); return; }
+  const stack = [c]; let k = 0;
+  while (stack.length){
+    const q = stack.pop();
+    if (q.open || q.flag) continue;
+    q.open = true; opened++;
+    q.el.classList.add('o'); q.el.style.animationDelay = Math.min(k++ * 4, 300) + 'ms';
+    if (q.n){ q.el.textContent = q.n; q.el.classList.add('n' + q.n); }
+    else nb(q).forEach(o => { if (!o.open && !o.mine) stack.push(o); });
+  }
+  beep(k > 5 ? 700 : 500, .04, 'triangle', .03);
+}
+function flag(c){
+  if (over || c.open) return;
+  c.flag = !c.flag; flags += c.flag ? 1 : -1;
+  c.el.textContent = c.flag ? '🚩' : '';
+  beep(c.flag ? 900 : 600, .04, 'sine', .04); updMines();
+}
+function updMines(){ const v = m - flags; $('mines').textContent = (v < 0 ? '-' : '') + String(Math.abs(v)).padStart(3, '0'); }
+function lose(c){
+  over = true; clearInterval(timer); $('face').textContent = '😵';
+  c.el.classList.add('boom');
+  beep(120, .5, 'sawtooth', .07);
+  let k = 0;
+  cells.forEach(o => {
+    if (o.mine && !o.flag){ setTimeout(() => { o.el.textContent = '💣'; o.el.classList.add('o'); if (o !== c && Math.random() < .3) beep(80 + Math.random() * 80, .1, 'sawtooth', .03); }, k++ * 25); }
+    if (!o.mine && o.flag){ o.el.classList.add('wrong'); o.el.textContent = '❌'; }
+  });
+}
+function checkWin(){
+  if (over || opened !== w * h - m) return;
+  over = true; clearInterval(timer);
+  const sec = Math.floor((Date.now() - t0) / 1000);
+  cells.forEach(c => { if (c.mine && !c.flag){ c.flag = true; c.el.textContent = '🚩'; } });
+  flags = m; updMines(); $('face').textContent = '😎';
+  const rec = saveBest(sec);
+  Hub.score('minen', sec, {lower:true, label:'Bestzeit (s)', silent:true});
+  Hub.achieve('minen', 'win_' + diff, {easy:'Minenräumer', mid:'Bombenexperte', hard:'Entschärfungsprofi'}[diff], `Gewinne auf ${D[diff].name}`);
+  [523, 659, 784, 1047].forEach((f, k) => beep(f, .15, 'triangle', .05, k * .1));
+  setTimeout(() => alertBox(`🎉 Gewonnen in ${sec} Sekunden!${rec ? ' 🏆 Neue Bestzeit!' : ''}`), 300);
+  showBest();
+}
+function alertBox(t){ $('best').textContent = t; }
+$('face').onclick = newGame;
+$('diff').onclick = e => { const b = e.target.closest('button'); if (!b) return; diff = b.dataset.d; [...$('diff').children].forEach(x => x.classList.toggle('on', x === b)); newGame(); };
+addEventListener('keydown', e => { if (e.key === 'F2' || e.key.toLowerCase() === 'n') newGame(); });
+newGame();
+</script>
+</body>
+</html>

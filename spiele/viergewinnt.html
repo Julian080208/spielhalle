@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vier gewinnt</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 0%,#1c2a5c,#0a0f24 70%)}
+main{flex:1;display:flex;align-items:center;justify-content:center;gap:34px;padding:20px;min-height:0}
+.side{width:250px;display:flex;flex-direction:column;gap:12px}
+.pl{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--border);transition:.25s}
+.pl.on{border-color:var(--c);box-shadow:0 0 0 1px var(--c),0 10px 30px -10px var(--c)}
+.pl .dot{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8,transparent 45%),var(--c);box-shadow:inset 0 -4px 0 rgba(0,0,0,.2);flex:none}
+.pl b{display:block;font-size:15px}
+.pl small{color:var(--muted)}
+.pl .w{margin-left:auto;font-family:var(--font-display);font-size:26px;font-weight:700}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{flex:1;height:32px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+.status{font-family:var(--font-display);font-size:22px;font-weight:600;text-align:center;min-height:30px}
+#wrap{position:relative;height:min(84vh,calc(100vw - 620px));aspect-ratio:1;max-height:100%}
+#discs,#boardSvg,#hover{position:absolute;left:0;right:0}
+#hover{top:0;height:14.2857%;pointer-events:none}
+#discs{top:14.2857%;bottom:0}
+#boardSvg{top:14.2857%;bottom:0;width:100%;height:85.7143%;filter:drop-shadow(0 20px 40px rgba(0,0,0,.5))}
+.disc{position:absolute;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),transparent 42%),var(--c);box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),inset 0 0 0 4px rgba(0,0,0,.08)}
+.disc.win{animation:glow .7s ease-in-out infinite alternate}
+@keyframes glow{to{box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),0 0 0 4px #fff,0 0 30px 6px var(--c)}}
+.ghost{position:absolute;border-radius:50%;opacity:.55;transition:left .12s var(--ease)}
+#cols{position:absolute;top:0;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(7,1fr);cursor:pointer}
+@media (max-width:900px){ main{flex-direction:column;gap:12px} .side{width:min(520px,100%);flex-direction:row;flex-wrap:wrap} .side > *{flex:1} #wrap{height:auto;width:min(92vw,520px)} }
+</style>
+</head>
+<body>
+<main>
+  <div class="side">
+    <div class="pl" id="p1" style="--c:#ff4d6a"><span class="dot"></span><div><b id="n1">Du</b><small>Rot</small></div><span class="w" id="w1">0</span></div>
+    <div class="pl" id="p2" style="--c:#ffd23f"><span class="dot"></span><div><b id="n2">Computer</b><small>Gelb</small></div><span class="w" id="w2">0</span></div>
+    <div class="status" id="status"></div>
+    <div class="seg" id="mode"><button data-m="ai">Gegen KI</button><button data-m="pvp">2 Spieler</button></div>
+    <div class="seg" id="lvl"><button data-l="1">Leicht</button><button data-l="2">Mittel</button><button data-l="3">Schwer</button></div>
+    <button class="h-btn primary lg" id="newBtn"></button>
+    <button class="h-btn" id="undoBtn"></button>
+  </div>
+  <div id="wrap"><div id="hover"></div><div id="discs"></div><svg id="boardSvg" viewBox="0 0 700 600"></svg><div id="cols"></div></div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('vier');
+const bar = Hub.bar({id:'vier', title:'Vier gewinnt', actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Vier gewinnt', html:'<p>Lass abwechselnd Steine in die Spalten fallen. Wer zuerst <b>vier in einer Reihe</b> hat – waagerecht, senkrecht oder diagonal – gewinnt.</p><p>Klick auf eine Spalte oder drück die Tasten <kbd>1</kbd>–<kbd>7</kbd>.</p>'}));
+const $ = id => document.getElementById(id), I = Hub.icon;
+$('newBtn').innerHTML = I('refresh') + 'Neue Runde'; $('undoBtn').innerHTML = I('undo') + 'Zug zurück';
+const C = 7, R = 6, COL = ['', '#ff4d6a', '#ffd23f'];
+const opts = Object.assign({mode:'ai', lvl:2, w1:0, w2:0, d:0, starter:1}, Hub.read('vier_opts', {}));
+let B, turn, over, history, busy = false, winLine = null;
+
+// ---------- Brett zeichnen ----------
+(function drawBoard(){
+  let holes = '';
+  for (let c = 0; c < C; c++) for (let r = 0; r < R; r++) holes += `<circle cx="${50 + c * 100}" cy="${50 + r * 100}" r="38" fill="#000"/>`;
+  $('boardSvg').innerHTML = `<defs><mask id="m"><rect width="700" height="600" rx="30" fill="#fff"/>${holes}</mask>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a63ff"/><stop offset="1" stop-color="#1f3ccf"/></linearGradient></defs>
+    <rect width="700" height="600" rx="30" fill="url(#bg)" mask="url(#m)"/>
+    <g fill="none" stroke="rgba(0,0,0,.28)" stroke-width="5">${holes.replace(/fill="#000"/g, '')}</g>
+    <rect x="2" y="2" width="696" height="596" rx="28" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="3" mask="url(#m)"/>`;
+  $('cols').innerHTML = Array.from({length:C}, (_, c) => `<div data-c="${c}"></div>`).join('');
+})();
+const cellPx = () => $('discs').clientWidth / C;
+function discEl(c, r, p){
+  const s = cellPx(), d = document.createElement('div');
+  d.className = 'disc'; d.style.setProperty('--c', COL[p]);
+  d.style.width = d.style.height = s * .78 + 'px';
+  d.style.left = c * s + s * .11 + 'px'; d.style.top = r * s * (6 / 6) + s * .11 + 'px';
+  d.dataset.c = c; d.dataset.r = r;
+  return d;
+}
+function relayout(){
+  const s = cellPx();
+  $('discs').querySelectorAll('.disc').forEach(d => { d.style.width = d.style.height = s * .78 + 'px'; d.style.left = d.dataset.c * s + s * .11 + 'px'; d.style.top = d.dataset.r * s + s * .11 + 'px'; });
+}
+addEventListener('resize', relayout);
+
+// ---------- Logik ----------
+function reset(){
+  B = Array.from({length:C}, () => []);
+  over = false; history = []; winLine = null; busy = false;
+  turn = opts.starter;
+  $('discs').innerHTML = '';
+  ui();
+  if (opts.mode === 'ai' && turn === 2) setTimeout(aiMove, 450);
+}
+const at = (c, r) => (c >= 0 && c < C && r >= 0 && r < R) ? (B[c][r] || 0) : -1;   // r = 0 unten
+function findWin(){
+  for (let c = 0; c < C; c++) for (let r = 0; r < R; r++){
+    const p = at(c, r); if (!p) continue;
+    for (const [dc, dr] of [[1, 0], [0, 1], [1, 1], [1, -1]]){
+      if ([1, 2, 3].every(k => at(c + dc * k, r + dr * k) === p)) return {p, cells:[0, 1, 2, 3].map(k => [c + dc * k, r + dr * k])};
+    }
+  }
+  return null;
+}
+function play(c){
+  if (over || busy || B[c].length >= R) return false;
+  const r = B[c].length, p = turn;
+  B[c].push(p); history.push(c);
+  const rowFromTop = R - 1 - r;
+  const d = discEl(c, rowFromTop, p);
+  $('discs').appendChild(d);
+  const s = cellPx(), dist = (rowFromTop + 1.4) * s;
+  busy = true;
+  const dur = 260 + rowFromTop * 55;
+  d.animate([{transform:`translateY(${-dist}px)`}, {transform:'translateY(0)', offset:.78}, {transform:`translateY(${-s * .12}px)`, offset:.88}, {transform:'translateY(0)'}], {duration:dur, easing:'cubic-bezier(.45,0,.75,1)'});
+  setTimeout(() => { Hub.tone(p === 1 ? 300 : 360, .08, 'triangle', .06); busy = false; after(); }, dur * .78);
+  return true;
+}
+function after(){
+  const w = findWin();
+  if (w){
+    over = true; winLine = w;
+    w.cells.forEach(([c, r]) => { const el = [...$('discs').children].find(d => +d.dataset.c === c && +d.dataset.r === R - 1 - r); if (el) el.classList.add('win'); });
+    if (w.p === 1) opts.w1++; else opts.w2++;
+    opts.starter = w.p === 1 ? 2 : 1;
+    Hub.write('vier_opts', opts);
+    if (opts.mode === 'ai'){
+      if (w.p === 1){ Hub.sfx('ach'); Hub.score('vier', opts.w1, {label:'Siege', silent:true}); Hub.achieve('vier', 'win', 'Vier in einer Reihe', 'Besiege den Computer');
+        if (opts.lvl === 3) Hub.achieve('vier', 'hard', 'Großmeister', 'Besiege den Computer auf Schwer'); }
+      else Hub.sfx('bad');
+    } else Hub.sfx('ach');
+    ui(); return;
+  }
+  if (B.every(col => col.length >= R)){ over = true; opts.d++; opts.starter = opts.starter === 1 ? 2 : 1; Hub.write('vier_opts', opts); ui(); return; }
+  turn = turn === 1 ? 2 : 1;
+  ui();
+  if (opts.mode === 'ai' && turn === 2) setTimeout(aiMove, 280);
+}
+function undo(){
+  if (busy || !history.length) return;
+  const n = opts.mode === 'ai' ? (turn === 1 && !over ? 2 : 1) : 1;
+  for (let k = 0; k < n && history.length; k++){
+    const c = history.pop(); B[c].pop();
+    const r = R - 1 - B[c].length;
+    const el = [...$('discs').children].reverse().find(d => +d.dataset.c === c && +d.dataset.r === r); if (el) el.remove();
+  }
+  if (over && winLine){ if (winLine.p === 1) opts.w1--; else opts.w2--; Hub.write('vier_opts', opts); }
+  $('discs').querySelectorAll('.win').forEach(d => d.classList.remove('win'));
+  over = false; winLine = null;
+  turn = history.length % 2 === 0 ? opts.starter : (opts.starter === 1 ? 2 : 1);
+  if (opts.mode === 'ai' && turn === 2){ ui(); setTimeout(aiMove, 300); return; }
+  ui();
+}
+
+// ---------- KI (Negamax mit Alpha-Beta) ----------
+function scoreWindow(w, p){
+  const o = 3 - p, mine = w.filter(x => x === p).length, theirs = w.filter(x => x === o).length, empty = w.filter(x => x === 0).length;
+  if (mine === 4) return 100000;
+  if (mine === 3 && empty === 1) return 50;
+  if (mine === 2 && empty === 2) return 8;
+  if (theirs === 3 && empty === 1) return -60;
+  if (theirs === 2 && empty === 2) return -6;
+  return 0;
+}
+function evaluate(g, p){
+  let s = 0;
+  for (let r = 0; r < R; r++) if (g[3][r] === p) s += 6;
+  for (let c = 0; c < C; c++) for (let r = 0; r < R; r++) for (const [dc, dr] of [[1, 0], [0, 1], [1, 1], [1, -1]]){
+    const ec = c + dc * 3, er = r + dr * 3; if (ec < 0 || ec >= C || er < 0 || er >= R) continue;
+    const w = [0, 1, 2, 3].map(k => g[c + dc * k][r + dr * k] || 0);
+    s += scoreWindow(w, p);
+  }
+  return s;
+}
+function wins(g, p){
+  for (let c = 0; c < C; c++) for (let r = 0; r < R; r++){
+    if (g[c][r] !== p) continue;
+    for (const [dc, dr] of [[1, 0], [0, 1], [1, 1], [1, -1]]){
+      let k = 1; for (; k < 4; k++){ const cc = c + dc * k, r2 = r + dr * k; if (cc < 0 || cc >= C || r2 < 0 || r2 >= R || g[cc][r2] !== p) break; }
+      if (k === 4) return true;
+    }
+  }
+  return false;
+}
+const ORDER = [3, 2, 4, 1, 5, 0, 6];
+function negamax(g, depth, a, b, p){
+  const o = 3 - p;
+  if (wins(g, o)) return -100000 - depth;
+  if (g.every(col => col.length >= R)) return 0;
+  if (depth === 0) return evaluate(g, p) - evaluate(g, o) * .9;
+  let best = -1e9;
+  for (const c of ORDER){
+    if (g[c].length >= R) continue;
+    g[c].push(p);
+    const v = -negamax(g, depth - 1, -b, -a, o);
+    g[c].pop();
+    if (v > best) best = v;
+    if (v > a) a = v;
+    if (a >= b) break;
+  }
+  return best;
+}
+function aiMove(){
+  if (over || turn !== 2) return;
+  const depth = [0, 2, 4, 7][opts.lvl];
+  const g = B.map(col => col.slice());
+  let best = null, bv = -1e9;
+  const cands = ORDER.filter(c => g[c].length < R);
+  for (const c of cands){
+    g[c].push(2);
+    let v = wins(g, 2) ? 1e6 : -negamax(g, depth - 1, -1e9, 1e9, 1);
+    g[c].pop();
+    if (opts.lvl === 1) v += Math.random() * 120 - 60;
+    if (v > bv){ bv = v; best = c; }
+  }
+  play(best);
+}
+
+// ---------- Oberfläche ----------
+function ui(){
+  $('p1').classList.toggle('on', !over && turn === 1); $('p2').classList.toggle('on', !over && turn === 2);
+  $('n2').textContent = opts.mode === 'ai' ? `Computer · ${['', 'Leicht', 'Mittel', 'Schwer'][opts.lvl]}` : 'Spieler 2';
+  $('n1').textContent = opts.mode === 'ai' ? 'Du' : 'Spieler 1';
+  $('w1').textContent = opts.w1; $('w2').textContent = opts.w2;
+  let st;
+  if (over) st = winLine ? (opts.mode === 'ai' ? (winLine.p === 1 ? 'Du hast gewonnen!' : 'Der Computer gewinnt.') : `${winLine.p === 1 ? 'Rot' : 'Gelb'} gewinnt!`) : 'Unentschieden!';
+  else st = opts.mode === 'ai' ? (turn === 1 ? 'Du bist dran' : 'Computer denkt …') : `${turn === 1 ? 'Rot' : 'Gelb'} ist dran`;
+  $('status').textContent = st;
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === opts.mode));
+  document.querySelectorAll('#lvl button').forEach(b => b.classList.toggle('on', +b.dataset.l === opts.lvl));
+  $('lvl').style.display = opts.mode === 'ai' ? '' : 'none';
+  $('undoBtn').disabled = !history.length;
+}
+let hoverCol = -1;
+function showGhost(c){
+  hoverCol = c;
+  const s = cellPx(), h = $('hover');
+  if (over || c < 0 || (opts.mode === 'ai' && turn === 2) || B[c].length >= R){ h.innerHTML = ''; return; }
+  let g = h.firstChild;
+  if (!g){ g = document.createElement('div'); g.className = 'ghost disc'; h.appendChild(g); }
+  g.style.setProperty('--c', COL[turn]); g.style.width = g.style.height = s * .7 + 'px'; g.style.left = c * s + s * .15 + 'px'; g.style.top = '0px';
+}
+$('cols').addEventListener('pointermove', e => { const c = e.target.closest('[data-c]'); if (c) showGhost(+c.dataset.c); });
+$('cols').addEventListener('pointerleave', () => showGhost(-1));
+$('cols').addEventListener('click', e => {
+  Hub.audio();
+  const c = e.target.closest('[data-c]'); if (!c) return;
+  if (opts.mode === 'ai' && turn === 2) return;
+  if (play(+c.dataset.c)) setTimeout(() => showGhost(hoverCol), 50);
+});
+addEventListener('keydown', e => { const n = +e.key; if (n >= 1 && n <= 7 && !(opts.mode === 'ai' && turn === 2)) play(n - 1); if (e.key.toLowerCase() === 'n') reset(); });
+$('mode').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.mode = b.dataset.m; opts.w1 = opts.w2 = 0; Hub.write('vier_opts', opts); reset(); };
+$('lvl').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.lvl = +b.dataset.l; Hub.write('vier_opts', opts); reset(); };
+$('newBtn').onclick = reset;
+$('undoBtn').onclick = undo;
+reset();
+</script>
+</body>
+</html>

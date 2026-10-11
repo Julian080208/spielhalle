@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wortjagd</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 0%,#1e2436,#0b0d14 70%)}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 10px 18px;min-height:0;gap:14px}
+.modes{display:flex;gap:10px;align-items:center}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{height:32px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+#grid{display:grid;grid-template-rows:repeat(6,1fr);gap:7px;--t:min(62px,calc((100vh - 400px) / 6))}
+.row{display:grid;grid-template-columns:repeat(5,var(--t));gap:7px}
+.row.shake{animation:shake .45s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.tile{width:var(--t);height:var(--t);display:flex;align-items:center;justify-content:center;border:2px solid #343a4c;border-radius:10px;font-family:var(--font-display);font-size:calc(var(--t) * .52);font-weight:700;
+  text-transform:uppercase;color:#fff;background:rgba(255,255,255,.02);transition:transform .1s}
+.tile.filled{border-color:#5a6280;animation:pop .1s}
+@keyframes pop{50%{transform:scale(1.1)}}
+.tile.flip{animation:flip .5s ease forwards}
+@keyframes flip{0%{transform:rotateX(0)}50%{transform:rotateX(90deg)}100%{transform:rotateX(0)}}
+.tile.g{background:#3fa94a;border-color:#3fa94a}
+.tile.y{background:#c9a018;border-color:#c9a018}
+.tile.x{background:#3a3f4c;border-color:#3a3f4c}
+.tile.win{animation:bounce .5s ease}
+@keyframes bounce{40%{transform:translateY(-16px)}}
+#kb{display:flex;flex-direction:column;gap:7px;width:min(620px,98vw)}
+.krow{display:flex;gap:6px;justify-content:center}
+.key{flex:1;max-width:52px;height:56px;border:0;border-radius:9px;background:#4a5068;color:#fff;font-family:var(--font-display);font-size:18px;font-weight:700;cursor:pointer;transition:filter .1s,transform .05s}
+.key:active{transform:scale(.95)}
+.key:hover{filter:brightness(1.15)}
+.key.wide{max-width:84px;flex:1.6;font-size:13px}
+.key.g{background:#3fa94a}.key.y{background:#c9a018}.key.x{background:#262a36;color:#8a90a8}
+#msg{position:fixed;left:50%;top:110px;transform:translateX(-50%);background:#fff;color:#111;font-weight:800;padding:10px 18px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+#msg.on{opacity:1}
+.dist{display:flex;flex-direction:column;gap:5px;margin:12px 0}
+.dist div{display:flex;align-items:center;gap:8px;font-size:13px}
+.dist i{display:block;height:20px;border-radius:4px;background:#4a5068;color:#fff;font-style:normal;font-weight:700;font-size:12px;text-align:right;padding:2px 7px;min-width:24px}
+.dist i.cur{background:#3fa94a}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.kp b{display:block;font-family:var(--font-display);font-size:28px}
+.kp small{color:var(--muted);font-size:11px}
+</style>
+</head>
+<body>
+<main>
+  <div class="modes"><div class="seg" id="mode"><button data-m="daily">Wort des Tages</button><button data-m="free">Endlos</button></div>
+    <button class="h-btn sm" id="statBtn"></button><label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text-2)" title="Wenn aus, wird jede Buchstabenfolge akzeptiert"><span class="h-switch" id="strictSw"></span>Nur echte Wörter</label></div>
+  <div id="grid"></div>
+  <div id="kb"></div>
+</main>
+<div id="msg"></div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('wort');
+const bar = Hub.bar({id:'wort', title:'Wortjagd', actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Wortjagd', html:`<p>Errate das gesuchte deutsche Wort mit <b>fünf Buchstaben</b> in höchstens sechs Versuchen.</p>
+  <p><span style="background:#3fa94a;padding:2px 8px;border-radius:5px;color:#fff;font-weight:700">Grün</span> = richtiger Buchstabe am richtigen Platz<br>
+  <span style="background:#c9a018;padding:2px 8px;border-radius:5px;color:#fff;font-weight:700">Gelb</span> = kommt vor, aber an anderer Stelle<br>
+  <span style="background:#3a3f4c;padding:2px 8px;border-radius:5px;color:#fff;font-weight:700">Grau</span> = kommt nicht vor</p><p>Umlaute (Ä, Ö, Ü) zählen als eigene Buchstaben.</p>`}));
+const $ = id => document.getElementById(id), I = Hub.icon;
+$('statBtn').innerHTML = I('chart') + 'Statistik';
+// Lösungswörter (häufige Substantive) – alles Großbuchstaben, genau 5 Zeichen
+const SOL = `ABEND ACHSE ADLER AGENT AHORN AKTIE ALARM ALBUM ALTAR AMPEL ANGEL ANGST ANKER APFEL ARENA ARMEE ATLAS AUDIO AUGEN AUTOR
+BACKE BAGEL BANDE BASIS BAUCH BAUER BEERE BERGE BESEN BETON BIBEL BIENE BIRNE BLASE BLATT BLECH BLICK BLITZ BLOCK BLUME BLUSE BODEN BOHNE BOMBE BONUS
+BOOTE BRAUT BRETT BRIEF BRISE BRUCH BRUST BUCHT BULLE CHAOS CHIPS CLOWN COMIC CREME DAMEN DAMPF DATEN DAUER DECKE DEGEN DEICH DELTA DIEBE DIELE DINGE
+DOGGE DOSEN DRAHT DRAMA DRECK DROGE DUELL DUNST DURST EBENE ECKEN EICHE EIMER EISEN ELITE ENGEL ENKEL ENTEN ERBSE ERNTE ESSIG ETAGE EULEN
+FABEL FADEN FAHNE FALKE FALLE FARBE FASAN FAUST FEDER FEIER FEIGE FELGE FERNE FERSE FEUER FIBEL FIGUR FILME FIRMA FISCH FLECK FLUCH FLUSS
+FOLGE FOLIE FOTOS FRACK FRAGE FRIST FROST FUCHS FUGEN FUNKE GABEL GALLE GARDE GASSE GEBET GECKO GEIGE GEIST GENIE GESTE GLANZ GLEIS GLIED GNADE
+GRAMM GREIS GRIFF GRILL GROLL GRUBE GRUFT GRUND GUMMI GUNST GURKE HAFEN HAGEL HAKEN HALLE HANDY HARFE HASEN HAUBE HAUPT HECHT HECKE HEIDE HERDE
+HEXEN HILFE HIRSE HIRTE HITZE HOBBY HOCKE HONIG HOTEL HUMOR HUNDE IDEAL IDEEN IMKER INDEX INSEL JACKE JAHRE JEANS JOKER JUBEL JUNGE JUWEL
+KABEL KAKAO KAMEL KAMIN KANAL KANNE KANTE KAPPE KARTE KASSE KATER KATZE KEGEL KEHLE KELCH KELLE KERNE KERZE KETTE KEULE KIOSK KISTE KLAGE KLANG
+KLEID KLIMA KLOTZ KLUFT KNALL KNETE KNOPF KOBRA KOHLE KOMET KOMMA KONTO KOPIE KRAFT KRAKE KRANZ KRAUT KREBS KREIS KREUZ KRIEG KRONE KUGEL KUNST
+KURVE LACHS LADEN LAGER LAMPE LANZE LARVE LASER LASSO LATTE LAUBE LAUNE LEBEN LEDER LEHRE LEUTE LICHT LIEBE LILIE LINDE LINIE LINSE LIPPE LISTE
+LITER LOBBY LOCKE LOGIK LOTSE LUCHS LUNGE MACHT MADEN MAGEN MAGIE MAKEL MANGO MARKE MARKT MASKE MASSE MATTE MAUER MEILE MENGE MESSE METER MIETE
+MILCH MINZE MIXER MONAT MOPED MORAL MOTIV MOTOR MOTTE MULDE MUMIE MUSIK NABEL NACHT NADEL NAGEL NARBE NASEN NATUR NEBEL NEFFE NELKE NIERE NONNE
+NOTEN NUDEL OCHSE OHREN OLIVE ONKEL OPFER ORBIT ORDEN ORGEL OSTEN OTTER OZEAN PAKET PALME PANDA PANIK PAPPE PARTY PASTA PAUKE PAUSE PEDAL PERLE
+PFAHL PFAND PFEIL PFERD PFOTE PFUND PIANO PILOT PILZE PIRAT PISTE PIZZA PLATZ POKAL PREIS PRINZ PROBE PROFI PUDEL PUDER PULLI PUMPE PUNKT PUPPE
+QUALM QUARK QUOTE RABEN RADIO RAMPE RANKE RASEN RATTE RAUCH RAUPE REGAL REGEL REGEN REIHE REISE RENTE RIESE RINDE RINGE RINNE ROBBE ROLLE ROMAN
+ROSEN RUDER RUINE RUNDE SACHE SAITE SALAT SALBE SALON SAMEN SAUNA SCHAF SCHUH SEELE SEGEL SEIFE SEITE SENSE SERIE SIRUP SKALA SOCKE SONNE SORGE
+SPASS SPATZ SPECK SPIEL SPORT SPOTT SPRAY STAAT STAHL STALL STAMM STAND STAUB STEAK STEIN STERN STIEL STIER STIFT STIRN STOCK STOFF STOLZ STROM
+STUBE STUHL STURM SUMPF SUPPE SZENE TABAK TAFEL TANGO TANNE TANTE TASSE TASTE TAUBE TEICH TEMPO THEMA TIGER TINTE TISCH TITEL TOAST TONNE TORTE
+TRAUM TREUE TRICK TRITT TRUHE TULPE TURBO VATER VIDEO VILLA VISUM VOGEL WAAGE WACHE WAFFE WAGEN WALZE WANGE WANNE WAREN WATTE WEIDE WELLE WELPE
+WERFT WESTE WETTE WIEGE WIESE WITWE WITZE WOCHE WOLKE WOLLE WUNDE WURST ZANGE ZEBRA ZEHEN ZEILE ZELLE ZEUGE ZIEGE ZWECK ZWERG
+BÄREN BÜHNE FÄHRE FLÖTE HÖHLE HÖLLE HÜGEL HÜTTE KÄFER KÄFIG KÄLTE KÖNIG KRÄHE KÜCHE KÜSTE LÄNGE LÖWEN MÖBEL MÜHLE MÜNZE SÄBEL SÄULE SÖHNE TÜREN ÜBUNG ZÄHNE ZÜGEL`.split(/\s+/).filter(w => [...w].length === 5);
+// Weitere erlaubte Rateversuche (Verben, Adjektive, Mehrzahlformen …)
+const EXTRA = `ALLES ALTEN ARMEN BAUEN BEIDE BITTE BLAUE BLIND BLOND BRAUN BRAVO BREIT DANKE DICHT DIESE DREHT DUMME DUNKEL ECHTE EIGEN EINEM EINEN
+EINER EINES ENDEN ERBEN ESSEN EXTRA FAHRE FALSCH FEINE FERNE FESTE FETTE FINDE FLACH FLINK FLOTT FRECH FREIE FROHE FRÜHE FÜHLE GEBEN GEHEN GELBE GENAU
+GERNE GLATT GROSS GRÜNE GUTEN HABEN HALBE HALTE HEISS HELLE HEUTE HOHLE HOLEN HÖREN IMMER JAGEN JETZT KALTE KAUEN KAUFE KEINE KLAPP KLEIN KLUGE KNAPP
+KOMME KURZE LANGE LASSE LAUTE LEERE LEGEN LEICHT LEISE LESEN LETZT LOBEN LUSTIG MACHE MALEN MEINE MERKE MITTE MÖGEN NACKT NETTE NEUEN NOBEL
+OBERE OFFEN PLUMP RASCH REDEN REICH REINE RUFEN RUHIG RUNDE SAGEN SANFT SATTE SAUER SCHÖN SEHEN SEHNE SEIEN SELBE SICHER SINNE SOGAR SPÄTE STARK STEIF
+STILL STUMM SÜSSE TAPFER TEUER TIEFE TOLLE TRÄGE TREUE TRÜBE ÜBRIG UNTER VIELE VOLLE WACHE WAHRE WARME WEISE WEISS WEITE WENIG WILDE WÜRDE ZARTE ZEIGE ZIEHE
+ZWEITE BÄUME BÄNKE BLÄTTER BÖDEN BRÜCKE DÜNEN FÄDEN GÄNSE HÄFEN HÄNDE HÄUTE KÖPFE KÖRBE KÜHLE LÄDEN MÄUSE NÄHTE RÄDER RÄUME SÄGEN SÄTZE STÄBE TÖPFE
+WÄLLE WÖLFE WÜRFE ZÜNDE`.split(/\s+/).filter(w => [...w].length === 5);
+const ALLOWED = new Set([...SOL, ...EXTRA]);
+const opts = Object.assign({mode:'daily', strict:true}, Hub.read('wort_opts', {}));
+const stats = Object.assign({played:0, won:0, streak:0, maxStreak:0, dist:[0, 0, 0, 0, 0, 0], daily:{}}, Hub.read('wort_stats', {}));
+let answer, guesses, cur, over, keyState;
+const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function dailyWord(){ const d = new Date(); const n = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); let h = n * 2654435761 % 4294967296; return SOL[h % SOL.length]; }
+function newGame(){
+  if (opts.mode === 'daily'){
+    answer = dailyWord();
+    const prev = stats.daily[dayKey()];
+    guesses = prev ? prev.guesses.slice() : []; over = !!(prev && prev.done);
+  } else { answer = SOL[Math.floor(Math.random() * SOL.length)]; guesses = []; over = false; }
+  cur = ''; keyState = {};
+  guesses.forEach(g => score(g).forEach((s, k) => upKey([...g][k], s)));
+  build(); ui();
+  if (over && opts.mode === 'daily') setTimeout(() => showMsg(guesses[guesses.length - 1] === answer ? 'Heute schon gelöst – komm morgen wieder!' : `Heute vorbei. Das Wort war ${answer}.`, 3000), 300);
+}
+function score(g){
+  const a = [...answer], gg = [...g], res = Array(5).fill('x'), left = {};
+  a.forEach((ch, k) => { if (gg[k] === ch) res[k] = 'g'; else left[ch] = (left[ch] || 0) + 1; });
+  gg.forEach((ch, k) => { if (res[k] !== 'g' && left[ch]){ res[k] = 'y'; left[ch]--; } });
+  return res;
+}
+const RANK = {x:1, y:2, g:3};
+function upKey(ch, s){ if (!keyState[ch] || RANK[s] > RANK[keyState[ch]]) keyState[ch] = s; }
+function build(){
+  $('grid').innerHTML = Array.from({length:6}, (_, r) => `<div class="row" data-r="${r}">${Array.from({length:5}, () => '<div class="tile"></div>').join('')}</div>`).join('');
+  guesses.forEach((g, r) => { const row = $('grid').children[r], sc = score(g); [...g].forEach((ch, k) => { const t = row.children[k]; t.textContent = ch; t.classList.add(sc[k]); }); });
+}
+function ui(){
+  const row = $('grid').children[guesses.length];
+  if (row && !over) [...row.children].forEach((t, k) => { const ch = [...cur][k] || ''; if (t.textContent !== ch){ t.textContent = ch; t.classList.toggle('filled', !!ch); } });
+  document.querySelectorAll('.key[data-k]').forEach(b => { b.classList.remove('g', 'y', 'x'); const s = keyState[b.dataset.k]; if (s) b.classList.add(s); });
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === opts.mode));
+  $('strictSw').classList.toggle('on', opts.strict);
+}
+function type(k){
+  if (over) return;
+  Hub.audio();
+  if (k === 'ENTER') return submit();
+  if (k === 'BACK'){ cur = [...cur].slice(0, -1).join(''); Hub.tone(300, .03, 'sine', .02); return ui(); }
+  if ([...cur].length >= 5) return;
+  cur += k; Hub.tone(600 + [...cur].length * 40, .03, 'triangle', .025); ui();
+}
+function submit(){
+  if ([...cur].length < 5){ shakeRow(); return showMsg('Zu wenige Buchstaben'); }
+  if (opts.strict && !ALLOWED.has(cur)){ shakeRow(); Hub.sfx('bad'); return showMsg('Unbekanntes Wort'); }
+  const g = cur, sc = score(g), r = guesses.length, row = $('grid').children[r];
+  guesses.push(g); cur = '';
+  [...row.children].forEach((t, k) => setTimeout(() => {
+    t.classList.add('flip');
+    setTimeout(() => { t.classList.add(sc[k]); Hub.tone(sc[k] === 'g' ? 880 : sc[k] === 'y' ? 660 : 330, .08, 'triangle', .04); }, 250);
+  }, k * 260));
+  over = true;   // während der Animation keine Eingabe
+  setTimeout(() => {
+    [...g].forEach((ch, k) => upKey(ch, sc[k]));
+    over = false; ui();
+    if (g === answer) finish(true, r);
+    else if (guesses.length >= 6) finish(false);
+    persistDaily();
+  }, 5 * 260 + 300);
+}
+function finish(win, r){
+  over = true;
+  stats.played++;
+  if (win){ stats.won++; stats.streak++; stats.maxStreak = Math.max(stats.maxStreak, stats.streak); stats.dist[r]++;
+    [...$('grid').children[r].children].forEach((t, k) => setTimeout(() => t.classList.add('win'), k * 90));
+    Hub.sfx('ach'); showMsg(['Genial!', 'Großartig!', 'Super!', 'Sehr gut!', 'Gut!', 'Puh!'][r], 1800);
+    Hub.score('wort', stats.streak, {label:'Serie', silent:true});
+    Hub.achieve('wort', 'first', 'Wortfinder', 'Errate dein erstes Wort');
+    if (r <= 1) Hub.achieve('wort', 'fast', 'Gedankenleser', 'Errate ein Wort in höchstens zwei Versuchen');
+    if (stats.streak >= 5) Hub.achieve('wort', 'streak5', 'Wortakrobat', 'Gewinne fünf Mal in Folge');
+  } else { stats.streak = 0; Hub.sfx('bad'); showMsg(`Das Wort war: ${answer}`, 4000); }
+  Hub.write('wort_stats', stats);
+  persistDaily(true);
+  setTimeout(showStats, 2200);
+}
+function persistDaily(done){ if (opts.mode !== 'daily') return; stats.daily[dayKey()] = {guesses:guesses.slice(), done:!!done || over}; Hub.write('wort_stats', stats); }
+function shakeRow(){ const row = $('grid').children[guesses.length]; if (!row) return; row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake'); }
+let msgT;
+function showMsg(t, ms = 1400){ const m = $('msg'); m.textContent = t; m.classList.add('on'); clearTimeout(msgT); msgT = setTimeout(() => m.classList.remove('on'), ms); }
+function showStats(){
+  const max = Math.max(1, ...stats.dist), last = guesses[guesses.length - 1] === answer ? guesses.length - 1 : -1;
+  Hub.dialog({title:'Statistik', center:true, html:`<div class="kp"><div><b>${stats.played}</b><small>Gespielt</small></div><div><b>${stats.played ? Math.round(stats.won / stats.played * 100) : 0}%</b><small>Gewonnen</small></div>
+    <div><b>${stats.streak}</b><small>Serie</small></div><div><b>${stats.maxStreak}</b><small>Beste Serie</small></div></div>
+    <div class="dist">${stats.dist.map((n, k) => `<div><span>${k + 1}</span><i class="${k === last ? 'cur' : ''}" style="width:${Math.max(6, n / max * 100)}%">${n}</i></div>`).join('')}</div>`,
+    buttons: opts.mode === 'free' || !over ? [{label:over ? 'Neues Wort' : 'Weiter', primary:true, value:'new'}] : [{label:'Endlos spielen', value:'free'}, {label:'OK', primary:true}]})
+  .then(v => { if (v === 'new' && over) newGame(); if (v === 'free'){ opts.mode = 'free'; Hub.write('wort_opts', opts); newGame(); } });
+}
+// Bildschirmtastatur
+(function kb(){
+  const rows = ['QWERTZUIOPÜ', 'ASDFGHJKLÖÄ', '⏎YXCVBNM⌫'];
+  $('kb').innerHTML = rows.map(r => `<div class="krow">${[...r].map(ch => ch === '⏎' ? '<button class="key wide" data-a="ENTER">Raten</button>' : ch === '⌫' ? `<button class="key wide" data-a="BACK">${I('left')}</button>` : `<button class="key" data-k="${ch}">${ch}</button>`).join('')}</div>`).join('');
+  $('kb').onclick = e => { const b = e.target.closest('.key'); if (b) type(b.dataset.a || b.dataset.k); };
+})();
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (document.querySelector('.h-overlay.on')) return;
+  if (e.key === 'Enter') return type('ENTER');
+  if (e.key === 'Backspace') return type('BACK');
+  const k = e.key.toUpperCase();
+  if (/^[A-ZÄÖÜ]$/.test(k)) type(k);
+});
+$('mode').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.mode = b.dataset.m; Hub.write('wort_opts', opts); newGame(); };
+$('strictSw').onclick = () => { opts.strict = !opts.strict; Hub.write('wort_opts', opts); ui(); };
+$('statBtn').onclick = showStats;
+newGame();
+</script>
+</body>
+</html>

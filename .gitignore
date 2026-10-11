@@ -1,0 +1,6 @@
+# Claude-Einstellungen und Build-Ergebnisse gehören nicht ins Repo
+.claude/
+installer/dist/
+*.exe
+*.old.exe
+_*.html

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reversi</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 0%,#14382a,#06120c 70%)}
+main{flex:1;display:flex;align-items:center;justify-content:center;gap:34px;padding:20px;min-height:0}
+#board{--s:min(calc((100vh - 150px) / 8),74px);display:grid;grid-template-columns:repeat(8,var(--s));grid-template-rows:repeat(8,var(--s));padding:14px;border-radius:18px;
+  background:linear-gradient(180deg,#5a3a20,#3a2412);box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 2px 0 rgba(255,255,255,.12)}
+.sq{position:relative;background:#1f8a4c;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);cursor:default;perspective:400px}
+.sq.alt{background:#23955a}
+.sq.move{cursor:pointer}
+.sq.move::after{content:'';position:absolute;left:50%;top:50%;width:22%;height:22%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,.25);transition:.15s}
+.sq.move:hover::after{width:70%;height:70%;background:var(--ghost)}
+.sq.last{box-shadow:inset 0 0 0 3px rgba(255,211,77,.7)}
+.disc{position:absolute;inset:9%;border-radius:50%;transform-style:preserve-3d;transition:transform .45s var(--ease)}
+.disc i{position:absolute;inset:0;border-radius:50%;backface-visibility:hidden;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.disc i.b{background:radial-gradient(circle at 35% 30%,#4a4e5a,#16181e 60%)}
+.disc i.w{background:radial-gradient(circle at 35% 30%,#fff,#d8dbe2 70%);transform:rotateY(180deg)}
+.disc.white{transform:rotateY(180deg)}
+.disc.new{animation:drop .3s var(--ease)}
+@keyframes drop{from{transform:scale(1.5) translateY(-20px);opacity:0}}
+.side{width:260px;display:flex;flex-direction:column;gap:12px}
+.pl{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--border);transition:.25s}
+.pl.on{border-color:#ffd34d;box-shadow:0 0 0 1px #ffd34d}
+.pl .dot{width:32px;height:32px;border-radius:50%;flex:none}
+.pl b{display:block}
+.pl small{color:var(--muted)}
+.pl .n{margin-left:auto;font-family:var(--font-display);font-size:30px;font-weight:700}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{flex:1;height:32px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+.status{font-family:var(--font-display);font-size:21px;font-weight:600;text-align:center;min-height:30px}
+@media (max-width:900px){ main{flex-direction:column;gap:12px} #board{--s:min(10.5vw,56px)} .side{width:min(94vw,500px);flex-direction:row;flex-wrap:wrap} .side > *{flex:1} }
+</style>
+</head>
+<body>
+<main>
+  <div id="board"></div>
+  <div class="side">
+    <div class="pl" id="pB"><span class="dot" style="background:radial-gradient(circle at 35% 30%,#4a4e5a,#16181e 60%)"></span><div><b id="nB">Du</b><small>Schwarz</small></div><span class="n" id="cB">2</span></div>
+    <div class="pl" id="pW"><span class="dot" style="background:radial-gradient(circle at 35% 30%,#fff,#d8dbe2 70%)"></span><div><b id="nW">Computer</b><small>Weiß</small></div><span class="n" id="cW">2</span></div>
+    <div class="status" id="status"></div>
+    <div class="seg" id="mode"><button data-m="ai">Gegen KI</button><button data-m="pvp">2 Spieler</button></div>
+    <div class="seg" id="lvl"><button data-l="1">Leicht</button><button data-l="2">Mittel</button><button data-l="3">Schwer</button></div>
+    <label style="display:flex;gap:10px;align-items:center;color:var(--text-2);font-size:13px"><span class="h-switch on" id="hintSw"></span>Mögliche Züge zeigen</label>
+    <button class="h-btn primary lg" id="newBtn"></button>
+    <button class="h-btn" id="undoBtn"></button>
+  </div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('reversi');
+const bar = Hub.bar({id:'reversi', title:'Reversi', actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Reversi', html:'<p>Setze einen Stein so, dass du gegnerische Steine <b>zwischen zwei eigenen</b> einschließt – waagerecht, senkrecht oder diagonal. Alle eingeschlossenen Steine werden umgedreht.</p><p>Kannst du nicht ziehen, musst du aussetzen. Wer am Ende die meisten Steine hat, gewinnt. Tipp: <b>Ecken</b> sind Gold wert!</p>'}));
+const $ = id => document.getElementById(id), I = Hub.icon;
+$('newBtn').innerHTML = I('refresh') + 'Neues Spiel'; $('undoBtn').innerHTML = I('undo') + 'Zug zurück';
+const opts = Object.assign({mode:'ai', lvl:2, hints:true}, Hub.read('reversi_opts', {}));
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+const WEIGHTS = [
+  [120, -20, 20, 5, 5, 20, -20, 120], [-20, -40, -5, -5, -5, -5, -40, -20], [20, -5, 15, 3, 3, 15, -5, 20], [5, -5, 3, 3, 3, 3, -5, 5],
+  [5, -5, 3, 3, 3, 3, -5, 5], [20, -5, 15, 3, 3, 15, -5, 20], [-20, -40, -5, -5, -5, -5, -40, -20], [120, -20, 20, 5, 5, 20, -20, 120]];
+let B, turn, hist, over, busy, lastMove;
+const sqs = [], pending = new Set();
+(function build(){ for (let i = 0; i < 64; i++){ const d = document.createElement('div'); d.className = 'sq' + ((Math.floor(i / 8) + i % 8) % 2 ? ' alt' : ''); d.onclick = () => clickSq(i); $('board').appendChild(d); sqs.push(d); } })();
+function flips(b, i, p){
+  if (b[i]) return [];
+  const r = Math.floor(i / 8), c = i % 8, out = [];
+  for (const [dr, dc] of DIRS){
+    const line = []; let rr = r + dr, cc = c + dc;
+    while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && b[rr * 8 + cc] === 3 - p){ line.push(rr * 8 + cc); rr += dr; cc += dc; }
+    if (line.length && rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && b[rr * 8 + cc] === p) out.push(...line);
+  }
+  return out;
+}
+const moves = (b, p) => { const m = []; for (let i = 0; i < 64; i++){ const f = flips(b, i, p); if (f.length) m.push([i, f]); } return m; };
+function reset(){
+  B = new Array(64).fill(0); B[27] = B[36] = 2; B[28] = B[35] = 1;
+  turn = 1; hist = []; over = false; busy = false; lastMove = -1;
+  render(true); ui();
+}
+function apply(i, f, p){ hist.push({B:B.slice(), turn, lastMove}); B[i] = p; f.forEach(j => B[j] = p); lastMove = i; }
+function clickSq(i){
+  if (over || busy || (opts.mode === 'ai' && turn === 2)) return;
+  Hub.audio();
+  const f = flips(B, i, turn); if (!f.length) return;
+  doMove(i, f);
+}
+function doMove(i, f){
+  const p = turn;
+  apply(i, f, p);
+  render(false, i, f);
+  Hub.tone(p === 1 ? 300 : 380, .08, 'triangle', .06);
+  f.forEach((j, k) => setTimeout(() => Hub.tone(500 + k * 40, .04, 'sine', .025), 120 + k * 45));
+  next();
+}
+function next(){
+  const o = 3 - turn;
+  if (moves(B, o).length) turn = o;
+  else if (!moves(B, turn).length){ return end(); }
+  else Hub.toast(`${o === 1 ? 'Schwarz' : 'Weiß'} muss aussetzen`, 'Keine gültigen Züge.', 'info');
+  ui();
+  if (opts.mode === 'ai' && turn === 2){ busy = true; setTimeout(() => { busy = false; ai(); }, 550); }
+}
+function end(){
+  over = true;
+  const b = B.filter(x => x === 1).length, w = B.filter(x => x === 2).length;
+  ui();
+  if (opts.mode === 'ai'){
+    if (b > w){ Hub.sfx('ach'); Hub.score('reversi', b, {label:'Steine', silent:true}); Hub.achieve('reversi', 'win', 'Umzingelt!', 'Besiege den Computer in Reversi'); if (opts.lvl === 3) Hub.achieve('reversi', 'hard', 'Reversi-Meister', 'Besiege den Computer auf Schwer'); if (w === 0) Hub.achieve('reversi', 'wipe', 'Totale Dominanz', 'Gewinne ohne dass der Gegner einen Stein übrig hat'); }
+    else Hub.sfx('bad');
+  } else Hub.sfx('ach');
+}
+// ---------- KI ----------
+function evalB(b, p){
+  let s = 0; const o = 3 - p;
+  for (let i = 0; i < 64; i++){ if (b[i] === p) s += WEIGHTS[Math.floor(i / 8)][i % 8]; else if (b[i] === o) s -= WEIGHTS[Math.floor(i / 8)][i % 8]; }
+  s += (moves(b, p).length - moves(b, o).length) * 6;
+  return s;
+}
+function search(b, depth, a, beta, p, passed){
+  const ms = moves(b, p);
+  if (!depth) return evalB(b, p);
+  if (!ms.length){
+    if (passed){ const d = b.filter(x => x === p).length - b.filter(x => x === 3 - p).length; return d * 1000; }
+    return -search(b, depth - 1, -beta, -a, 3 - p, true);
+  }
+  ms.sort((x, y) => WEIGHTS[Math.floor(y[0] / 8)][y[0] % 8] - WEIGHTS[Math.floor(x[0] / 8)][x[0] % 8]);
+  let best = -1e9;
+  for (const [i, f] of ms){
+    const nb = b.slice(); nb[i] = p; f.forEach(j => nb[j] = p);
+    const v = -search(nb, depth - 1, -beta, -a, 3 - p, false);
+    if (v > best) best = v; if (v > a) a = v; if (a >= beta) break;
+  }
+  return best;
+}
+function ai(){
+  if (over || turn !== 2) return;
+  const ms = moves(B, 2); if (!ms.length) return next();
+  const depth = [0, 1, 3, 5][opts.lvl];
+  let best = ms[0], bv = -1e9;
+  for (const m of ms){
+    const nb = B.slice(); nb[m[0]] = 2; m[1].forEach(j => nb[j] = 2);
+    let v = -search(nb, depth - 1, -1e9, 1e9, 1, false);
+    if (opts.lvl === 1) v += Math.random() * 60;
+    if (v > bv){ bv = v; best = m; }
+  }
+  doMove(best[0], best[1]);
+}
+// ---------- Darstellung ----------
+function render(instant, placed = -1, flipped = []){
+  const ms = !over && opts.hints && !(opts.mode === 'ai' && turn === 2) ? new Set(moves(B, turn).map(m => m[0])) : new Set();
+  for (let i = 0; i < 64; i++){
+    const sq = sqs[i]; let d = sq.querySelector('.disc');
+    if (B[i]){
+      if (!d){ d = document.createElement('div'); d.className = 'disc' + (i === placed ? ' new' : ''); d.innerHTML = '<i class="b"></i><i class="w"></i>'; sq.appendChild(d); if (B[i] === 2){ d.style.transition = 'none'; d.classList.add('white'); requestAnimationFrame(() => d.style.transition = ''); } }
+      const k = flipped.indexOf(i);
+      if (k >= 0){ pending.add(i); setTimeout(() => { pending.delete(i); d.classList.toggle('white', B[i] === 2); }, 80 + k * 45); }
+      else if (!pending.has(i)) d.classList.toggle('white', B[i] === 2);
+    } else if (d) d.remove();
+    sq.classList.toggle('move', ms.has(i));
+    sq.classList.toggle('last', i === lastMove);
+  }
+  $('board').style.setProperty('--ghost', turn === 1 ? 'rgba(22,24,30,.45)' : 'rgba(255,255,255,.45)');
+}
+function ui(){
+  const b = B.filter(x => x === 1).length, w = B.filter(x => x === 2).length;
+  $('cB').textContent = b; $('cW').textContent = w;
+  $('pB').classList.toggle('on', !over && turn === 1); $('pW').classList.toggle('on', !over && turn === 2);
+  $('nB').textContent = opts.mode === 'ai' ? 'Du' : 'Spieler 1';
+  $('nW').textContent = opts.mode === 'ai' ? `Computer · ${['', 'Leicht', 'Mittel', 'Schwer'][opts.lvl]}` : 'Spieler 2';
+  let st;
+  if (over) st = b === w ? 'Unentschieden!' : opts.mode === 'ai' ? (b > w ? `Gewonnen! ${b} : ${w}` : `Verloren – ${b} : ${w}`) : `${b > w ? 'Schwarz' : 'Weiß'} gewinnt ${Math.max(b, w)} : ${Math.min(b, w)}`;
+  else st = opts.mode === 'ai' ? (turn === 1 ? 'Du bist dran' : 'Computer denkt …') : `${turn === 1 ? 'Schwarz' : 'Weiß'} ist dran`;
+  $('status').textContent = st;
+  document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('on', x.dataset.m === opts.mode));
+  document.querySelectorAll('#lvl button').forEach(x => x.classList.toggle('on', +x.dataset.l === opts.lvl));
+  $('lvl').style.display = opts.mode === 'ai' ? '' : 'none';
+  $('hintSw').classList.toggle('on', opts.hints);
+  $('undoBtn').disabled = !hist.length;
+  render();
+}
+function undo(){
+  if (busy || !hist.length) return;
+  let h = hist.pop();
+  if (opts.mode === 'ai') while (h.turn === 2 && hist.length) h = hist.pop();
+  B = h.B; turn = h.turn; lastMove = h.lastMove; over = false;
+  ui();
+}
+$('mode').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.mode = b.dataset.m; Hub.write('reversi_opts', opts); reset(); };
+$('lvl').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.lvl = +b.dataset.l; Hub.write('reversi_opts', opts); reset(); };
+$('hintSw').onclick = () => { opts.hints = !opts.hints; Hub.write('reversi_opts', opts); ui(); };
+$('newBtn').onclick = reset; $('undoBtn').onclick = undo;
+reset();
+</script>
+</body>
+</html>

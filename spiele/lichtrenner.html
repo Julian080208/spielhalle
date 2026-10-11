@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lichtrenner</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden;background:#02040a}
+body{display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px}
+#cv{max-width:100%;max-height:100%;aspect-ratio:16/10;border-radius:14px;box-shadow:0 0 0 1px rgba(63,230,255,.25),0 0 60px rgba(63,230,255,.12),0 30px 80px rgba(0,0,0,.8)}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:rgba(2,4,10,.72);backdrop-filter:blur(4px)}
+.ov.hide{display:none}
+.ov h1{margin:0;font-family:var(--font-display);font-size:66px;letter-spacing:8px;color:#bff8ff;text-shadow:0 0 18px #3fe6ff,0 0 40px #3fe6ff}
+.ov p{color:var(--text-2);margin:0}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{height:34px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="1200" height="750"></canvas>
+  <div class="ov" id="ov"><h1>LICHTRENNER</h1><p id="ovText">Zieh deine Lichtspur – und lass die anderen dagegen fahren.</p>
+    <div class="seg" id="mode"><button data-m="party">👥 Partyrunde (bis 4)</button><button data-m="1">1 Gegner</button><button data-m="3">3 Gegner</button><button data-m="pvp">2 Spieler</button></div>
+    <div class="seg" id="lvl"><button data-l="1">Leicht</button><button data-l="2">Mittel</button><button data-l="3">Schwer</button></div>
+    <p style="font-size:13px">Du (Cyan): <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> · Turbo: <kbd>Leertaste</kbd> · Spieler 2 (Orange): <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, Turbo <kbd>Shift</kbd></p>
+    <div id="partyKeys" style="display:none;gap:10px;flex-wrap:wrap;justify-content:center"></div>
+    <button class="h-btn primary lg" id="go">Start</button></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('tron');
+const bar = Hub.bar({id:'tron', title:'Lichtrenner', stats:[['round', 'Runde'], ['score', 'Stand'], ['wins', 'Siege gesamt']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Lichtrenner', html:'<p>Jedes Motorrad hinterlässt eine <b>Lichtwand</b>. Wer gegen eine Wand, den Rand oder eine Lichtspur fährt, scheidet aus. Der Letzte auf dem Feld gewinnt die Runde – wer zuerst <b>3 Runden</b> gewinnt, gewinnt das Match.</p><p>Der <b>Turbo</b> macht dich kurz schneller, muss sich aber wieder aufladen (Balken unter deinem Namen).</p>'}));
+
+const $ = id => document.getElementById(id), cv = $('cv'), ctx = cv.getContext('2d');
+const W = 1200, H = 750, C = 10, GW = 120, GH = 75;
+const COLORS = ['#3fe6ff', '#ff9a3d', '#ff3dbb', '#9cff6b'], NAMES = ['Du', 'Orange', 'Pink', 'Grün'];
+const DIRS = {up:[0, -1], down:[0, 1], left:[-1, 0], right:[1, 0]};
+const opts = Object.assign({mode:'1', lvl:2}, Hub.read('tron_opts', {}));
+const PKEYS = [
+  {up:['ArrowUp'], down:['ArrowDown'], left:['ArrowLeft'], right:['ArrowRight'], turbo:['Enter', 'NumpadEnter', 'ControlRight'], label:'Pfeiltasten · Turbo: Enter'},
+  {up:['KeyW'], down:['KeyS'], left:['KeyA'], right:['KeyD'], turbo:['KeyQ', 'ShiftLeft'], label:'W A S D · Turbo: Q'},
+  {up:['KeyI'], down:['KeyK'], left:['KeyJ'], right:['KeyL'], turbo:['KeyU'], label:'I J K L · Turbo: U'},
+  {up:['KeyT', 'Numpad8'], down:['KeyG', 'Numpad5'], left:['KeyF', 'Numpad4'], right:['KeyH', 'Numpad6'], turbo:['KeyR', 'Numpad0'], label:'T F G H · Turbo: R'}];
+let riders = null, partyOffset = 0;
+function pickRiders(){
+  const act = Hub.party.active(); if (act.length < 2) return null;
+  const n = Math.min(4, act.length), out = [];
+  for (let k = 0; k < n; k++) out.push(act[(partyOffset + k) % act.length]);
+  return out;
+}
+function showPartyKeys(){
+  const box = $('partyKeys');
+  if (opts.mode !== 'party'){ box.style.display = 'none'; return; }
+  riders = pickRiders();
+  if (!riders){ box.style.display = 'flex'; box.innerHTML = '<p>Lege im Partyraum fest, wer dabei ist (mind. 2).</p>'; return; }
+  box.style.display = 'flex';
+  box.innerHTML = riders.map((r, k) => `<div style="padding:8px 14px;border-radius:12px;border:2px solid ${r.color};background:rgba(0,0,0,.3);text-align:left"><b style="color:${r.color};font-size:17px">${r.avatar} ${r.name}</b><br><small style="color:var(--text-2)">${PKEYS[k].label}</small></div>`).join('') +
+    (Hub.party.active().length > 4 ? '<p style="width:100%;font-size:13px">Maximal 4 gleichzeitig – nach jedem Match wechseln die Fahrer durch.</p>' : riders.length < 4 ? '<p style="width:100%;font-size:13px">Freie Plätze fahren Computer-Gegner.</p>' : '');
+}
+let grid, bikes, state = 'menu', acc = 0, lastT = 0, round = 0, wins, matchWins = Hub.read('tron_wins', 0), msg = null, parts = [], t = 0;
+
+function setup(){
+  const n = opts.mode === '3' || opts.mode === 'party' ? 4 : 2;
+  if (opts.mode === 'party'){ riders = pickRiders(); if (!riders){ opts.mode = '1'; return setup(); } }
+  wins = Array(n).fill(0); round = 0;
+}
+function startRound(){
+  round++;
+  grid = new Uint8Array(GW * GH);
+  const n = wins.length;
+  const starts = [[20, 37, 'right'], [100, 37, 'left'], [60, 10, 'down'], [60, 65, 'up']];
+  bikes = Array.from({length:n}, (_, i) => ({i, x:starts[i][0], y:starts[i][1], d:starts[i][2], q:[], alive:true, ai:opts.mode === 'party' ? !riders[i] : !(i === 0 || (opts.mode === 'pvp' && i === 1)), turbo:1, boosting:0, trail:[[starts[i][0], starts[i][1]]], col:opts.mode === 'party' && riders[i] ? riders[i].color : COLORS[i], nm:opts.mode === 'party' ? (riders[i] ? riders[i].avatar + ' ' + riders[i].name : '🤖 KI') : null}));
+  bikes.forEach(b => grid[b.y * GW + b.x] = b.i + 1);
+  state = 'count'; acc = -2.2; msg = {txt:`Runde ${round}`, t:2.2};
+  updBar(); Hub.tone(330, .15, 'square', .03); Hub.tone(330, .15, 'square', .03, .7); Hub.tone(660, .3, 'square', .04, 1.4);
+}
+function updBar(){ bar.set('round', round); bar.set('score', wins.join(' : ')); bar.set('wins', matchWins); }
+const free = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && !grid[y * GW + x];
+const opp = (a, b) => DIRS[a][0] === -DIRS[b][0] && DIRS[a][1] === -DIRS[b][1];
+function flood(sx, sy, limit){
+  if (!free(sx, sy)) return 0;
+  const seen = new Uint8Array(GW * GH), st = [sx + sy * GW]; seen[st[0]] = 1; let n = 0;
+  while (st.length && n < limit){ const p = st.pop(), x = p % GW, y = (p / GW) | 0; n++;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const nx = x + dx, ny = y + dy, k = nx + ny * GW; if (free(nx, ny) && !seen[k]){ seen[k] = 1; st.push(k); } } }
+  return n;
+}
+function aiThink(b){
+  const lvl = opts.lvl;
+  const opts2 = Object.keys(DIRS).filter(d => !opp(d, b.d));
+  let best = b.d, bv = -1e9;
+  for (const d of opts2){
+    const [dx, dy] = DIRS[d], nx = b.x + dx, ny = b.y + dy;
+    if (!free(nx, ny)){ continue; }
+    let v = flood(nx, ny, lvl === 1 ? 60 : lvl === 2 ? 400 : 1600);
+    // Abstand zu gegnerischen Köpfen (Frontalcrash vermeiden), Gerade fahren leicht bevorzugen
+    bikes.forEach(o => { if (o !== b && o.alive){ const dd = Math.abs(o.x - nx) + Math.abs(o.y - ny); if (dd <= 1) v -= 500; if (lvl === 3) v -= Math.max(0, 30 - dd) * .3; } });
+    if (d === b.d) v += lvl === 1 ? 3 : 1.5;
+    // Gerade-Sicht
+    let run = 0; let x = nx, y = ny; while (free(x, y) && run < 30){ run++; x += dx; y += dy; } v += run * .4;
+    v += Math.random() * (lvl === 1 ? 25 : lvl === 2 ? 6 : 1);
+    if (v > bv){ bv = v; best = d; }
+  }
+  if (lvl === 1 && Math.random() < .03){ const r = opts2[Math.floor(Math.random() * opts2.length)]; const [dx, dy] = DIRS[r]; if (free(b.x + dx, b.y + dy)) best = r; }
+  b.d = best;
+  if (lvl === 3 && b.turbo >= 1 && Math.random() < .01) b.boosting = .8;
+}
+function tick(){
+  // Bewegung: Turbo-Bikes bewegen sich doppelt so oft
+  const moving = bikes.filter(b => b.alive);
+  moving.forEach(b => { if (b.q.length){ const nd = b.q.shift(); if (!opp(nd, b.d) && nd !== b.d) b.d = nd; } if (b.ai) aiThink(b); });
+  const next = moving.map(b => [b, b.x + DIRS[b.d][0], b.y + DIRS[b.d][1]]);
+  const dead = new Set();
+  next.forEach(([b, x, y]) => { if (!free(x, y)) dead.add(b); });
+  // Frontalzusammenstoß
+  for (let i = 0; i < next.length; i++) for (let j = i + 1; j < next.length; j++) if (next[i][1] === next[j][1] && next[i][2] === next[j][2]){ dead.add(next[i][0]); dead.add(next[j][0]); }
+  next.forEach(([b, x, y]) => { if (dead.has(b)) return; b.x = x; b.y = y; grid[y * GW + x] = b.i + 1; b.trail.push([x, y]); });
+  dead.forEach(crash);
+}
+function crash(b){
+  b.alive = false;
+  for (let k = 0; k < 50; k++){ const a = Math.random() * 6.283, s = 60 + Math.random() * 360; parts.push({x:b.x * C + 5, y:b.y * C + 5, vx:Math.cos(a) * s, vy:Math.sin(a) * s, t:.9, col:b.col}); }
+  Hub.tone(160, .4, 'sawtooth', .05, 0, 40);
+  // Spur verblasst und wird frei
+  b.fade = 1;
+}
+function endRound(){
+  let alive = bikes.filter(b => b.alive);
+  if (opts.mode !== 'pvp' && opts.mode !== 'party' && !bikes[0].alive && alive.length > 1) alive = [alive.sort((x, y) => y.trail.length - x.trail.length)[0]];
+  state = 'end'; acc = 0;
+  let txt;
+  if (alive.length === 1 && opts.mode === 'party'){ wins[alive[0].i]++; txt = `${alive[0].nm} gewinnt die Runde!`; Hub.sfx('ok'); }
+  else if (alive.length === 1){ wins[alive[0].i]++; txt = `${alive[0].i === 0 ? 'Du gewinnst' : (opts.mode === 'pvp' ? 'Spieler 2 gewinnt' : NAMES[alive[0].i] + ' gewinnt')} die Runde!`; if (alive[0].i === 0) Hub.sfx('ok'); }
+  else txt = 'Unentschieden!';
+  msg = {txt, t:2}; updBar();
+  const champ = wins.findIndex(w => w >= 3);
+  setTimeout(() => {
+    if (champ >= 0) return endMatch(champ);
+    startRound();
+  }, 2000);
+}
+function endMatch(champ){
+  state = 'over';
+  if (opts.mode === 'party'){
+    Hub.sfx('ach'); Hub.achieve('tron', 'party', 'Rasterparty', 'Spiele Lichtrenner mit der Partyrunde');
+    const b = bikes[champ];
+    $('ovText').innerHTML = `🏆 <b style="color:${b.col}">${b.nm}</b> gewinnt das Match (${wins.join(' : ')})!`;
+    partyOffset += 4 >= Hub.party.active().length ? 0 : 4; showPartyKeys();
+    $('go').textContent = 'Nächstes Match'; $('ov').classList.remove('hide'); updBar(); return;
+  }
+  if (champ === 0 && opts.mode !== 'pvp'){
+    matchWins++; Hub.write('tron_wins', matchWins); Hub.score('tron', matchWins, {label:'Siege', silent:true});
+    Hub.achieve('tron', 'win', 'Lichtgeschwindigkeit', 'Gewinne ein Lichtrenner-Match');
+    if (opts.mode === '3') Hub.achieve('tron', 'ffa', 'Letzter auf dem Raster', 'Gewinne ein Match gegen drei Gegner');
+    if (opts.lvl === 3) Hub.achieve('tron', 'hard', 'Raster-Legende', 'Gewinne auf Schwer');
+    Hub.sfx('ach');
+  } else if (opts.mode !== 'pvp') Hub.sfx('bad'); else Hub.sfx('ach');
+  updBar();
+  $('ovText').innerHTML = opts.mode === 'pvp' ? `<b>${champ === 0 ? 'Spieler 1 (Cyan)' : 'Spieler 2 (Orange)'}</b> gewinnt ${wins.join(' : ')}!` : champ === 0 ? `<b>Sieg!</b> Endstand ${wins.join(' : ')}` : `${NAMES[champ]} gewinnt das Match (${wins.join(' : ')}).`;
+  $('go').textContent = 'Neues Match'; $('ov').classList.remove('hide');
+}
+
+function draw(){
+  ctx.fillStyle = '#02040a'; ctx.fillRect(0, 0, W, H);
+  // Raster
+  ctx.strokeStyle = 'rgba(63,230,255,.07)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x <= GW; x += 5){ ctx.moveTo(x * C + .5, 0); ctx.lineTo(x * C + .5, H); }
+  for (let y = 0; y <= GH; y += 5){ ctx.moveTo(0, y * C + .5); ctx.lineTo(W, y * C + .5); }
+  ctx.stroke();
+  if (!bikes) return;
+  // Spuren
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  bikes.forEach(b => {
+    const a = b.alive ? 1 : Math.max(0, b.fade);
+    if (a <= 0) return;
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = b.col; ctx.shadowColor = b.col; ctx.shadowBlur = 14; ctx.lineWidth = 4;
+    ctx.beginPath(); b.trail.forEach(([x, y], k) => k ? ctx.lineTo(x * C + 5, y * C + 5) : ctx.moveTo(x * C + 5, y * C + 5)); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.globalAlpha = a * .7; ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (b.alive){
+      // Motorrad
+      const [dx, dy] = DIRS[b.d], hx = b.x * C + 5, hy = b.y * C + 5;
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(Math.atan2(dy, dx));
+      ctx.fillStyle = b.col; ctx.shadowColor = b.col; ctx.shadowBlur = b.boosting > 0 ? 30 : 16;
+      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -6); ctx.lineTo(-3, 0); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
+      ctx.restore(); ctx.shadowBlur = 0;
+    }
+  });
+  parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.t / .9); ctx.fillStyle = p.col; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); }); ctx.globalAlpha = 1;
+  // Turbo-Anzeigen
+  bikes.forEach((b, k) => {
+    if (b.ai) return;
+    const x = 16 + k * 220, y = H - 24;
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 6, y - 18, 200, 30);
+    ctx.fillStyle = b.col; ctx.font = '700 12px Bahnschrift'; ctx.textAlign = 'left'; ctx.fillText(opts.mode === 'party' ? `${b.nm} · TURBO` : opts.mode === 'pvp' ? `SPIELER ${k + 1} · TURBO` : 'TURBO', x, y - 4);
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x, y + 2, 186, 5); ctx.fillStyle = b.col; ctx.fillRect(x, y + 2, 186 * b.turbo, 5);
+  });
+  if (msg && msg.t > 0){
+    ctx.globalAlpha = Math.min(1, msg.t * 2); ctx.textAlign = 'center'; ctx.font = '700 46px Bahnschrift';
+    ctx.fillStyle = '#bff8ff'; ctx.shadowColor = '#3fe6ff'; ctx.shadowBlur = 24; ctx.fillText(msg.txt, W / 2, H / 2 - 10);
+    if (state === 'count'){ ctx.font = '700 80px Bahnschrift'; ctx.fillText(Math.max(1, Math.ceil(-acc - .4)), W / 2, H / 2 + 80); }
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+}
+function loop(now){
+  const dt = Math.min(.05, (now - lastT) / 1000 || 0); lastT = now; t += dt;
+  if (state === 'count'){ acc += dt; if (acc >= -.3){ state = 'play'; acc = 0; } }
+  if (state === 'play'){
+    const base = 1 / (13 + (opts.lvl - 1) * 2);
+    bikes.forEach(b => { if (b.boosting > 0){ b.boosting -= dt; b.turbo = Math.max(0, b.turbo - dt / .9); } else b.turbo = Math.min(1, b.turbo + dt / 6); });
+    acc += dt;
+    // Turbo: Bikes mit Boost bekommen Extra-Schritte
+    while (acc >= base / 2){
+      acc -= base / 2; bikes.half = !bikes.half;
+      const movers = bikes.filter(b => b.alive && (bikes.half || b.boosting > 0));
+      if (movers.length){
+        const saved = bikes.map(b => b.alive);
+        bikes.forEach(b => { if (!movers.includes(b)) b.alive = false; });
+        tick();
+        bikes.forEach((b, k) => { if (!movers.includes(b)) b.alive = saved[k]; });
+      }
+      if (bikes.filter(b => b.alive).length <= 1 || !bikes[0].alive && opts.mode !== 'pvp' && false){ endRound(); break; }
+      if (opts.mode !== 'pvp' && opts.mode !== 'party' && !bikes[0].alive){ endRound(); break; }
+      if (opts.mode === 'party' && !bikes.some(b => b.alive && !b.ai) && bikes.filter(b => b.alive).length >= 1 && bikes.some(b => !b.ai)){ endRound(); break; }
+      if (opts.mode === 'pvp' && (!bikes[0].alive || !bikes[1].alive)){ endRound(); break; }
+    }
+  }
+  bikes && bikes.forEach(b => { if (!b.alive && b.fade > 0){ b.fade -= dt * .8; if (b.fade <= 0) b.trail.forEach(([x, y]) => { if (grid[y * GW + x] === b.i + 1) grid[y * GW + x] = 0; }); } });
+  if (msg) msg.t -= dt;
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; p.vy *= .96; p.t -= dt; }); parts = parts.filter(p => p.t > 0);
+  draw();
+  requestAnimationFrame(loop);
+}
+const KEY1 = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'}, KEY2 = {KeyW:'up', KeyS:'down', KeyA:'left', KeyD:'right'};
+addEventListener('keydown', e => {
+  if (!$('ov').classList.contains('hide')){ if (e.code === 'Enter' || e.code === 'Space'){ e.preventDefault(); $('go').click(); } return; }
+  if (!bikes) return;
+  if (opts.mode === 'party'){
+    PKEYS.forEach((K, k) => {
+      const b = bikes[k]; if (!b || b.ai) return;
+      for (const d of ['up', 'down', 'left', 'right']) if (K[d].includes(e.code)){ e.preventDefault(); if (b.q.length < 3) b.q.push(d); }
+      if (K.turbo.includes(e.code) && b.turbo >= .5 && b.boosting <= 0){ e.preventDefault(); b.boosting = .9; Hub.tone(300 + k * 40, .3, 'sawtooth', .03, 0, 900); }
+    });
+    return;
+  }
+  const p1 = KEY1[e.code] || (opts.mode !== 'pvp' ? KEY2[e.code] : null), p2 = opts.mode === 'pvp' ? KEY2[e.code] : null;
+  if (p1){ e.preventDefault(); const b = bikes[0]; if (b.q.length < 3) b.q.push(p1); }
+  if (p2){ const b = bikes[1]; if (b.q.length < 3) b.q.push(p2); }
+  if (e.code === 'Space'){ e.preventDefault(); const b = bikes[0]; if (b.turbo >= .5 && b.boosting <= 0){ b.boosting = .9; Hub.tone(300, .3, 'sawtooth', .03, 0, 900); } }
+  if ((e.code === 'ShiftLeft') && opts.mode === 'pvp'){ const b = bikes[1]; if (b.turbo >= .5 && b.boosting <= 0){ b.boosting = .9; Hub.tone(260, .3, 'sawtooth', .03, 0, 800); } }
+});
+let tp = null;
+cv.addEventListener('pointerdown', e => tp = [e.clientX, e.clientY]);
+cv.addEventListener('pointermove', e => { if (!tp || !bikes) return; const dx = e.clientX - tp[0], dy = e.clientY - tp[1]; if (Math.hypot(dx, dy) > 24){ bikes[0].q.push(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); tp = [e.clientX, e.clientY]; } });
+addEventListener('pointerup', () => tp = null);
+function syncSeg(){ document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === opts.mode)); document.querySelectorAll('#lvl button').forEach(b => b.classList.toggle('on', +b.dataset.l === opts.lvl)); }
+$('mode').onclick = e => { if (e.target.dataset.m){ opts.mode = e.target.dataset.m; Hub.write('tron_opts', opts); syncSeg(); showPartyKeys(); } };
+$('lvl').onclick = e => { if (e.target.dataset.l){ opts.lvl = +e.target.dataset.l; Hub.write('tron_opts', opts); syncSeg(); } };
+if (Hub.party.wantsParty('tron')){ opts.mode = 'party'; }
+setTimeout(showPartyKeys, 0);
+$('go').onclick = () => { $('ov').classList.add('hide'); setup(); startRound(); Hub.sfx('click'); };
+syncSeg(); wins = [0, 0]; updBar();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

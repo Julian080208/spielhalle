@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lebensweg</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+/* Partymodus */
+.tbanner{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;pointer-events:none;background:radial-gradient(circle,rgba(0,0,0,.45),rgba(0,0,0,.1) 70%);animation:tbIn .35s ease}
+.tbanner.out{animation:tbOut .35s ease forwards}
+.tb-in{display:flex;align-items:center;gap:26px;padding:24px 46px 24px 26px;border-radius:30px;background:linear-gradient(135deg,var(--pc),rgba(0,0,0,.55));color:#fff;box-shadow:0 0 0 5px rgba(255,255,255,.35),0 30px 90px rgba(0,0,0,.5),0 0 90px var(--pc);animation:tbPop .5s cubic-bezier(.2,1.6,.4,1)}
+.tb-av{width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;font-size:76px;font-family:'Segoe UI Emoji';box-shadow:inset 0 -6px 0 rgba(0,0,0,.12)}
+.tb-in small{display:block;font-size:17px;font-weight:700;opacity:.9}
+.tb-in b{display:block;font-family:var(--font-display);font-size:80px;line-height:1;text-shadow:0 4px 0 rgba(0,0,0,.25)}
+.tb-in span{display:block;font-size:26px;font-weight:700}
+@keyframes tbIn{from{opacity:0}}@keyframes tbOut{to{opacity:0;transform:scale(1.08)}}@keyframes tbPop{from{transform:scale(.4) rotate(-6deg)}}
+.lcard .kn{position:absolute;left:8px;top:8px;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.35);color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;z-index:2}
+html.tv #plist{zoom:var(--tvz,1.3)}
+html.tv #hud{zoom:var(--tvz,1.3)}
+html.tv #tools{zoom:1.2}
+html.tv #log{zoom:1.2}
+html.tv #lobby .lb{zoom:var(--tvz,1.3)}
+
+body{display:flex;flex-direction:column;background:#7cc46a}
+#wrap{position:relative;flex:1;min-height:0;overflow:hidden}
+#world{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#world.drag{cursor:grabbing}
+/* Spieler-Leiste */
+#plist{position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;width:250px;z-index:5;max-height:calc(100% - 24px);overflow:auto;pointer-events:auto}
+.pc{position:relative;border-radius:14px;padding:8px 10px;background:rgba(255,255,255,.93);color:#1b2028;box-shadow:0 6px 18px rgba(0,0,0,.18);border:3px solid transparent;transition:.25s}
+.pc.cur{border-color:var(--pc);transform:translateX(4px);box-shadow:0 8px 24px rgba(0,0,0,.25),0 0 0 3px rgba(255,255,255,.6)}
+.pc.ret{opacity:.75}
+.pc .r1{display:flex;align-items:center;gap:8px}
+.pc .av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-family:'Segoe UI Emoji';background:var(--pc);box-shadow:inset 0 -3px 0 rgba(0,0,0,.2)}
+.pc .nm{font-weight:800;font-size:14px;line-height:1.1}
+.pc .jb{font-size:11px;color:#5a6270;font-weight:600}
+.pc .cash{margin-left:auto;font-family:var(--font-display);font-weight:700;font-size:17px;color:#167a3a;text-align:right;line-height:1.05}
+.pc .cash small{display:block;font-size:10px;color:#c4202f;font-weight:700}
+.pc .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;font-size:11px}
+.pc .chips span{padding:2px 6px;border-radius:999px;background:#eef1f6;font-weight:700;color:#3a4250;white-space:nowrap}
+/* Rechte Seite: Glücksrad & Aktionen */
+#hud{position:absolute;right:12px;bottom:12px;z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+#hud > *{pointer-events:auto}
+.wheelBox{position:relative;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,#fff 0 60%,#e9edf2);box-shadow:0 14px 40px rgba(0,0,0,.35),inset 0 0 0 8px #fff,inset 0 0 0 11px #d7dce6}
+#wheel{position:absolute;inset:12px;width:206px;height:206px;cursor:pointer;border-radius:50%}
+.wheelBox .ptr{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:30px solid #1b2028;filter:drop-shadow(0 3px 2px rgba(0,0,0,.4));transform-origin:50% 0}
+.wheelBox .ptr.tick{animation:tk .08s}
+@keyframes tk{50%{transform:translateX(-50%) rotate(-14deg)}}
+.wheelBox .hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:66px;height:66px;border-radius:50%;background:#1b2028;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:14px;pointer-events:none;text-align:center;line-height:1}
+.wheelBox.ready .hint{animation:rdy 1s ease-in-out infinite;background:#ff5d3a}
+@keyframes rdy{50%{transform:translate(-50%,-50%) scale(1.12)}}
+#msg{max-width:420px;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.95);color:#1b2028;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.2);font-size:14px;text-align:right;min-height:20px}
+#msg:empty{display:none}
+#acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:520px}
+#acts .h-btn{box-shadow:0 6px 18px rgba(0,0,0,.25)}
+/* oben rechts */
+#tools{position:absolute;right:12px;top:12px;z-index:6;display:flex;gap:6px}
+#tools .h-btn{background:rgba(255,255,255,.92);color:#1b2028;border:0;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+#tools .h-btn.on{background:#1b2028;color:#fff}
+#log{position:absolute;left:12px;bottom:12px;width:300px;max-height:30%;overflow:auto;z-index:4;display:flex;flex-direction:column-reverse;gap:3px;pointer-events:auto}
+#log div{background:rgba(255,255,255,.88);color:#2a3240;font-size:12px;padding:4px 9px;border-radius:9px;border-left:4px solid var(--lc,#aaa)}
+#log:empty{display:none}
+/* Karten */
+.lcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.lcard{position:relative;border-radius:16px;overflow:hidden;background:#fff;color:#1b2028;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35);transition:transform .15s,box-shadow .15s;border:0;padding:0;font:inherit;text-align:center;display:flex;flex-direction:column}
+.lcard:hover{transform:translateY(-4px) rotate(-1deg);box-shadow:0 14px 30px rgba(0,0,0,.45)}
+.lcard .top{padding:16px 10px 10px;background:var(--c,#7a5cff);color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px}
+.lcard .top .e{font-size:46px;font-family:'Segoe UI Emoji';filter:drop-shadow(0 3px 2px rgba(0,0,0,.25))}
+.lcard .top b{font-family:var(--font-display);font-size:18px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.lcard .bd{padding:10px 12px 12px;display:flex;flex-direction:column;gap:4px;flex:1}
+.lcard .big{font-family:var(--font-display);font-size:22px;font-weight:800;color:#167a3a}
+.lcard .sm{font-size:12px;color:#5a6270;line-height:1.35}
+.lcard.dis{opacity:.45;cursor:not-allowed}
+.evcard{width:300px;margin:0 auto;border-radius:18px;overflow:hidden;background:#fff;color:#1b2028;box-shadow:0 16px 40px rgba(0,0,0,.5);text-align:center;animation:evc .6s cubic-bezier(.2,1.4,.4,1)}
+@keyframes evc{from{transform:rotateY(90deg) scale(.6);opacity:0}}
+.evcard .top{padding:18px;background:var(--c);color:#fff}
+.evcard .top .e{font-size:60px;font-family:'Segoe UI Emoji'}
+.evcard .top b{display:block;font-family:var(--font-display);letter-spacing:2px;font-size:14px;opacity:.9}
+.evcard p{margin:14px 16px 6px;font-size:17px;font-weight:600;line-height:1.35}
+.evcard .amt{font-family:var(--font-display);font-size:26px;font-weight:800;padding-bottom:16px}
+.evcard .amt.p{color:#167a3a}.evcard .amt.n{color:#c4202f}
+.stockgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.stockgrid button{height:54px;border-radius:12px;border:2px solid var(--border-2);background:var(--surface-2);color:var(--text);font-family:var(--font-display);font-size:22px;font-weight:800;cursor:pointer}
+.stockgrid button:disabled{opacity:.3;cursor:not-allowed}
+.stockgrid button:not(:disabled):hover{border-color:var(--accent)}
+.float{position:absolute;z-index:8;pointer-events:none;font-family:var(--font-display);font-weight:800;font-size:22px;text-shadow:0 2px 4px rgba(0,0,0,.35),0 0 2px #fff;animation:fl 1.8s ease forwards;white-space:nowrap}
+@keyframes fl{0%{opacity:0;transform:translate(-50%,0) scale(.7)}15%{opacity:1;transform:translate(-50%,-10px) scale(1.1)}100%{opacity:0;transform:translate(-50%,-80px)}}
+/* Lobby */
+#lobby{position:absolute;inset:0;z-index:40;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:24px 20px;background:linear-gradient(180deg,rgba(80,170,240,.92),rgba(70,150,90,.95))}
+#lobby.hide{display:none}
+.lb{width:min(1060px,100%);display:flex;flex-direction:column;gap:14px}
+.lb h1{margin:0;text-align:center;font-family:var(--font-display);font-size:62px;letter-spacing:3px;color:#fff;text-shadow:0 4px 0 #c45cff,0 8px 30px rgba(0,0,0,.25)}
+.lb .sub{text-align:center;color:#fff;font-weight:600;margin-top:-8px;text-shadow:0 1px 3px rgba(0,0,0,.3)}
+.lb .sec{background:rgba(255,255,255,.92);color:#1b2028;border-radius:18px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+.lb .sec h3{margin:0 0 10px;font-size:12px;letter-spacing:1.5px;color:#5a6270;text-transform:uppercase}
+.seats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.seat{border-radius:14px;padding:10px;background:#f1f4f8;display:flex;flex-direction:column;gap:6px;align-items:center}
+.seat.off{opacity:.45}
+.seat canvas{width:110px;height:62px;cursor:pointer}
+.seat input,.seat select{width:100%;height:30px;border-radius:8px;border:1px solid #cfd5df;background:#fff;color:#1b2028;font:inherit;font-size:13px;text-align:center}
+.avs{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
+.avs button{width:24px;height:24px;border-radius:6px;border:1px solid transparent;background:#fff;font-size:14px;cursor:pointer;padding:0;font-family:'Segoe UI Emoji'}
+.avs button.on{border-color:#1b2028;background:#ffe9a8}
+.rules{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.rule{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:12px;background:#f1f4f8;font-size:13.5px;font-weight:600}
+.rule select{height:30px;border-radius:8px;border:1px solid #cfd5df;background:#fff;color:#1b2028;font:inherit;font-size:13px}
+.lb .go{display:flex;gap:10px;justify-content:center;padding-bottom:20px}
+.endrank{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.endrank div{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.06)}
+.endrank div b{margin-left:auto;font-family:var(--font-display);font-size:18px}
+.endrank small{color:var(--text-2)}
+@media (max-width:760px){#plist{width:190px}.wheelBox{width:170px;height:170px}#wheel{width:146px;height:146px}#log{display:none}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="world"></canvas>
+  <div id="plist"></div>
+  <div id="tools"><button class="h-btn sm" id="tOver">🗺️ Übersicht</button><button class="h-btn sm on" id="tFollow">🎥 Folgen</button><button class="h-btn sm" id="tSpeed">⏩ Normal</button></div>
+  <div id="log"></div>
+  <div id="hud"><div id="acts"></div><div id="msg"></div><div class="wheelBox" id="wbox"><canvas id="wheel" width="412" height="412"></canvas><div class="ptr" id="ptr"></div><div class="hint" id="whint">DREH</div></div></div>
+  <div id="lobby"></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<script src="lebensweg.js"></script>
+</body>
+</html>

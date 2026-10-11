@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sudoku</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 0%,#221d48,#0b0a18 70%)}
+main{flex:1;display:flex;align-items:center;justify-content:center;gap:32px;padding:20px;min-height:0}
+#grid{--s:min(calc((100vh - 150px) / 9), 64px);display:grid;grid-template-columns:repeat(9,var(--s));grid-template-rows:repeat(9,var(--s));background:#2a2a48;border-radius:14px;overflow:hidden;
+  box-shadow:0 0 0 3px #4a4a7a,0 30px 60px rgba(0,0,0,.5);user-select:none}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;background:#16162c;font-family:var(--font-display);font-size:calc(var(--s) * .56);font-weight:600;color:#a594ff;cursor:pointer;
+  box-shadow:inset -1px -1px 0 #2e2e52;transition:background .12s}
+.cell.given{color:#eceef8;font-weight:700}
+.cell:nth-child(9n+3),.cell:nth-child(9n+6){box-shadow:inset -3px -1px 0 #5a5a90}
+.cell.rb{box-shadow:inset -1px -3px 0 #5a5a90}
+.cell.rb:nth-child(9n+3),.cell.rb:nth-child(9n+6){box-shadow:inset -3px -3px 0 #5a5a90}
+.cell.zone{background:#1e1e3a}
+.cell.same{background:#2c2860}
+.cell.sel{background:#3d3590!important;color:#fff}
+.cell.err{color:#ff5d6c!important}
+.cell.err::after{content:'';position:absolute;inset:3px;border-radius:6px;background:rgba(255,93,108,.12)}
+.cell.pop{animation:cpop .35s var(--ease)}
+@keyframes cpop{50%{transform:scale(1.18)}}
+.cell.wave{animation:wave .6s ease both}
+@keyframes wave{40%{background:#7c6cff;color:#fff}}
+.notes{position:absolute;inset:3px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);font-size:calc(var(--s) * .2);font-weight:600;color:#8a8ab8;font-family:var(--font)}
+.notes span{display:flex;align-items:center;justify-content:center}
+.notes span.hl{color:#fff;background:#5a50c8;border-radius:4px}
+.side{width:300px;display:flex;flex-direction:column;gap:14px}
+.info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.info div{padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--border)}
+.info small{display:block;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.info b{font-family:var(--font-display);font-size:19px;font-weight:600}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{flex:1;height:32px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:12.5px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{position:relative;height:62px;border-radius:14px;border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);font-family:var(--font-display);font-size:28px;font-weight:600;cursor:pointer;transition:.12s}
+.pad button:hover{background:var(--surface-3);transform:translateY(-1px)}
+.pad button small{position:absolute;right:8px;top:5px;font-size:11px;color:var(--muted);font-family:var(--font)}
+.pad button.done{opacity:.3}
+.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tools button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer}
+.tools button:hover{color:var(--text);background:var(--surface-2)}
+.tools button.on{color:#fff;background:rgba(var(--accent-rgb),.25);border-color:rgba(var(--accent-rgb),.6)}
+.tools .ico{width:20px;height:20px}
+@media (max-width:860px){ main{flex-direction:column;gap:12px} #grid{--s:min(10vw,48px)} .side{width:min(92vw,440px)} .pad{grid-template-columns:repeat(9,1fr)} .pad button{height:46px;font-size:20px} }
+</style>
+</head>
+<body>
+<main>
+  <div id="grid"></div>
+  <div class="side">
+    <div class="seg" id="diff"><button data-d="0">Leicht</button><button data-d="1">Mittel</button><button data-d="2">Schwer</button><button data-d="3">Experte</button></div>
+    <div class="info"><div><small>Zeit</small><b id="time">0:00</b></div><div><small>Fehler</small><b id="errs">0/3</b></div><div><small>Bestzeit</small><b id="best">–</b></div></div>
+    <div class="tools">
+      <button id="tUndo"><span data-i="undo"></span>Zurück</button><button id="tErase"><span data-i="x"></span>Löschen</button>
+      <button id="tNotes"><span data-i="list"></span>Notizen</button><button id="tHint"><span data-i="sparkles"></span>Tipp</button>
+    </div>
+    <div class="pad" id="pad"></div>
+    <button class="h-btn primary lg" id="newBtn"></button>
+  </div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('sudoku');
+const bar = Hub.bar({id:'sudoku', title:'Sudoku', actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Sudoku', html:'<p>Fülle das Feld so, dass in jeder <b>Zeile</b>, jeder <b>Spalte</b> und jedem <b>3×3-Block</b> jede Zahl von 1 bis 9 genau einmal vorkommt.</p><p>Tasten: <kbd>1</kbd>–<kbd>9</kbd> Zahl · <kbd>N</kbd> Notizen · <kbd>Entf</kbd> löschen · Pfeiltasten bewegen · <kbd>Strg</kbd>+<kbd>Z</kbd> zurück. Nach 3 Fehlern ist das Spiel vorbei.</p>'}));
+const $ = id => document.getElementById(id), I = Hub.icon;
+document.querySelectorAll('[data-i]').forEach(e => e.outerHTML = I(e.dataset.i));
+$('newBtn').innerHTML = I('refresh') + 'Neues Rätsel';
+const DIFF = ['Leicht', 'Mittel', 'Schwer', 'Experte'], CLUES = [40, 33, 28, 24];
+const SAVE = 'sudoku_state';
+const bests = Hub.read('sudoku_best', {});
+let P, sel = 0, notesMode = false, hist = [], t0, elapsed = 0, timer, errors = 0, done = false, diff = 1;
+
+// ---------- Generator ----------
+const box = i => Math.floor(Math.floor(i / 9) / 3) * 3 + Math.floor((i % 9) / 3);
+const PEERS = Array.from({length:81}, (_, i) => { const s = new Set(); for (let j = 0; j < 81; j++) if (j !== i && (Math.floor(j / 9) === Math.floor(i / 9) || j % 9 === i % 9 || box(j) === box(i))) s.add(j); return [...s]; });
+function solve(g, count = false, limit = 2){
+  // Bitmasken-Backtracking mit "kleinste Kandidatenzahl zuerst"
+  const rows = new Array(9).fill(0), cols = new Array(9).fill(0), boxes = new Array(9).fill(0);
+  for (let i = 0; i < 81; i++) if (g[i]){ const b = 1 << g[i]; rows[Math.floor(i / 9)] |= b; cols[i % 9] |= b; boxes[box(i)] |= b; }
+  let found = 0;
+  const rec = () => {
+    let best = -1, bestMask = 0, bestN = 10;
+    for (let i = 0; i < 81; i++){
+      if (g[i]) continue;
+      const m = ~(rows[Math.floor(i / 9)] | cols[i % 9] | boxes[box(i)]) & 0x3FE;
+      let n = 0; for (let v = m; v; v &= v - 1) n++;
+      if (n < bestN){ bestN = n; best = i; bestMask = m; if (n <= 1) break; }
+    }
+    if (best < 0){ found++; return !count || found >= limit; }
+    if (!bestN) return false;
+    const nums = []; for (let d = 1; d <= 9; d++) if (bestMask & (1 << d)) nums.push(d);
+    if (!count) for (let k = nums.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [nums[k], nums[j]] = [nums[j], nums[k]]; }
+    const r = Math.floor(best / 9), c = best % 9, bx = box(best);
+    for (const d of nums){
+      const b = 1 << d;
+      g[best] = d; rows[r] |= b; cols[c] |= b; boxes[bx] |= b;
+      if (rec()) return true;
+      g[best] = 0; rows[r] &= ~b; cols[c] &= ~b; boxes[bx] &= ~b;
+    }
+    return false;
+  };
+  rec();
+  return count ? found : g;
+}
+function generate(d){
+  const sol = solve(new Array(81).fill(0));
+  const puz = sol.slice();
+  const shuffle = a => { for (let k = a.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+  let clues = 81;
+  // 1. Durchgang: symmetrische Paare (sieht schöner aus), 2. Durchgang: einzelne Zellen bis zum Ziel
+  for (const i of shuffle([...Array(41).keys()])){
+    if (clues <= CLUES[d] + 6) break;
+    const sym = 80 - i, a = puz[i], b = puz[sym];
+    puz[i] = 0; puz[sym] = 0;
+    if (solve(puz.slice(), true) !== 1){ puz[i] = a; puz[sym] = b; continue; }
+    clues -= sym !== i ? 2 : 1;
+  }
+  for (const i of shuffle([...Array(81).keys()])){
+    if (clues <= CLUES[d]) break;
+    if (!puz[i]) continue;
+    const a = puz[i]; puz[i] = 0;
+    if (solve(puz.slice(), true) !== 1){ puz[i] = a; continue; }
+    clues--;
+  }
+  return {sol, puz};
+}
+
+// ---------- Spielzustand ----------
+function newGame(d = diff){
+  diff = d;
+  const {sol, puz} = generate(d);
+  P = {sol, given:puz.map(v => v > 0), val:puz.slice(), notes:Array.from({length:81}, () => 0), diff:d};
+  hist = []; errors = 0; done = false; elapsed = 0; sel = P.val.findIndex(v => !v);
+  start(); render(); persist();
+}
+function start(){ t0 = Date.now() - elapsed * 1000; clearInterval(timer); timer = setInterval(() => { if (!done && !document.hidden){ elapsed = (Date.now() - t0) / 1000; $('time').textContent = fmtT(elapsed); persist(); } }, 1000); }
+const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function persist(){ if (!done) Hub.write(SAVE, {P, errors, elapsed, diff}); }
+function push(){ hist.push(JSON.stringify({val:P.val, notes:P.notes})); if (hist.length > 300) hist.shift(); }
+
+// ---------- Darstellung ----------
+const cellsEl = [];
+(function build(){
+  for (let i = 0; i < 81; i++){
+    const d = document.createElement('div'); d.className = 'cell' + (Math.floor(i / 9) === 2 || Math.floor(i / 9) === 5 ? ' rb' : '');
+    d.onpointerdown = () => { sel = i; render(); Hub.audio(); };
+    $('grid').appendChild(d); cellsEl.push(d);
+  }
+  $('pad').innerHTML = Array.from({length:9}, (_, k) => `<button data-n="${k + 1}">${k + 1}<small></small></button>`).join('');
+  $('pad').onclick = e => { const b = e.target.closest('button'); if (b) input(+b.dataset.n); };
+})();
+function render(){
+  const sv = P.val[sel], sr = Math.floor(sel / 9), sc = sel % 9, sb = box(sel);
+  for (let i = 0; i < 81; i++){
+    const el = cellsEl[i], v = P.val[i];
+    el.classList.toggle('given', P.given[i]);
+    el.classList.toggle('sel', i === sel);
+    el.classList.toggle('zone', Math.floor(i / 9) === sr || i % 9 === sc || box(i) === sb);
+    el.classList.toggle('same', !!sv && v === sv && i !== sel);
+    el.classList.toggle('err', !!v && !P.given[i] && v !== P.sol[i]);
+    if (v) el.textContent = v;
+    else if (P.notes[i]){
+      el.innerHTML = `<div class="notes">${Array.from({length:9}, (_, k) => `<span class="${sv === k + 1 ? 'hl' : ''}">${P.notes[i] & (1 << (k + 1)) ? k + 1 : ''}</span>`).join('')}</div>`;
+    } else el.textContent = '';
+  }
+  const cnt = new Array(10).fill(0); P.val.forEach((v, i) => { if (v && v === P.sol[i]) cnt[v]++; });
+  $('pad').querySelectorAll('button').forEach(b => { const n = +b.dataset.n; b.querySelector('small').textContent = 9 - cnt[n] || ''; b.classList.toggle('done', cnt[n] >= 9); });
+  $('errs').textContent = `${errors}/3`;
+  $('tNotes').classList.toggle('on', notesMode);
+  $('time').textContent = fmtT(elapsed);
+  $('best').textContent = bests[diff] ? fmtT(bests[diff]) : '–';
+  document.querySelectorAll('#diff button').forEach(b => b.classList.toggle('on', +b.dataset.d === diff));
+}
+function input(n){
+  if (done || P.given[sel]) return;
+  Hub.audio();
+  if (notesMode && !P.val[sel]){
+    push(); P.notes[sel] ^= 1 << n; Hub.tone(1200, .03, 'sine', .03); render(); persist(); return;
+  }
+  if (P.val[sel] === n) return;
+  push();
+  P.val[sel] = n; P.notes[sel] = 0;
+  const el = cellsEl[sel]; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  if (n !== P.sol[sel]){
+    errors++; Hub.sfx('bad');
+    if (errors >= 3){ render(); return lose(); }
+  } else {
+    // Notizen der Nachbarn bereinigen
+    PEERS[sel].forEach(j => P.notes[j] &= ~(1 << n));
+    Hub.tone(520 + n * 40, .07, 'triangle', .045);
+    checkGroups(sel);
+  }
+  render(); persist();
+  if (P.val.every((v, i) => v === P.sol[i])) win();
+}
+function checkGroups(i){
+  const r = Math.floor(i / 9), c = i % 9, b = box(i);
+  const groups = [[...Array(9)].map((_, k) => r * 9 + k), [...Array(9)].map((_, k) => k * 9 + c), [...Array(81).keys()].filter(j => box(j) === b)];
+  groups.forEach(g => { if (g.every(j => P.val[j] === P.sol[j])) g.forEach((j, k) => setTimeout(() => { cellsEl[j].classList.remove('wave'); void cellsEl[j].offsetWidth; cellsEl[j].classList.add('wave'); }, k * 35)); });
+}
+function erase(){ if (done || P.given[sel] || (!P.val[sel] && !P.notes[sel])) return; push(); P.val[sel] = 0; P.notes[sel] = 0; render(); persist(); }
+function undo(){ if (!hist.length || done) return; const h = JSON.parse(hist.pop()); P.val = h.val; P.notes = h.notes; render(); persist(); Hub.sfx('click'); }
+function hint(){
+  if (done) return;
+  let i = !P.given[sel] && P.val[sel] !== P.sol[sel] ? sel : -1;
+  if (i < 0){ const open = [...Array(81).keys()].filter(j => P.val[j] !== P.sol[j]); if (!open.length) return; i = open.sort((a, b) => PEERS[b].filter(j => P.val[j]).length - PEERS[a].filter(j => P.val[j]).length)[0]; }
+  push(); sel = i; P.val[i] = P.sol[i]; P.notes[i] = 0; PEERS[i].forEach(j => P.notes[j] &= ~(1 << P.sol[i]));
+  elapsed += 20; t0 -= 20000;
+  Hub.toast('Tipp genutzt', '+20 Sekunden Strafzeit', 'sparkles');
+  checkGroups(i); render(); persist();
+  if (P.val.every((v, j) => v === P.sol[j])) win();
+}
+function win(){
+  done = true; clearInterval(timer);
+  for (let i = 0; i < 81; i++) setTimeout(() => { cellsEl[i].classList.remove('wave'); void cellsEl[i].offsetWidth; cellsEl[i].classList.add('wave'); }, (Math.floor(i / 9) + i % 9) * 40);
+  const sec = Math.round(elapsed), rec = !bests[diff] || sec < bests[diff];
+  if (rec){ bests[diff] = sec; Hub.write('sudoku_best', bests); }
+  Hub.score('sudoku', sec, {lower:true, label:'Bestzeit (s)', silent:true});
+  Hub.achieve('sudoku', 'win', 'Zahlenmeister', 'Löse dein erstes Sudoku');
+  if (diff >= 2) Hub.achieve('sudoku', 'hard', 'Logik-Profi', 'Löse ein schweres Sudoku');
+  if (diff === 3) Hub.achieve('sudoku', 'expert', 'Sudoku-Experte', 'Löse ein Experten-Sudoku');
+  if (!errors) Hub.achieve('sudoku', 'clean', 'Fehlerfrei', 'Löse ein Sudoku ohne einen Fehler');
+  Hub.sfx('ach'); Hub.write(SAVE, null);
+  setTimeout(() => Hub.dialog({title:'Gelöst!', center:true, html:`<p>${DIFF[diff]} in <b>${fmtT(sec)}</b> mit ${errors} Fehler${errors === 1 ? '' : 'n'}.${rec ? '<br><b style="color:#ffcf5a">Neue Bestzeit!</b>' : ''}</p>`, buttons:[{label:'Nächstes Rätsel', primary:true}]}).then(() => newGame()), 1200);
+  render();
+}
+function lose(){
+  done = true; clearInterval(timer); Hub.write(SAVE, null);
+  Hub.dialog({title:'Drei Fehler', center:true, html:'<p>Das war leider einer zu viel. Versuch es gleich noch einmal!</p>', buttons:[{label:'Weiter mit diesem Rätsel', value:'cont'}, {label:'Neues Rätsel', value:'new', primary:true}]})
+    .then(v => { if (v === 'cont'){ done = false; errors = 2; start(); render(); } else newGame(); });
+}
+// ---------- Steuerung ----------
+$('tUndo').onclick = undo; $('tErase').onclick = erase; $('tHint').onclick = hint;
+$('tNotes').onclick = () => { notesMode = !notesMode; render(); };
+$('newBtn').onclick = () => newGame();
+$('diff').onclick = async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (!done && P.val.some((v, i) => v && !P.given[i])){ const ok = await Hub.dialog({title:'Neues Rätsel?', html:'<p>Das aktuelle Rätsel wird verworfen.</p>', buttons:[{label:'Abbrechen', value:false}, {label:'Ja', value:true, primary:true}]}); if (!ok) return; }
+  newGame(+b.dataset.d);
+};
+addEventListener('keydown', e => {
+  if (e.key >= '1' && e.key <= '9'){ input(+e.key); return; }
+  const k = e.key.toLowerCase();
+  if (k === 'arrowup') sel = (sel + 72) % 81; else if (k === 'arrowdown') sel = (sel + 9) % 81;
+  else if (k === 'arrowleft') sel = Math.floor(sel / 9) * 9 + (sel % 9 + 8) % 9; else if (k === 'arrowright') sel = Math.floor(sel / 9) * 9 + (sel % 9 + 1) % 9;
+  else if (k === 'backspace' || k === 'delete' || k === '0') return erase();
+  else if (k === 'n') { notesMode = !notesMode; }
+  else if (k === 'z' && (e.ctrlKey || e.metaKey)) return undo();
+  else if (k === 'h') return hint();
+  else return;
+  e.preventDefault(); render();
+});
+// Fortsetzen, falls ein Spiel offen war
+const saved = Hub.read(SAVE, null);
+if (saved && saved.P){ P = saved.P; errors = saved.errors; elapsed = saved.elapsed; diff = saved.diff; sel = P.val.findIndex(v => !v); if (sel < 0) sel = 0; start(); render(); Hub.toast('Willkommen zurück', 'Dein letztes Sudoku wurde fortgesetzt.', 'refresh'); }
+else newGame(1);
+</script>
+</body>
+</html>

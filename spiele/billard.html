@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billard</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden;background:#0a0d0b}
+body{display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px}
+#cv{max-width:100%;max-height:100%;aspect-ratio:16/9;border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,.7);touch-action:none;cursor:crosshair}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:rgba(6,10,8,.72);backdrop-filter:blur(4px)}
+.ov.hide{display:none}
+.ov h1{margin:0;font-family:var(--font-display);font-size:66px;letter-spacing:3px;color:#fff;text-shadow:0 4px 30px rgba(60,200,120,.4)}
+.ov p{color:var(--text-2);margin:0;max-width:480px}
+.seg{display:flex;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{height:34px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="1280" height="720"></canvas>
+  <div class="ov" id="ov"><h1>BILLARD</h1><p id="ovText">8-Ball: Versenke deine Kugelgruppe – und zum Schluss die schwarze Acht.</p>
+    <div class="seg" id="mode"><button data-m="ai">Gegen KI</button><button data-m="pvp">2 Spieler</button></div>
+    <div class="seg" id="lvl"><button data-l="1">Leicht</button><button data-l="2">Mittel</button><button data-l="3">Profi</button></div>
+    <p style="font-size:13px">Maus bewegen = zielen · <b>Gedrückt halten und zurückziehen</b> = Stoßkraft · Loslassen = Stoß</p>
+    <button class="h-btn primary lg" id="go">Anstoß</button></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('billard');
+const bar = Hub.bar({id:'billard', title:'Billard', stats:[['p1', 'Du'], ['p2', 'Gegner'], ['wins', 'Siege']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'8-Ball – Regeln', html:'<p>Wer zuerst eine Kugel versenkt, bekommt diese Gruppe: <b>Volle</b> (1–7) oder <b>Halbe</b> (9–15). Danach musst du immer zuerst eine Kugel deiner Gruppe treffen.</p><p>Versenkst du eine eigene Kugel, bist du nochmal dran. Sind alle deine Kugeln weg, versenke die <b>schwarze 8</b> zum Sieg.</p><p><b>Fouls</b> (Gegner bekommt „Ball in der Hand“ und darf die weiße Kugel frei hinlegen): Weiße versenkt, keine Kugel getroffen oder zuerst eine fremde Kugel getroffen.</p><p>Wer die 8 zu früh oder mit einem Foul versenkt, <b>verliert</b>.</p>'}));
+
+const $ = id => document.getElementById(id), cv = $('cv'), ctx = cv.getContext('2d');
+const W = 1280, H = 720, R = 12, X0 = 160, X1 = 1120, Y0 = 170, Y1 = 650, CX = (X0 + X1) / 2, CY = (Y0 + Y1) / 2;
+const PC = 32, PM = 24;
+const POCKETS = [[X0 - 6, Y0 - 6, 25], [CX, Y0 - 12, 23], [X1 + 6, Y0 - 6, 25], [X0 - 6, Y1 + 6, 25], [CX, Y1 + 12, 23], [X1 + 6, Y1 + 6, 25]];
+const AIM = [[X0 + 8, Y0 + 8], [CX, Y0 + 2], [X1 - 8, Y0 + 8], [X0 + 8, Y1 - 8], [CX, Y1 - 2], [X1 - 8, Y1 - 8]];
+const RAILS = [];
+const rail = (ax, ay, bx, by) => RAILS.push([ax, ay, bx, by]);
+rail(X0 + PC, Y0, CX - PM, Y0); rail(CX + PM, Y0, X1 - PC, Y0); rail(X0 + PC, Y1, CX - PM, Y1); rail(CX + PM, Y1, X1 - PC, Y1);
+rail(X0, Y0 + PC, X0, Y1 - PC); rail(X1, Y0 + PC, X1, Y1 - PC);
+// Taschenbacken
+rail(X0 + PC, Y0, X0 + PC - 16, Y0 - 22); rail(X0, Y0 + PC, X0 - 22, Y0 + PC - 16);
+rail(X1 - PC, Y0, X1 - PC + 16, Y0 - 22); rail(X1, Y0 + PC, X1 + 22, Y0 + PC - 16);
+rail(X0 + PC, Y1, X0 + PC - 16, Y1 + 22); rail(X0, Y1 - PC, X0 - 22, Y1 - PC + 16);
+rail(X1 - PC, Y1, X1 - PC + 16, Y1 + 22); rail(X1, Y1 - PC, X1 + 22, Y1 - PC + 16);
+rail(CX - PM, Y0, CX - PM + 4, Y0 - 24); rail(CX + PM, Y0, CX + PM - 4, Y0 - 24); rail(CX - PM, Y1, CX - PM + 4, Y1 + 24); rail(CX + PM, Y1, CX + PM - 4, Y1 + 24);
+const COL = {1:'#f5c400', 2:'#1f4fd1', 3:'#d7262b', 4:'#5a2a9a', 5:'#f07a12', 6:'#1a8a3a', 7:'#7a1a1a', 8:'#111'};
+const colOf = n => COL[n > 8 ? n - 8 : n];
+const opts = Object.assign({mode:'ai', lvl:2}, Hub.read('billard_opts', {}));
+const stats = Object.assign({wins:0}, Hub.read('billard_stats', {}));
+let balls, cue, turn, groups, state = 'menu', aimA = 0, power = 0, drag = null, ballInHand = false, shot = null, msg = null, potted = [[], []], lastT = 0, t = 0, isBreak = true, mouse = {x:CX, y:CY}, cueAnim = 0, gen = 0;
+
+const groupOf = n => n === 8 ? 8 : n < 8 ? 'solid' : 'stripe';
+const GNAME = {solid:'Volle', stripe:'Halbe'};
+function rack(){
+  balls = [];
+  const fx = X0 + (X1 - X0) * .73, order = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15];
+  // zufällig, aber 8 in die Mitte, Ecken gemischt
+  const rest = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15].sort(() => Math.random() - .5);
+  let k = 0;
+  for (let row = 0; row < 5; row++) for (let i = 0; i <= row; i++){
+    const n = row === 2 && i === 1 ? 8 : rest[k++];
+    balls.push({n, x:fx + row * R * 1.75, y:CY + (i - row / 2) * (R * 2 + .4), vx:0, vy:0, in:false, rot:Math.random() * 6});
+  }
+  // Ecken: eine Volle, eine Halbe
+  const c1 = balls[10], c2 = balls[14];
+  if (groupOf(c1.n) === groupOf(c2.n)){ const sw = balls.find(b => b !== c1 && b !== c2 && b.n !== 8 && groupOf(b.n) !== groupOf(c1.n)); [sw.n, c2.n] = [c2.n, sw.n]; }
+  cue = {n:0, x:X0 + (X1 - X0) * .25, y:CY, vx:0, vy:0, in:false, rot:0};
+  balls.push(cue);
+}
+function newGame(){
+  gen++; rack(); turn = 0; groups = [null, null]; potted = [[], []]; isBreak = true; ballInHand = false; shot = null; state = 'aim';
+  msg = {txt:opts.mode === 'ai' ? 'Du hast den Anstoß!' : 'Spieler 1 – Anstoß', t:2.5};
+  updBar();
+}
+const names = () => opts.mode === 'ai' ? ['Du', 'Computer'] : ['Spieler 1', 'Spieler 2'];
+function updBar(){
+  const n = names();
+  bar.set('p1', groups[0] ? GNAME[groups[0]] : 'offen'); bar.set('p2', groups[1] ? GNAME[groups[1]] : 'offen'); bar.set('wins', stats.wins);
+  bar.el.querySelector('[data-k="p1"] small').textContent = n[0]; bar.el.querySelector('[data-k="p2"] small').textContent = n[1];
+}
+const isAI = () => opts.mode === 'ai' && turn === 1;
+const remaining = g => balls.filter(b => !b.in && b.n && groupOf(b.n) === g).length;
+function onEight(p){ return groups[p] && remaining(groups[p]) === 0; }
+
+// ---------- Physik ----------
+function step(dt){
+  let maxv = 0; balls.forEach(b => { if (!b.in) maxv = Math.max(maxv, Math.hypot(b.vx, b.vy)); });
+  const n = Math.max(1, Math.ceil(maxv * dt / (R * .4))), h = dt / n;
+  for (let s = 0; s < n; s++){
+    for (const b of balls){
+      if (b.in) continue;
+      b.x += b.vx * h; b.y += b.vy * h; b.rot += Math.hypot(b.vx, b.vy) * h / R;
+      for (const [ax, ay, bx, by] of RAILS){
+        const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+        let k = ((b.x - ax) * dx + (b.y - ay) * dy) / L2; k = Math.max(0, Math.min(1, k));
+        const px = ax + dx * k, py = ay + dy * k; let nx = b.x - px, ny = b.y - py; const d = Math.hypot(nx, ny);
+        if (d < R && d > 1e-6){ nx /= d; ny /= d; b.x = px + nx * R; b.y = py + ny * R; const vn = b.vx * nx + b.vy * ny;
+          if (vn < 0){ b.vx -= 1.78 * vn * nx; b.vy -= 1.78 * vn * ny; b.vx *= .97; b.vy *= .97; if (-vn > 80) Hub.tone(140, .04, 'triangle', Math.min(.05, -vn / 20000)); } }
+      }
+      for (const [px, py, pr] of POCKETS){
+        if (Math.hypot(b.x - px, b.y - py) < pr){ b.in = true; b.vx = b.vy = 0; if (shot) shot.pocketed.push(b.n); Hub.tone(90, .25, 'sine', .07, 0, 50); Hub.tone(220, .08, 'triangle', .03, .05); break; }
+      }
+      if (!b.in && (b.x < X0 - 40 || b.x > X1 + 40 || b.y < Y0 - 40 || b.y > Y1 + 40)){ b.in = true; b.vx = b.vy = 0; if (shot) shot.pocketed.push(b.n); }
+    }
+    for (let i = 0; i < balls.length; i++){
+      const a = balls[i]; if (a.in) continue;
+      for (let j = i + 1; j < balls.length; j++){
+        const b = balls[j]; if (b.in) continue;
+        const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+        if (d2 >= 4 * R * R || d2 < 1e-9) continue;
+        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, ov = 2 * R - d;
+        a.x -= nx * ov / 2; a.y -= ny * ov / 2; b.x += nx * ov / 2; b.y += ny * ov / 2;
+        const rv = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+        if (rv > 0){
+          const j2 = rv * .97;
+          a.vx -= j2 * nx; a.vy -= j2 * ny; b.vx += j2 * nx; b.vy += j2 * ny;
+          if (shot && shot.first == null && (a.n === 0 || b.n === 0)) shot.first = a.n === 0 ? b.n : a.n;
+          if (rv > 40) Hub.tone(1800 + Math.random() * 400, .03, 'sine', Math.min(.07, rv / 12000));
+        }
+      }
+    }
+  }
+  // Reibung
+  let moving = false;
+  for (const b of balls){
+    if (b.in) continue;
+    const v = Math.hypot(b.vx, b.vy);
+    if (v < 4){ b.vx = b.vy = 0; continue; }
+    const nv = Math.max(0, v - (95 + v * .35) * dt);
+    b.vx *= nv / v; b.vy *= nv / v; moving = true;
+  }
+  return moving;
+}
+function strike(angle, pw){
+  const v = 140 + pw * 1900;
+  cue.vx = Math.cos(angle) * v; cue.vy = Math.sin(angle) * v;
+  shot = {first:null, pocketed:[], player:turn, wasBreak:isBreak, onEight:onEight(turn)};
+  state = 'roll'; cueAnim = 0;
+  Hub.tone(300 + pw * 200, .05, 'triangle', .04 + pw * .04);
+}
+function endShot(){
+  const s = shot, p = s.player, o = 1 - p, my = groups[p];
+  const cueIn = s.pocketed.includes(0), eightIn = s.pocketed.includes(8);
+  let foul = false, why = '';
+  if (cueIn){ foul = true; why = 'Weiße versenkt'; }
+  else if (s.first == null){ foul = true; why = 'Keine Kugel getroffen'; }
+  else if (my && !s.onEight && groupOf(s.first) !== my){ foul = true; why = 'Zuerst fremde Kugel getroffen'; }
+  else if (my && s.onEight && s.first !== 8){ foul = true; why = 'Zuerst muss die 8 getroffen werden'; }
+  else if (!my && s.first === 8 && !s.wasBreak){ foul = true; why = 'Die 8 darf nicht zuerst getroffen werden'; }
+  s.pocketed.filter(n => n && n !== 8).forEach(n => potted[groupOf(n) === 'solid' ? 0 : 1].push(n));
+  isBreak = false;
+  if (eightIn){
+    if (s.wasBreak){ // 8 beim Anstoß: neu aufbauen
+      msg = {txt:'Die 8 beim Anstoß – neu aufbauen!', t:2.5}; setTimeout(() => newGame(), 1500); state = 'wait'; return;
+    }
+    return finish(!foul && s.onEight ? p : o, !foul && s.onEight ? 'versenkt die 8!' : (foul ? 'Foul auf die 8' : 'Die 8 zu früh versenkt'));
+  }
+  // Gruppenvergabe
+  const own = s.pocketed.filter(n => n && n !== 8);
+  if (!my && !foul && own.length && !s.wasBreak){
+    groups[p] = groupOf(own[0]); groups[o] = groups[p] === 'solid' ? 'stripe' : 'solid';
+    msg = {txt:`${names()[p]}: ${GNAME[groups[p]]}`, t:2.2}; Hub.tone(660, .1, 'triangle', .05);
+  }
+  const mine = groups[p] ? own.filter(n => groupOf(n) === groups[p]) : own;
+  let keep = !foul && mine.length > 0;
+  if (cueIn){ cue.in = false; cue.vx = cue.vy = 0; }
+  if (foul){ msg = {txt:`Foul: ${why}`, sub:`${names()[o]} hat Ball in der Hand`, t:2.6}; Hub.sfx('bad'); }
+  else if (keep && !msg) msg = {txt:'Weiter geht’s!', t:1.2};
+  if (keep && !foul && p === 0 && opts.mode === 'ai'){ if (mine.length >= 2) Hub.achieve('billard', 'double', 'Doppelpack', 'Versenke zwei eigene Kugeln mit einem Stoß'); }
+  if (!keep) turn = o;
+  ballInHand = foul;
+  if (ballInHand){ placeCueDefault(); }
+  updBar(); state = 'aim';
+  if (isAI()) aiTurn();
+}
+function placeCueDefault(){
+  cue.in = false; cue.vx = cue.vy = 0;
+  let x = X0 + (X1 - X0) * .25, y = CY;
+  for (let k = 0; k < 50 && !freeSpot(x, y); k++){ x = X0 + 40 + Math.random() * (X1 - X0 - 80); y = Y0 + 40 + Math.random() * (Y1 - Y0 - 80); }
+  cue.x = x; cue.y = y;
+}
+const freeSpot = (x, y) => x > X0 + R && x < X1 - R && y > Y0 + R && y < Y1 - R && balls.every(b => b === cue || b.in || Math.hypot(b.x - x, b.y - y) > 2 * R + 1);
+async function finish(winner, how){
+  state = 'over';
+  const n = names(), youWin = opts.mode === 'ai' ? winner === 0 : true;
+  if (opts.mode === 'ai' && winner === 0){
+    stats.wins++; Hub.write('billard_stats', stats); Hub.score('billard', stats.wins, {label:'Siege', silent:true});
+    Hub.achieve('billard', 'win', 'Queue-Künstler', 'Gewinne eine Partie Billard gegen den Computer');
+    if (opts.lvl === 3) Hub.achieve('billard', 'pro', 'Billard-Profi', 'Besiege den Computer auf Profi');
+    if (remaining(groups[1] || 'stripe') >= 5) Hub.achieve('billard', 'run', 'Machtdemonstration', 'Gewinne, während der Gegner noch 5 Kugeln hat');
+    Hub.sfx('ach');
+  } else if (opts.mode === 'ai') Hub.sfx('bad'); else Hub.sfx('ach');
+  updBar();
+  const r = await Hub.dialog({title:`${n[winner]} ${opts.mode === 'ai' && winner === 0 ? 'gewinnst' : 'gewinnt'}!`, center:true, html:`<p>${n[winner === 0 && how.includes('8!') ? 0 : winner]} – ${how}</p>`, buttons:[{label:'Schließen'}, {label:'Neue Partie', primary:true, value:'new'}]});
+  if (r === 'new') newGame();
+}
+
+// ---------- KI ----------
+function clearPath(x1, y1, x2, y2, ignore){
+  const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+  for (const b of balls){
+    if (b.in || ignore.includes(b)) continue;
+    let k = ((b.x - x1) * dx + (b.y - y1) * dy) / L2; if (k < 0 || k > 1) continue;
+    const px = x1 + dx * k, py = y1 + dy * k;
+    if (Math.hypot(b.x - px, b.y - py) < 2 * R + 1) return false;
+  }
+  return true;
+}
+function bestShot(cx, cy, p){
+  const my = groups[p], eight = my && remaining(my) === 0;
+  const targets = balls.filter(b => !b.in && b.n && (eight ? b.n === 8 : my ? groupOf(b.n) === my : b.n !== 8));
+  let best = null;
+  const cueObj = cue;
+  for (const b of targets) AIM.forEach(([px, py], pi) => {
+    const dx = px - b.x, dy = py - b.y, d2 = Math.hypot(dx, dy), ux = dx / d2, uy = dy / d2;
+    const gx = b.x - ux * 2 * R, gy = b.y - uy * 2 * R;
+    const ex = gx - cx, ey = gy - cy, d1 = Math.hypot(ex, ey);
+    const cos = (ex * ux + ey * uy) / d1;
+    if (cos < .3) return;
+    if (!clearPath(cx, cy, gx, gy, [cueObj, b]) || !clearPath(b.x, b.y, px, py, [b, cueObj])) return;
+    // Mittellöcher nur bei flachem Winkel
+    if ((pi === 1 || pi === 4) && Math.abs(uy) < .55) return;
+    const score = cos * cos * 1000 / (d1 + d2 * 1.4 + 150);
+    if (!best || score > best.score) best = {score, ang:Math.atan2(ey, ex), dist:d1 / cos + d2, b};
+  });
+  return best;
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function aiTurn(){
+  const g = gen;
+  await wait(700); if (g !== gen || state !== 'aim') return;
+  if (ballInHand){
+    let bp = null;
+    for (let k = 0; k < 160; k++){
+      const x = X0 + 30 + Math.random() * (X1 - X0 - 60), y = Y0 + 30 + Math.random() * (Y1 - Y0 - 60);
+      if (!freeSpot(x, y)) continue;
+      const s = bestShot(x, y, 1); if (s && (!bp || s.score > bp.s.score)) bp = {x, y, s};
+    }
+    if (bp){ cue.x = bp.x; cue.y = bp.y; }
+    ballInHand = false; await wait(500); if (g !== gen) return;
+  }
+  let ang, pw;
+  if (isBreak){ ang = Math.atan2(CY - cue.y + (Math.random() - .5) * 6, X0 + (X1 - X0) * .73 - cue.x); pw = .95; }
+  else {
+    const s = bestShot(cue.x, cue.y, 1);
+    const noise = [0, .045, .018, .006][opts.lvl];
+    if (s){ ang = s.ang + (Math.random() - .5) * 2 * noise; pw = Math.min(1, Math.max(.22, Math.sqrt(s.dist) / 34 + .08)); }
+    else {
+      // Sicherheitsstoß auf nächste eigene Kugel
+      const my = groups[1], eight = my && remaining(my) === 0;
+      const tg = balls.filter(b => !b.in && b.n && (eight ? b.n === 8 : my ? groupOf(b.n) === my : b.n !== 8)).sort((a, b) => Math.hypot(a.x - cue.x, a.y - cue.y) - Math.hypot(b.x - cue.x, b.y - cue.y));
+      const b = tg.find(b => clearPath(cue.x, cue.y, b.x, b.y, [cue, b])) || tg[0];
+      ang = b ? Math.atan2(b.y - cue.y, b.x - cue.x) : Math.random() * 6.28; pw = .45;
+    }
+  }
+  // Ziel-Animation
+  const from = aimA; for (let k = 1; k <= 20; k++){ aimA = from + (((ang - from + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * k / 20; await wait(25); if (g !== gen) return; }
+  aimA = ang;
+  for (let k = 0; k <= 15; k++){ power = pw * k / 15; await wait(30); }
+  await wait(150); if (g !== gen || state !== 'aim') return;
+  strike(ang, pw); power = 0;
+}
+
+// ---------- Zeichnen ----------
+let tableC = null;
+function buildTable(){
+  tableC = document.createElement('canvas'); tableC.width = W; tableC.height = H;
+  const c = tableC.getContext('2d');
+  const bg = c.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, 800); bg.addColorStop(0, '#1d2620'); bg.addColorStop(1, '#070a08'); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  // Holzrahmen
+  c.save(); c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 40; c.shadowOffsetY = 18;
+  const wg = c.createLinearGradient(0, Y0 - 70, 0, Y1 + 70); wg.addColorStop(0, '#7a4524'); wg.addColorStop(.5, '#5a2f17'); wg.addColorStop(1, '#3e200f');
+  c.fillStyle = wg; c.beginPath(); c.roundRect ? c.roundRect(X0 - 62, Y0 - 62, X1 - X0 + 124, Y1 - Y0 + 124, 30) : c.rect(X0 - 62, Y0 - 62, X1 - X0 + 124, Y1 - Y0 + 124); c.fill(); c.restore();
+  for (let k = 0; k < 60; k++){ c.strokeStyle = `rgba(0,0,0,${.05 + Math.random() * .08})`; c.lineWidth = 1 + Math.random() * 2; c.beginPath(); const y = Y0 - 60 + Math.random() * (Y1 - Y0 + 120); c.moveTo(X0 - 60, y); c.bezierCurveTo(X0 + 200, y + 6, X1 - 200, y - 6, X1 + 60, y); c.stroke(); }
+  // Banden (grün)
+  c.fillStyle = '#156b3a'; c.fillRect(X0 - 24, Y0 - 24, X1 - X0 + 48, Y1 - Y0 + 48);
+  // Tuch
+  const fg = c.createRadialGradient(CX, CY, 50, CX, CY, 620); fg.addColorStop(0, '#2aa05a'); fg.addColorStop(1, '#1a7a42');
+  c.fillStyle = fg; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+  for (let k = 0; k < 9000; k++){ c.fillStyle = Math.random() < .5 ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.03)'; c.fillRect(X0 + Math.random() * (X1 - X0), Y0 + Math.random() * (Y1 - Y0), 1.5, 1.5); }
+  // Bandenkanten-Schatten
+  c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 4; c.strokeRect(X0 + 2, Y0 + 2, X1 - X0 - 4, Y1 - Y0 - 4);
+  // Kopflinie & Punkte
+  c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.beginPath(); c.moveTo(X0 + (X1 - X0) * .25, Y0); c.lineTo(X0 + (X1 - X0) * .25, Y1); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.3)'; [[X0 + (X1 - X0) * .25, CY], [X0 + (X1 - X0) * .73, CY]].forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 3, 0, 7); c.fill(); });
+  // Diamanten
+  c.fillStyle = '#f4ead6';
+  for (let k = 1; k < 8; k++){ if (k === 4) continue; const x = X0 + (X1 - X0) * k / 8; [Y0 - 44, Y1 + 44].forEach(y => { c.save(); c.translate(x, y); c.rotate(Math.PI / 4); c.fillRect(-4, -4, 8, 8); c.restore(); }); }
+  for (let k = 1; k < 4; k++){ const y = Y0 + (Y1 - Y0) * k / 4; [X0 - 44, X1 + 44].forEach(x => { c.save(); c.translate(x, y); c.rotate(Math.PI / 4); c.fillRect(-4, -4, 8, 8); c.restore(); }); }
+  // Taschen
+  POCKETS.forEach(([x, y, r]) => { c.fillStyle = '#2a1a0c'; c.beginPath(); c.arc(x, y, r + 7, 0, 7); c.fill(); const pg = c.createRadialGradient(x, y, 2, x, y, r); pg.addColorStop(0, '#000'); pg.addColorStop(1, '#111'); c.fillStyle = pg; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); });
+  // Banden-Gummi (Linien der Kollision) dezent
+  c.strokeStyle = '#0f5a30'; c.lineWidth = 3; c.lineCap = 'round';
+  RAILS.forEach(([ax, ay, bx, by]) => { c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); });
+}
+function drawBall(b, x = b.x, y = b.y, r = R){
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 4, r, r * .9, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip();
+  if (b.n === 0){ ctx.fillStyle = '#f6f4ee'; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+  else if (b.n > 8){
+    ctx.fillStyle = '#f6f4ee'; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    const off = Math.sin(b.rot) * r * .4;
+    ctx.fillStyle = colOf(b.n); ctx.fillRect(x - r, y - r * .55 + off, r * 2, r * 1.1);
+  } else { ctx.fillStyle = colOf(b.n); ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+  if (b.n){
+    const ox = Math.cos(b.rot * .7) * r * .3, oy = Math.sin(b.rot) * r * .25;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + ox, y + oy, r * .48, 0, 7); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.font = `700 ${Math.round(r * .72)}px Bahnschrift`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.n, x + ox, y + oy + 1);
+  }
+  const g = ctx.createRadialGradient(x - r * .4, y - r * .45, 1, x, y, r * 1.1); g.addColorStop(0, 'rgba(255,255,255,.7)'); g.addColorStop(.25, 'rgba(255,255,255,.08)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.restore();
+}
+function aimPreview(){
+  // Geisterkugel: erste Kollision entlang der Stoßrichtung
+  const dx = Math.cos(aimA), dy = Math.sin(aimA);
+  let tMin = 2000, hit = null;
+  for (const b of balls){
+    if (b === cue || b.in) continue;
+    const fx = cue.x - b.x, fy = cue.y - b.y, bb = fx * dx + fy * dy, cc = fx * fx + fy * fy - 4 * R * R, disc = bb * bb - cc;
+    if (disc < 0) continue;
+    const tt = -bb - Math.sqrt(disc); if (tt > 0 && tt < tMin){ tMin = tt; hit = b; }
+  }
+  // Bande
+  let tw = 2000;
+  if (dx > 0) tw = Math.min(tw, (X1 - R - cue.x) / dx); if (dx < 0) tw = Math.min(tw, (X0 + R - cue.x) / dx);
+  if (dy > 0) tw = Math.min(tw, (Y1 - R - cue.y) / dy); if (dy < 0) tw = Math.min(tw, (Y0 + R - cue.y) / dy);
+  const tt = Math.min(tMin, tw), gx = cue.x + dx * tt, gy = cue.y + dy * tt;
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+  ctx.beginPath(); ctx.moveTo(cue.x, cue.y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(gx, gy, R, 0, 7); ctx.stroke();
+  if (hit && tMin <= tw){
+    const nx = (hit.x - gx) / (2 * R), ny = (hit.y - gy) / (2 * R);
+    const my = groups[turn], bad = my ? (onEight(turn) ? hit.n !== 8 : groupOf(hit.n) !== my) : hit.n === 8;
+    ctx.strokeStyle = bad ? 'rgba(255,93,108,.9)' : 'rgba(255,255,255,.75)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(hit.x, hit.y); ctx.lineTo(hit.x + nx * 120, hit.y + ny * 120); ctx.stroke();
+    // Weiße danach (90°-Regel)
+    const dot = dx * nx + dy * ny, tx = dx - dot * nx, ty = dy - dot * ny;
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + tx * 70, gy + ty * 70); ctx.stroke();
+  }
+}
+function drawCue(){
+  const pull = 18 + power * 140 + (state === 'roll' ? -cueAnim : 0);
+  const dx = Math.cos(aimA), dy = Math.sin(aimA);
+  const sx = cue.x - dx * (R + pull), sy = cue.y - dy * (R + pull), ex = sx - dx * 560, ey = sy - dy * 560;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(sx + 6, sy + 8); ctx.lineTo(ex + 6, ey + 8); ctx.stroke();
+  const g = ctx.createLinearGradient(sx, sy, ex, ey); g.addColorStop(0, '#e8e2d0'); g.addColorStop(.02, '#3a8ad8'); g.addColorStop(.04, '#f2dcb0'); g.addColorStop(.6, '#c48a4a'); g.addColorStop(.62, '#222'); g.addColorStop(1, '#5a2a12');
+  ctx.strokeStyle = g; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+}
+function draw(){
+  ctx.drawImage(tableC, 0, 0);
+  balls.forEach(b => { if (!b.in) drawBall(b); });
+  if (state === 'aim' && !cue.in){
+    if (ballInHand && !isAI()){
+      ctx.strokeStyle = `rgba(255,255,255,${.5 + Math.sin(t * 5) * .3})`; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(cue.x, cue.y, R + 6, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#fff'; ctx.font = '600 14px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('Ball in der Hand – klicken zum Ablegen', cue.x, cue.y - 26);
+    } else {
+      if (!isAI()) aimPreview();
+      drawCue();
+    }
+  }
+  if (state === 'roll' && cueAnim < 30) drawCue();
+  // Leisten oben: Spieler & Kugeln
+  const n = names();
+  [0, 1].forEach(p => {
+    const x = p ? W - 40 : 40, al = p ? 'right' : 'left', act = turn === p && state !== 'over';
+    ctx.textAlign = al; ctx.textBaseline = 'alphabetic'; ctx.font = '700 20px Bahnschrift'; ctx.fillStyle = act ? '#fff' : 'rgba(255,255,255,.45)';
+    ctx.fillText((act ? '▶ ' : '') + n[p] + (groups[p] ? ` · ${GNAME[groups[p]]}` : ''), p ? x : x, 40);
+    if (groups[p]){
+      const list = balls.filter(b => b.n && b.n !== 8 && groupOf(b.n) === groups[p]).sort((a, b) => a.n - b.n);
+      list.forEach((b, k) => { const bx = p ? x - 14 - k * 30 : x + 14 + k * 30; ctx.globalAlpha = b.in ? .2 : 1; drawBall(b, bx, 70, 11); ctx.globalAlpha = 1; });
+      if (onEight(p)){ const bx = p ? x - 14 - list.length * 30 : x + 14 + list.length * 30; drawBall({n:8, rot:0}, bx, 70, 11); }
+    }
+  });
+  // Stoßkraft
+  if (drag && power > 0){
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(W / 2 - 160, H - 34, 320, 16);
+    ctx.fillStyle = `hsl(${120 - power * 120},90%,55%)`; ctx.fillRect(W / 2 - 158, H - 32, 316 * power, 12);
+  }
+  if (msg && msg.t > 0){
+    ctx.globalAlpha = Math.min(1, msg.t * 2); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(W / 2 - 280, 90, 560, msg.sub ? 74 : 50);
+    ctx.fillStyle = '#fff'; ctx.font = '700 24px Bahnschrift'; ctx.fillText(msg.txt, W / 2, 124);
+    if (msg.sub){ ctx.fillStyle = '#ffd23f'; ctx.font = '600 16px Bahnschrift'; ctx.fillText(msg.sub, W / 2, 152); }
+    ctx.globalAlpha = 1;
+  }
+}
+function loop(now){
+  const dt = Math.min(.033, (now - lastT) / 1000 || 0); lastT = now; t += dt;
+  if (state === 'roll'){
+    cueAnim += dt * 600;
+    const moving = step(dt);
+    if (!moving){ state = 'eval'; setTimeout(endShot, 250); }
+  }
+  if (msg) msg.t -= dt;
+  if (balls) draw();
+  requestAnimationFrame(loop);
+}
+// ---------- Eingabe ----------
+const pos = e => { const r = cv.getBoundingClientRect(); return {x:(e.clientX - r.left) * W / r.width, y:(e.clientY - r.top) * H / r.height}; };
+cv.addEventListener('pointermove', e => {
+  mouse = pos(e);
+  if (state !== 'aim' || isAI()) return;
+  if (ballInHand){ const x = Math.max(X0 + R, Math.min(X1 - R, mouse.x)), y = Math.max(Y0 + R, Math.min(Y1 - R, mouse.y)); if (freeSpot(x, y)){ cue.x = x; cue.y = y; } return; }
+  if (drag){
+    const dx = mouse.x - drag.x, dy = mouse.y - drag.y;
+    const back = -(dx * Math.cos(aimA) + dy * Math.sin(aimA));
+    power = Math.max(0, Math.min(1, back / 220));
+  } else aimA = Math.atan2(mouse.y - cue.y, mouse.x - cue.x);
+});
+cv.addEventListener('pointerdown', e => {
+  if (state !== 'aim' || isAI()) return;
+  if (ballInHand){ if (freeSpot(cue.x, cue.y)){ ballInHand = false; Hub.sfx('click'); } return; }
+  const p = pos(e); aimA = Math.atan2(p.y - cue.y, p.x - cue.x); drag = p; power = 0; cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointerup', () => {
+  if (!drag) return; drag = null;
+  if (state === 'aim' && power > .03 && !isAI()){ strike(aimA, power); }
+  power = 0;
+});
+addEventListener('keydown', e => {
+  if (state === 'aim' && !isAI() && !ballInHand){
+    if (e.code === 'ArrowLeft') aimA -= e.shiftKey ? .002 : .012;
+    if (e.code === 'ArrowRight') aimA += e.shiftKey ? .002 : .012;
+  }
+  if ((e.code === 'Enter') && !$('ov').classList.contains('hide')) $('go').click();
+});
+function syncSeg(){ document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === opts.mode)); document.querySelectorAll('#lvl button').forEach(b => b.classList.toggle('on', +b.dataset.l === opts.lvl)); $('lvl').style.display = opts.mode === 'ai' ? '' : 'none'; }
+$('mode').onclick = e => { if (e.target.dataset.m){ opts.mode = e.target.dataset.m; Hub.write('billard_opts', opts); syncSeg(); } };
+$('lvl').onclick = e => { if (e.target.dataset.l){ opts.lvl = +e.target.dataset.l; Hub.write('billard_opts', opts); syncSeg(); } };
+$('go').onclick = () => { $('ov').classList.add('hide'); newGame(); Hub.sfx('click'); };
+buildTable(); syncSeg(); rack(); groups = [null, null]; turn = 0; updBar();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

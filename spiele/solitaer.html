@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solitär</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 30%,#1f6b45 0%,#124a30 55%,#0a2a1c 100%)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;opacity:.35;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .25 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+#board{position:relative;flex:1;margin:0 auto;width:100%;max-width:1200px;touch-action:none}
+.slot{position:absolute;border-radius:calc(var(--cw) * .08);border:2px dashed rgba(255,255,255,.18);background:rgba(0,0,0,.08)}
+.slot.found::after{content:attr(data-s);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(var(--cw) * .42);color:rgba(255,255,255,.16);font-family:var(--font-display);font-weight:700}
+.slot.stock{cursor:pointer;border-style:solid}
+.slot.stock::after{content:'';position:absolute;left:50%;top:50%;width:34%;height:34%;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.25);border-radius:50%}
+.card{position:absolute;width:var(--cw);height:var(--ch);border-radius:calc(var(--cw) * .08);transition:left .2s var(--ease),top .2s var(--ease),transform .2s;cursor:grab;user-select:none;
+  box-shadow:0 1px 2px rgba(0,0,0,.35),0 3px 8px rgba(0,0,0,.18);will-change:left,top}
+.card .f{position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,#fff,#f1f2f6);overflow:hidden}
+.card .b{position:absolute;inset:0;border-radius:inherit;display:none;background:
+  repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 4px,transparent 4px 10px),linear-gradient(135deg,var(--accent-2),var(--accent));border:3px solid #fff}
+.card.down .f{display:none}.card.down .b{display:block}.card.down{cursor:default}
+.card .c{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:.9;font-family:var(--font-display);font-weight:700}
+.card .c b{font-size:calc(var(--cw) * .24)}
+.card .c i{font-style:normal;font-size:calc(var(--cw) * .2);font-family:"Segoe UI Symbol",serif}
+.card .tl{left:6%;top:4%}.card .br{right:6%;bottom:4%;transform:rotate(180deg)}
+.card .mid{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(var(--cw) * .56);font-family:"Segoe UI Symbol",serif}
+.card .face{position:absolute;left:18%;right:18%;top:16%;bottom:16%;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-direction:column;
+  font-family:var(--font-display);font-weight:700;font-size:calc(var(--cw) * .42);background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.09));border:1px solid rgba(0,0,0,.1)}
+.card .face small{font-size:calc(var(--cw) * .2);font-family:"Segoe UI Symbol",serif}
+.red{color:#d42a3a}.blk{color:#1b1e26}
+.card.drag{transition:none;z-index:1000!important;transform:rotate(2deg) scale(1.04);box-shadow:0 18px 40px rgba(0,0,0,.45);cursor:grabbing}
+.card.hint{animation:hint .9s ease-in-out 2}
+@keyframes hint{50%{box-shadow:0 0 0 4px #ffd34d,0 0 24px #ffd34d}}
+.card.pop{animation:cpop .3s var(--ease)}
+@keyframes cpop{50%{transform:scale(1.08)}}
+#win{position:fixed;inset:0;pointer-events:none;z-index:800}
+.optbar{display:flex;gap:6px;align-items:center}
+.seg{display:flex;gap:3px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;padding:3px}
+.seg button{height:28px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text-2);font-weight:700;font-size:12.5px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+</style>
+</head>
+<body>
+<div id="board"></div>
+<canvas id="win"></canvas>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('solitaer');
+const bar = Hub.bar({id:'solitaer', title:'Solitär', stats:[['time', 'Zeit'], ['moves', 'Züge'], ['score', 'Punkte']], actions:['help', 'sound', 'full']});
+const I = Hub.icon, $ = id => document.getElementById(id);
+const opt = document.createElement('div'); opt.className = 'optbar';
+opt.innerHTML = `<div class="seg" id="drawSeg"><button data-d="1">1 Karte</button><button data-d="3">3 Karten</button></div>
+  <button class="h-btn sm ghost" id="undoBtn">${I('undo')}Zurück</button><button class="h-btn sm ghost" id="hintBtn">${I('sparkles')}Tipp</button><button class="h-btn sm" id="newBtn">${I('refresh')}Neu</button>`;
+bar.el.insertBefore(opt, bar.el.querySelector('.h-actions'));
+bar.on('help', () => Hub.dialog({title:'Solitär – so geht’s', html:`<p>Lege alle Karten nach Farbe von <b>Ass bis König</b> auf die vier Ablagen oben rechts.</p>
+  <p>Im Spielfeld legst du Karten <b>absteigend</b> und <b>abwechselnd rot/schwarz</b> aufeinander. Auf leere Plätze darf nur ein König.</p>
+  <p><b>Ziehen</b> mit der Maus, <b>Klick</b> auf eine Karte schiebt sie automatisch an den besten Platz. <kbd>Strg</kbd>+<kbd>Z</kbd> = zurück, <kbd>H</kbd> = Tipp.</p>`}));
+
+const SUITS = ['♠', '♥', '♦', '♣'], RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'B', 'D', 'K'];
+const isRed = s => s === 1 || s === 2;
+const settings = Object.assign({draw:1}, Hub.read('solitaer_opts', {}));
+let S, cards = {}, history = [], moves = 0, score = 0, t0 = 0, timer = null, won = false, started = false;
+const board = $('board');
+let L = {};   // Layout
+
+function deal(){
+  const deck = [];
+  for (let s = 0; s < 4; s++) for (let r = 1; r <= 13; r++) deck.push({id:`${s}_${r}`, s, r, up:false});
+  for (let i = deck.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  S = {stock:[], waste:[], found:[[], [], [], []], tab:[[], [], [], [], [], [], []]};
+  for (let p = 0; p < 7; p++) for (let k = 0; k <= p; k++){ const c = deck.pop(); c.up = k === p; S.tab[p].push(c); }
+  S.stock = deck;
+  history = []; moves = 0; score = 0; won = false; started = false; t0 = 0;
+  clearInterval(timer); timer = setInterval(tick, 1000);
+  board.querySelectorAll('.card').forEach(e => e.remove()); cards = {};
+  build(); layout(); render(true); upd();
+}
+function tick(){ if (started && !won) upd(); }
+function upd(){
+  const s = started ? Math.floor((Date.now() - t0) / 1000) : 0;
+  bar.set('time', `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); bar.set('moves', moves); bar.set('score', score);
+  $('undoBtn').disabled = !history.length;
+}
+function build(){
+  for (const c of all()){
+    const el = document.createElement('div');
+    el.className = 'card'; el.dataset.id = c.id;
+    const col = isRed(c.s) ? 'red' : 'blk', R = RANKS[c.r], su = SUITS[c.s];
+    const mid = c.r > 10 ? `<div class="face ${col}">${R}<small>${su}</small></div>` : `<div class="mid ${col}">${su}</div>`;
+    el.innerHTML = `<div class="f"><div class="c tl ${col}"><b>${R}</b><i>${su}</i></div>${mid}<div class="c br ${col}"><b>${R}</b><i>${su}</i></div></div><div class="b"></div>`;
+    board.appendChild(el); cards[c.id] = el;
+    el.addEventListener('pointerdown', e => down(e, c));
+  }
+}
+const all = () => [...S.stock, ...S.waste, ...S.found.flat(), ...S.tab.flat()];
+function layout(){
+  const W = board.clientWidth, H = board.clientHeight;
+  const cw = Math.min((W - 40) / 7.7, (H - 40) / 5.2 / 1.4, 130);
+  const ch = cw * 1.4, gap = (W - cw * 7) / 8;
+  board.style.setProperty('--cw', cw + 'px'); board.style.setProperty('--ch', ch + 'px');
+  L = {cw, ch, gap, top:18, tabY:18 + ch + gap * .9, x:i => gap + i * (cw + gap), fan:Math.min(ch * .28, (H - 18 - ch - gap - ch - 20) / 14), fanDown:ch * .12};
+  board.querySelectorAll('.slot').forEach(e => e.remove());
+  const slot = (cls, x, y, extra = '') => { const d = document.createElement('div'); d.className = 'slot ' + cls; d.style.cssText = `left:${x}px;top:${y}px;width:${cw}px;height:${ch}px`; if (extra) d.dataset.s = extra; board.prepend(d); return d; };
+  slot('stock', L.x(0), L.top).onclick = drawStock;
+  slot('', L.x(1), L.top);
+  for (let f = 0; f < 4; f++) slot('found', L.x(3 + f), L.top, 'A');
+  for (let p = 0; p < 7; p++) slot('', L.x(p), L.tabY);
+}
+function posOf(c){
+  let i = S.stock.indexOf(c);
+  if (i >= 0) return {x:L.x(0) - Math.min(i, 3) * .5, y:L.top - Math.min(i, 3) * .5, z:i};
+  i = S.waste.indexOf(c);
+  if (i >= 0){ const n = S.waste.length, vis = settings.draw === 3 ? Math.max(0, i - (n - 3)) : 0; return {x:L.x(1) + vis * L.cw * .22, y:L.top, z:100 + i}; }
+  for (let f = 0; f < 4; f++){ i = S.found[f].indexOf(c); if (i >= 0) return {x:L.x(3 + f), y:L.top, z:200 + i}; }
+  for (let p = 0; p < 7; p++){
+    i = S.tab[p].indexOf(c);
+    if (i >= 0){ let y = L.tabY; for (let k = 0; k < i; k++) y += S.tab[p][k].up ? L.fan : L.fanDown; return {x:L.x(p), y, z:300 + i}; }
+  }
+  return {x:0, y:0, z:0};
+}
+function render(instant){
+  for (const c of all()){
+    const el = cards[c.id], p = posOf(c);
+    if (instant) el.style.transition = 'none';
+    el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; el.style.zIndex = p.z;
+    el.classList.toggle('down', !c.up);
+    if (instant) requestAnimationFrame(() => el.style.transition = '');
+  }
+}
+function snapshot(){ return JSON.stringify({S, moves, score}); }
+function pushHist(){ history.push(snapshot()); if (history.length > 200) history.shift(); }
+function undo(){
+  if (!history.length || won) return;
+  const h = JSON.parse(history.pop());
+  const byId = {}; all().forEach(c => byId[c.id] = c);
+  const fix = arr => arr.map(c => Object.assign(byId[c.id], {up:c.up}));
+  S = {stock:fix(h.S.stock), waste:fix(h.S.waste), found:h.S.found.map(fix), tab:h.S.tab.map(fix)};
+  moves = h.moves; score = Math.max(0, h.score - 5);
+  render(); upd(); Hub.sfx('click');
+}
+function begin(){ if (!started){ started = true; t0 = Date.now(); } }
+function drawStock(){
+  begin(); pushHist();
+  if (!S.stock.length){
+    if (!S.waste.length){ history.pop(); return; }
+    S.stock = S.waste.reverse().map(c => (c.up = false, c)); S.waste = [];
+    score = Math.max(0, score - (settings.draw === 1 ? 100 : 20));
+    Hub.tone(300, .12, 'sine', .04);
+  } else {
+    for (let k = 0; k < settings.draw && S.stock.length; k++){ const c = S.stock.pop(); c.up = true; S.waste.push(c); }
+    Hub.tone(900, .04, 'triangle', .03);
+  }
+  moves++; render(); upd();
+}
+// ---------- Regeln ----------
+const topOf = a => a[a.length - 1];
+function canFound(c, f){ const t = topOf(S.found[f]); return t ? t.s === c.s && c.r === t.r + 1 : c.r === 1; }
+function canTab(c, p){ const t = topOf(S.tab[p]); return t ? t.up && isRed(t.s) !== isRed(c.s) && c.r === t.r - 1 : c.r === 13; }
+function where(c){
+  if (S.waste.includes(c)) return {pile:S.waste, kind:'waste'};
+  for (let f = 0; f < 4; f++) if (S.found[f].includes(c)) return {pile:S.found[f], kind:'found', i:f};
+  for (let p = 0; p < 7; p++) if (S.tab[p].includes(c)) return {pile:S.tab[p], kind:'tab', i:p};
+  return {pile:S.stock, kind:'stock'};
+}
+function moveStack(stack, from, to, kind, idx){
+  pushHist(); begin();
+  from.pile.splice(from.pile.indexOf(stack[0]), stack.length);
+  to.push(...stack);
+  if (kind === 'found') score += 10;
+  if (kind === 'tab' && from.kind === 'waste') score += 5;
+  if (kind === 'tab' && from.kind === 'found') score = Math.max(0, score - 15);
+  if (from.kind === 'tab'){ const t = topOf(from.pile); if (t && !t.up){ t.up = true; score += 5; cards[t.id].classList.add('pop'); setTimeout(() => cards[t.id].classList.remove('pop'), 320); } }
+  moves++;
+  Hub.tone(kind === 'found' ? 1046 : 620, .06, 'triangle', .04);
+  render(); upd(); checkWin();
+}
+function autoMove(c){
+  const from = where(c);
+  if (from.kind === 'stock') return false;
+  const stack = from.pile.slice(from.pile.indexOf(c));
+  if (stack.length === 1) for (let f = 0; f < 4; f++) if (canFound(c, f)){ moveStack(stack, from, S.found[f], 'found', f); return true; }
+  for (let p = 0; p < 7; p++){ if (from.kind === 'tab' && from.i === p) continue; if (canTab(c, p) && !(c.r === 13 && from.kind === 'tab' && from.pile.indexOf(c) === 0)){ moveStack(stack, from, S.tab[p], 'tab', p); return true; } }
+  return false;
+}
+// ---------- Ziehen & Ablegen ----------
+let drag = null;
+function down(e, c){
+  if (won) return;
+  Hub.audio();
+  const from = where(c);
+  if (from.kind === 'stock'){ drawStock(); return; }
+  if (!c.up) return;
+  if (from.kind === 'waste' && c !== topOf(S.waste)) return;
+  if (from.kind === 'found' && c !== topOf(from.pile)) return;
+  const stack = from.pile.slice(from.pile.indexOf(c));
+  const rect = board.getBoundingClientRect();
+  drag = {c, from, stack, sx:e.clientX, sy:e.clientY, moved:false, base:stack.map(s => posOf(s)), rect};
+  e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId);
+  e.preventDefault();
+}
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+  drag.moved = true;
+  drag.stack.forEach((s, k) => { const el = cards[s.id]; el.classList.add('drag'); el.style.left = drag.base[k].x + dx + 'px'; el.style.top = drag.base[k].y + dy + 'px'; el.style.zIndex = 1000 + k; });
+});
+addEventListener('pointerup', e => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  d.stack.forEach(s => cards[s.id].classList.remove('drag'));
+  if (!d.moved){ if (!autoMove(d.c)){ Hub.tone(200, .06, 'square', .02); render(); } return; }
+  // Ziel bestimmen: Mitte der gezogenen Karte
+  const lead = cards[d.c.id], cx = parseFloat(lead.style.left) + L.cw / 2, cy = parseFloat(lead.style.top) + L.ch / 2;
+  let best = null, bd = 1e9;
+  const consider = (kind, i, x, y, h) => { const ddx = Math.abs(cx - (x + L.cw / 2)), ddy = cy < y ? y - cy : cy > y + h ? cy - y - h : 0; if (ddx < L.cw * .8 && ddy < L.ch * .5){ const dist = ddx + ddy; if (dist < bd){ bd = dist; best = {kind, i}; } } };
+  for (let f = 0; f < 4; f++) consider('found', f, L.x(3 + f), L.top, L.ch);
+  for (let p = 0; p < 7; p++){ const last = topOf(S.tab[p]); const y1 = last ? posOf(last).y : L.tabY; consider('tab', p, L.x(p), L.tabY, y1 - L.tabY + L.ch); }
+  if (best){
+    if (best.kind === 'found' && d.stack.length === 1 && canFound(d.c, best.i)) return moveStack(d.stack, d.from, S.found[best.i], 'found', best.i);
+    if (best.kind === 'tab' && !(d.from.kind === 'tab' && d.from.i === best.i) && canTab(d.c, best.i)) return moveStack(d.stack, d.from, S.tab[best.i], 'tab', best.i);
+  }
+  Hub.tone(200, .06, 'square', .02);
+  render();
+});
+// ---------- Tipp ----------
+function hint(){
+  const cand = [];
+  if (S.waste.length) cand.push(topOf(S.waste));
+  S.tab.forEach(p => p.forEach(c => { if (c.up) cand.push(c); }));
+  for (const c of cand){
+    const from = where(c), stack = from.pile.slice(from.pile.indexOf(c));
+    if (stack.length === 1) for (let f = 0; f < 4; f++) if (canFound(c, f)) return flash(c);
+    for (let p = 0; p < 7; p++){
+      if (from.kind === 'tab' && from.i === p) continue;
+      if (canTab(c, p)){
+        const idx = from.pile.indexOf(c);
+        if (from.kind === 'tab' && idx > 0 && from.pile[idx - 1].up && c.r !== 13) continue;  // nutzloser Zug
+        if (c.r === 13 && from.kind === 'tab' && idx === 0) continue;
+        return flash(c);
+      }
+    }
+  }
+  if (S.stock.length || S.waste.length){ Hub.toast('Tipp', 'Zieh eine neue Karte vom Stapel.', 'sparkles'); return; }
+  Hub.toast('Keine Züge mehr', 'Starte ein neues Spiel.', 'info');
+}
+function flash(c){ const el = cards[c.id]; el.classList.remove('hint'); void el.offsetWidth; el.classList.add('hint'); }
+// ---------- Sieg ----------
+function checkWin(){
+  if (S.found.every(f => f.length === 13)) return victory();
+  // automatisch fertig spielen, wenn alles offen liegt
+  if (!S.stock.length && !S.waste.length && S.tab.every(p => p.every(c => c.up))) setTimeout(autoFinish, 250);
+}
+function autoFinish(){
+  if (won) return;
+  for (let p = 0; p < 7; p++){ const c = topOf(S.tab[p]); if (c) for (let f = 0; f < 4; f++) if (canFound(c, f)){ moveStack([c], where(c), S.found[f], 'found', f); return; } }
+}
+function victory(){
+  won = true; clearInterval(timer);
+  const secs = Math.floor((Date.now() - t0) / 1000);
+  const bonus = secs > 30 ? Math.round(700000 / secs) : 0; score += bonus; upd();
+  Hub.score('solitaer', score, {label:'Punkte'});
+  Hub.achieve('solitaer', 'win', 'Patience', 'Gewinne eine Runde Solitär');
+  if (settings.draw === 3) Hub.achieve('solitaer', 'win3', 'Profi-Patience', 'Gewinne mit 3 Karten pro Zug');
+  if (secs < 180) Hub.achieve('solitaer', 'fast', 'Kartenhai', 'Gewinne in unter 3 Minuten');
+  Hub.sfx('ach');
+  cascade();
+  setTimeout(() => Hub.dialog({title:'Gewonnen!', center:true, html:`<p>Zeit: <b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b> · Züge: <b>${moves}</b><br>Zeitbonus: <b>${bonus}</b> · Punkte: <b>${score}</b></p>`,
+    buttons:[{label:'Neues Spiel', primary:true}]}).then(() => { stopCascade(); deal(); }), 2500);
+}
+let casc = null;
+function cascade(){
+  const cv = $('win'), x = cv.getContext('2d'); cv.width = innerWidth; cv.height = innerHeight;
+  const brect = board.getBoundingClientRect(), list = [];
+  let k = 0;
+  casc = setInterval(() => {
+    const f = k % 4, pile = S.found[f], c = pile[12 - Math.floor(k / 4)];
+    if (!c){ clearInterval(casc); return; }
+    const el = cards[c.id], r = el.getBoundingClientRect();
+    el.style.visibility = 'hidden';
+    list.push({x:r.left, y:r.top, vx:(Math.random() * 4 + 2) * (Math.random() < .5 ? -1 : 1), vy:-Math.random() * 6, el, w:r.width, h:r.height, c});
+    k++;
+  }, 90);
+  const draw = () => {
+    for (const p of list){
+      p.vy += .5; p.x += p.vx; p.y += p.vy;
+      if (p.y + p.h > innerHeight){ p.y = innerHeight - p.h; p.vy *= -.75; }
+      x.save(); x.translate(p.x, p.y);
+      x.fillStyle = '#fff'; x.strokeStyle = 'rgba(0,0,0,.25)'; x.beginPath(); x.roundRect ? x.roundRect(0, 0, p.w, p.h, 8) : x.rect(0, 0, p.w, p.h); x.fill(); x.stroke();
+      x.fillStyle = isRed(p.c.s) ? '#d42a3a' : '#1b1e26'; x.font = `700 ${p.w * .24}px Bahnschrift, sans-serif`; x.fillText(RANKS[p.c.r], p.w * .08, p.w * .28);
+      x.font = `${p.w * .5}px "Segoe UI Symbol", serif`; x.textAlign = 'center'; x.fillText(SUITS[p.c.s], p.w / 2, p.h * .62);
+      x.restore();
+    }
+    if (won) requestAnimationFrame(draw);
+  };
+  requestAnimationFrame(draw);
+}
+function stopCascade(){ clearInterval(casc); const cv = $('win'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); board.querySelectorAll('.card').forEach(e => e.style.visibility = ''); }
+
+// ---------- Steuerung ----------
+function syncDraw(){ document.querySelectorAll('#drawSeg button').forEach(b => b.classList.toggle('on', +b.dataset.d === settings.draw)); }
+$('drawSeg').onclick = async e => {
+  const b = e.target.closest('button'); if (!b || +b.dataset.d === settings.draw) return;
+  if (started && !won){ const ok = await Hub.dialog({title:'Neues Spiel starten?', html:'<p>Die Änderung gilt ab dem nächsten Spiel. Jetzt neu mischen?</p>', buttons:[{label:'Nein', value:false}, {label:'Ja', value:true, primary:true}]}); if (!ok) return; }
+  settings.draw = +b.dataset.d; Hub.write('solitaer_opts', settings); syncDraw(); deal();
+};
+$('undoBtn').onclick = undo;
+$('hintBtn').onclick = hint;
+$('newBtn').onclick = async () => {
+  if (started && !won){ const ok = await Hub.dialog({title:'Neues Spiel?', html:'<p>Das aktuelle Spiel wird aufgegeben.</p>', buttons:[{label:'Abbrechen', value:false}, {label:'Neu mischen', value:true, primary:true}]}); if (!ok) return; }
+  stopCascade(); deal();
+};
+addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); undo(); }
+  if (e.key.toLowerCase() === 'h') hint();
+  if (e.key === ' '){ e.preventDefault(); drawStock(); }
+});
+addEventListener('resize', () => { layout(); render(true); });
+syncDraw();
+deal();
+</script>
+</body>
+</html>

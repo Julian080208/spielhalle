@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turmverteidigung</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:#0d140c}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px}
+#cv{max-width:100%;max-height:100%;aspect-ratio:960/576;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);cursor:crosshair;touch-action:none}
+#dock{display:flex;gap:10px;align-items:stretch;padding:10px 14px;background:rgba(10,14,10,.9);border-top:1px solid var(--border)}
+.tw{position:relative;display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border-radius:14px;border:1px solid var(--border-2);background:var(--surface);cursor:pointer;transition:.12s;color:var(--text)}
+.tw:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.25)}
+.tw.on{border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c),0 8px 24px -8px var(--c)}
+.tw.poor{opacity:.45}
+.tw canvas{width:44px;height:44px}
+.tw b{display:block;font-size:14px}
+.tw small{color:#ffd34d;font-weight:700;font-family:var(--font-display)}
+.tw kbd{position:absolute;top:4px;right:6px;font-size:9px;padding:0 4px}
+#sel{flex:1;display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--border);font-size:13px;color:var(--text-2);flex-wrap:wrap;min-width:220px}
+#sel b.t{font-family:var(--font-display);font-size:16px;color:#fff}
+.seg{display:flex;gap:3px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:3px}
+.seg button{height:28px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--text-2);font-weight:700;font-size:12px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+#waveBtn{min-width:180px}
+.ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,5,.75);backdrop-filter:blur(6px);z-index:5}
+.ov.hide{display:none}
+.maps{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
+.map{width:300px;border-radius:18px;overflow:hidden;background:var(--surface);border:1px solid var(--border-2);cursor:pointer;transition:.2s}
+.map:hover{transform:translateY(-5px);box-shadow:0 20px 40px rgba(0,0,0,.5)}
+.map canvas{width:100%;display:block}
+.map div{padding:12px 16px}
+.map b{font-family:var(--font-display);font-size:20px}
+.map small{display:block;color:var(--muted)}
+.map .st{color:#ffcf5a;letter-spacing:2px}
+h1.t{font-family:var(--font-display);font-size:46px;margin:0 0 6px;text-align:center;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="960" height="576"></canvas>
+  <div class="ov" id="ov"><div><h1 class="t">Turmverteidigung</h1><p style="text-align:center;color:var(--text-2);margin:0 0 22px">Wähle eine Karte. Halte 30 Wellen auf – kein Gegner darf durchkommen!</p><div class="maps" id="maps"></div></div></div>
+</div>
+<div id="dock">
+  <div style="display:flex;gap:8px" id="towers"></div>
+  <div id="sel"></div>
+  <div style="display:flex;flex-direction:column;gap:6px;justify-content:center">
+    <button class="h-btn primary" id="waveBtn"></button>
+    <div class="seg" id="speed"><button data-v="0">❚❚</button><button data-v="1" class="on">1×</button><button data-v="2">2×</button><button data-v="3">3×</button></div>
+  </div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('turm');
+const bar = Hub.bar({id:'turm', title:'Turmverteidigung', stats:[['gold', 'Gold'], ['lives', 'Leben'], ['wave', 'Welle'], ['score', 'Punkte']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Turmverteidigung', html:'<p>Gegner laufen den Weg entlang. Baue <b>Türme</b> auf das Gras, um sie aufzuhalten. Jeder Gegner, der durchkommt, kostet ein Leben.</p><p><b>Kanone</b> – schnell & günstig · <b>Frost</b> – verlangsamt · <b>Mörser</b> – Flächenschaden · <b>Blitz</b> – springt zwischen Gegnern.</p><p>Klick auf einen Turm, um ihn zu <b>verbessern</b> oder zu verkaufen. Ruf Wellen früher, um <b>Bonus-Gold</b> zu bekommen. Tasten: <kbd>1</kbd>–<kbd>4</kbd> Türme, <kbd>Leertaste</kbd> nächste Welle, <kbd>U</kbd> verbessern, <kbd>S</kbd> verkaufen.</p>'}));
+const $ = id => document.getElementById(id), I = Hub.icon;
+const cv = $('cv'); let ctx = cv.getContext('2d');
+const T = 48, GW = 20, GH = 12, WW = GW * T, WH = GH * T, MAX_WAVE = 30;
+const rnd = (a, b) => a + Math.random() * (b - a), TAU = Math.PI * 2;
+
+// ---------- Karten ----------
+const MAPS = [
+  {name:'Grüne Wiese', diff:'Leicht', grass:['#5aa84a', '#4f9a40'], path:['#d2b07a', '#b8955f'], deco:'tree', lives:20, gold:180,
+    wp:[[-1, 2], [4, 2], [4, 8], [9, 8], [9, 3], [14, 3], [14, 9], [20, 9]]},
+  {name:'Wüstenschlucht', diff:'Mittel', grass:['#d9b26a', '#cfa35a'], path:['#9a6a3a', '#8a5a2e'], deco:'cactus', lives:15, gold:170,
+    wp:[[-1, 6], [3, 6], [3, 1], [8, 1], [8, 10], [12, 10], [12, 5], [16, 5], [16, 2], [20, 2]]},
+  {name:'Frostpass', diff:'Schwer', grass:['#dfe9f2', '#cfdceb'], path:['#8a9ab0', '#77879e'], deco:'pine', lives:10, gold:160,
+    wp:[[-1, 10], [6, 10], [6, 6], [2, 6], [2, 2], [11, 2], [11, 8], [17, 8], [17, 4], [20, 4]]},
+];
+// ---------- Türme & Gegner ----------
+const TW = {
+  gun:   {name:'Kanone', key:'1', col:'#4f9dff', cost:50,  lv:[{dmg:11, rate:2.2, range:120}, {dmg:20, rate:2.6, range:135, cost:60}, {dmg:36, rate:3.2, range:150, cost:120}]},
+  frost: {name:'Frost',  key:'2', col:'#7fe0ff', cost:70,  lv:[{dmg:3, rate:1, range:95, slow:.55, dur:1.3}, {dmg:6, rate:1.1, range:110, slow:.42, dur:1.6, cost:70}, {dmg:10, rate:1.3, range:125, slow:.3, dur:2, cost:130}]},
+  mortar:{name:'Mörser', key:'3', col:'#ff8a3d', cost:100, lv:[{dmg:34, rate:.55, range:170, splash:55}, {dmg:62, rate:.6, range:185, splash:62, cost:130}, {dmg:110, rate:.7, range:200, splash:72, cost:220}]},
+  tesla: {name:'Blitz',  key:'4', col:'#c77bff', cost:125, lv:[{dmg:24, rate:1.1, range:115, chain:3}, {dmg:40, rate:1.25, range:125, chain:4, cost:150}, {dmg:70, rate:1.4, range:140, chain:6, cost:250}]},
+};
+const EN = {
+  normal:{name:'Läufer', hp:42, speed:52, reward:6, col:'#ff5d6c', r:11},
+  fast:  {name:'Flitzer', hp:26, speed:96, reward:5, col:'#ffd23f', r:9},
+  tank:  {name:'Panzer', hp:170, speed:33, reward:16, col:'#9aa0ab', r:15, armor:4},
+  swarm: {name:'Schwarm', hp:15, speed:70, reward:2, col:'#3fd28b', r:7},
+  boss:  {name:'Koloss', hp:1500, speed:27, reward:160, col:'#c77bff', r:24, armor:6},
+};
+function waveSpec(n){
+  const g = [];
+  if (n % 10 === 0){ g.push({type:'boss', count:n / 10, gap:3}); g.push({type:'normal', count:6 + n / 2, gap:.6}); return g; }
+  g.push({type:'normal', count:6 + Math.floor(n * 1.3), gap:Math.max(.35, .9 - n * .02)});
+  if (n >= 3) g.push({type:'fast', count:Math.floor(n * .9), gap:.45});
+  if (n % 5 === 0 || n > 15) g.push({type:'swarm', count:10 + n, gap:.18});
+  if (n >= 4) g.push({type:'tank', count:Math.floor((n - 2) / 2), gap:1.4});
+  return g;
+}
+const hpScale = n => 1 + (n - 1) * .2 + n * n * .006;
+
+// ---------- Zustand ----------
+let G = null, sel = null, build = null, hover = null, speed = 1, bgC = null;
+const mouse = {x:0, y:0, in:false};
+function startMap(mi){
+  const m = MAPS[mi];
+  const pts = m.wp.map(([x, y]) => [x * T + T / 2, y * T + T / 2]);
+  const segs = []; let tot = 0;
+  for (let k = 0; k < pts.length - 1; k++){ const [x0, y0] = pts[k], [x1, y1] = pts[k + 1], L = Math.hypot(x1 - x0, y1 - y0); segs.push({x0, y0, x1, y1, L, d0:tot}); tot += L; }
+  const pathSet = new Set();
+  for (let k = 0; k < m.wp.length - 1; k++){
+    let [x, y] = m.wp[k]; const [tx, ty] = m.wp[k + 1];
+    while (true){ pathSet.add(`${x},${y}`); if (x === tx && y === ty) break; x += Math.sign(tx - x); y += Math.sign(ty - y); }
+  }
+  G = {mi, m, segs, total:tot, pathSet, towers:[], enemies:[], shots:[], fx:[], floats:[], gold:m.gold, lives:m.lives, wave:0, score:0,
+    spawnQ:[], waveActive:false, over:false, won:false, kills:0, deco:[]};
+  const r = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(mi * 97 + 7);
+  for (let k = 0; k < 26; k++){ const x = Math.floor(r() * GW), y = Math.floor(r() * GH); if (!pathSet.has(`${x},${y}`)) G.deco.push({x, y, s:.6 + r() * .5, ox:r() * 20 - 10, oy:r() * 20 - 10}); }
+  bgC = renderBg();
+  sel = null; build = null;
+  $('ov').classList.add('hide');
+  ui(); renderSel();
+}
+function posAt(d){
+  for (const s of G.segs) if (d <= s.d0 + s.L){ const f = (d - s.d0) / s.L; return [s.x0 + (s.x1 - s.x0) * f, s.y0 + (s.y1 - s.y0) * f, Math.atan2(s.y1 - s.y0, s.x1 - s.x0)]; }
+  const s = G.segs[G.segs.length - 1]; return [s.x1, s.y1, 0];
+}
+const isDeco = (x, y) => G.deco.some(d => d.x === x && d.y === y);
+const canBuild = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && !G.pathSet.has(`${x},${y}`) && !G.towers.some(t => t.gx === x && t.gy === y) && !isDeco(x, y);
+
+// ---------- Hintergrund vorrendern ----------
+function renderBg(){
+  const c = document.createElement('canvas'); c.width = WW; c.height = WH; const x = c.getContext('2d'), m = G.m;
+  const r = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(G.mi * 31 + 3);
+  for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++){ x.fillStyle = (gx + gy) % 2 ? m.grass[0] : m.grass[1]; x.fillRect(gx * T, gy * T, T, T); }
+  for (let k = 0; k < 1600; k++){ x.fillStyle = r() < .5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.07)'; x.fillRect(r() * WW, r() * WH, 2, 2 + r() * 3); }
+  // Weg
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  const line = (w, col) => { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); G.segs.forEach((s, k) => { if (!k) x.moveTo(s.x0, s.y0); x.lineTo(s.x1, s.y1); }); x.stroke(); };
+  line(T + 10, 'rgba(0,0,0,.18)'); line(T + 4, m.path[1]); line(T - 6, m.path[0]);
+  for (let k = 0; k < 500; k++){ const d = r() * G.total, [px, py] = posAt(d); x.fillStyle = r() < .5 ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.12)'; x.beginPath(); x.arc(px + (r() - .5) * 34, py + (r() - .5) * 34, 1 + r() * 2.4, 0, TAU); x.fill(); }
+  // Deko
+  for (const d of G.deco){
+    const cx = d.x * T + T / 2 + d.ox * .5, cy = d.y * T + T / 2 + d.oy * .5, s = d.s;
+    x.fillStyle = 'rgba(0,0,0,.18)'; x.beginPath(); x.ellipse(cx + 4, cy + 14 * s, 16 * s, 7 * s, 0, 0, TAU); x.fill();
+    if (m.deco === 'tree'){ x.fillStyle = '#6a4a2a'; x.fillRect(cx - 3, cy, 6, 14 * s); x.fillStyle = '#2f7a2a'; x.beginPath(); x.arc(cx, cy - 4, 17 * s, 0, TAU); x.fill(); x.fillStyle = '#3f9a3a'; x.beginPath(); x.arc(cx - 5 * s, cy - 9 * s, 10 * s, 0, TAU); x.fill(); }
+    if (m.deco === 'cactus'){ x.fillStyle = '#3f7a3a'; x.fillRect(cx - 5 * s, cy - 18 * s, 10 * s, 32 * s); x.fillRect(cx - 15 * s, cy - 8 * s, 8 * s, 12 * s); x.fillRect(cx + 7 * s, cy - 13 * s, 8 * s, 12 * s); }
+    if (m.deco === 'pine'){ x.fillStyle = '#2a4a3a'; x.beginPath(); x.moveTo(cx, cy - 26 * s); x.lineTo(cx + 15 * s, cy + 10 * s); x.lineTo(cx - 15 * s, cy + 10 * s); x.fill(); x.fillStyle = '#fff'; x.beginPath(); x.moveTo(cx, cy - 26 * s); x.lineTo(cx + 6 * s, cy - 12 * s); x.lineTo(cx - 6 * s, cy - 12 * s); x.fill(); }
+  }
+  // Start/Ziel
+  const [sx, sy] = posAt(0), [ex, ey] = posAt(G.total);
+  x.fillStyle = 'rgba(255,93,108,.5)'; x.fillRect(Math.max(0, ex - 20), ey - 26, 22, 52);
+  x.fillStyle = 'rgba(63,210,139,.4)'; x.fillRect(Math.max(0, sx), sy - 26, 18, 52);
+  return c;
+}
+
+// ---------- Wellen ----------
+function callWave(){
+  if (G.over || G.wave >= MAX_WAVE) return;
+  if (G.waveActive){
+    // Frühzeitig rufen = Bonusgold
+    const bonus = 10 + G.wave * 2; G.gold += bonus; floatTxt(WW - 120, 30, `+${bonus} Bonus`, '#ffd34d');
+  }
+  G.wave++; G.waveActive = true;
+  let t = 0;
+  for (const grp of waveSpec(G.wave)){ for (let k = 0; k < grp.count; k++){ G.spawnQ.push({t, type:grp.type}); t += grp.gap; } t += 1.2; }
+  G.spawnQ.sort((a, b) => a.t - b.t); G.spawnT = 0;
+  Hub.tone(330, .2, 'triangle', .05); Hub.tone(495, .25, 'triangle', .05, .12);
+  if (G.wave % 10 === 0) banner('BOSS-WELLE!'); else banner(`Welle ${G.wave}`);
+  ui();
+}
+let bannerTxt = '', bannerT = 0;
+function banner(t){ bannerTxt = t; bannerT = 2; }
+function spawn(type){
+  const e = EN[type], hp = Math.round(e.hp * hpScale(G.wave));
+  G.enemies.push({type, d:-10, hp, max:hp, speed:e.speed, slow:1, slowT:0, r:e.r, col:e.col, armor:e.armor || 0, reward:Math.round(e.reward * (1 + G.wave * .03)), wob:Math.random() * 6});
+}
+
+// ---------- Kampf ----------
+function damage(e, dmg){
+  if (e.dead) return;
+  const real = Math.max(1, dmg - e.armor);
+  e.hp -= real; e.hit = .1;
+  if (e.hp <= 0){
+    e.dead = true; G.gold += e.reward; G.score += e.reward * 10; G.kills++;
+    const [x, y] = posAt(e.d);
+    floatTxt(x, y - 16, `+${e.reward}`, '#ffd34d');
+    for (let k = 0; k < 12; k++){ const a = rnd(0, TAU), s = rnd(30, 140); G.fx.push({kind:'p', x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s, life:.5, col:e.col}); }
+    Hub.tone(e.type === 'boss' ? 80 : 240, e.type === 'boss' ? .6 : .08, 'square', .025);
+    if (e.type === 'boss') Hub.achieve('turm', 'boss', 'Kolossbezwinger', 'Besiege einen Boss');
+    if (G.kills === 500) Hub.achieve('turm', 'k500', 'Unaufhaltsam', 'Besiege 500 Gegner in einer Partie');
+  }
+}
+function targetFor(t, range, x, y){
+  let best = null, bv = -1e9;
+  for (const e of G.enemies){
+    if (e.dead || e.d < 0) continue;
+    const [ex, ey] = posAt(e.d); if (Math.hypot(ex - x, ey - y) > range) continue;
+    const v = t.mode === 'first' ? e.d : t.mode === 'strong' ? e.hp : -Math.hypot(ex - x, ey - y);
+    if (v > bv){ bv = v; best = e; }
+  }
+  return best;
+}
+function update(dt){
+  if (!G || G.over) return;
+  // Spawnen
+  if (G.spawnQ.length){ G.spawnT += dt; while (G.spawnQ.length && G.spawnQ[0].t <= G.spawnT) spawn(G.spawnQ.shift().type); }
+  // Gegner
+  for (const e of G.enemies){
+    if (e.dead) continue;
+    if (e.slowT > 0){ e.slowT -= dt; if (e.slowT <= 0) e.slow = 1; }
+    e.d += e.speed * e.slow * dt; e.wob += dt * 8; if (e.hit) e.hit = Math.max(0, e.hit - dt);
+    if (e.d >= G.total){ e.dead = true; e.escaped = true; G.lives -= e.type === 'boss' ? 5 : 1; Hub.sfx('bad'); shake = 8;
+      if (G.lives <= 0){ G.lives = 0; return lose(); } }
+  }
+  G.enemies = G.enemies.filter(e => !e.dead);
+  // Türme
+  for (const t of G.towers){
+    const L = TW[t.type].lv[t.lv], x = t.gx * T + T / 2, y = t.gy * T + T / 2;
+    t.cool -= dt; t.flash = Math.max(0, (t.flash || 0) - dt);
+    if (t.type === 'frost'){
+      if (t.cool <= 0 && G.enemies.some(e => { const [ex, ey] = posAt(e.d); return Math.hypot(ex - x, ey - y) <= L.range; })){
+        t.cool = 1 / L.rate; G.fx.push({kind:'ring', x, y, r:L.range, life:.5, col:'127,224,255'});
+        for (const e of G.enemies){ const [ex, ey] = posAt(e.d); if (Math.hypot(ex - x, ey - y) <= L.range){ e.slow = Math.min(e.slow, L.slow); e.slowT = L.dur; damage(e, L.dmg); } }
+        Hub.tone(1400, .1, 'sine', .015, 0, 700);
+      }
+      continue;
+    }
+    const tg = targetFor(t, L.range, x, y);
+    if (tg){ const [ex, ey] = posAt(tg.d); const want = Math.atan2(ey - y, ex - x); let da = ((want - t.a + Math.PI) % TAU + TAU) % TAU - Math.PI; t.a += Math.sign(da) * Math.min(Math.abs(da), dt * 10); }
+    if (!tg || t.cool > 0) continue;
+    t.cool = 1 / L.rate; t.flash = .08;
+    if (t.type === 'gun'){ G.shots.push({kind:'bullet', x:x + Math.cos(t.a) * 20, y:y + Math.sin(t.a) * 20, tg, dmg:L.dmg, sp:520}); Hub.tone(700, .03, 'square', .012); }
+    if (t.type === 'mortar'){ const [ex, ey] = posAt(tg.d + tg.speed * tg.slow * .9); G.shots.push({kind:'shell', x0:x, y0:y, x1:ex, y1:ey, t:0, dur:.9, dmg:L.dmg, splash:L.splash}); Hub.tone(160, .15, 'sine', .04, 0, 90); }
+    if (t.type === 'tesla'){
+      const hit = [tg]; let cur = tg;
+      for (let k = 1; k < L.chain; k++){
+        const [cx, cy] = posAt(cur.d); let nb = null, nd = 90;
+        for (const e of G.enemies){ if (hit.includes(e) || e.dead) continue; const [ex, ey] = posAt(e.d); const d = Math.hypot(ex - cx, ey - cy); if (d < nd){ nd = d; nb = e; } }
+        if (!nb) break; hit.push(nb); cur = nb;
+      }
+      const pts = [[x, y - 10], ...hit.map(e => posAt(e.d))];
+      G.fx.push({kind:'bolt', pts, life:.15});
+      hit.forEach((e, k) => damage(e, L.dmg * Math.pow(.85, k)));
+      Hub.tone(1800, .06, 'sawtooth', .02, 0, 600);
+    }
+  }
+  // Geschosse
+  for (const s of G.shots){
+    if (s.kind === 'bullet'){
+      if (s.tg.dead){ s.done = true; continue; }
+      const [ex, ey] = posAt(s.tg.d), dx = ex - s.x, dy = ey - s.y, dd = Math.hypot(dx, dy);
+      if (dd < 8){ damage(s.tg, s.dmg); s.done = true; continue; }
+      s.x += dx / dd * s.sp * dt; s.y += dy / dd * s.sp * dt;
+    } else {
+      s.t += dt;
+      if (s.t >= s.dur){
+        s.done = true;
+        G.fx.push({kind:'boom', x:s.x1, y:s.y1, r:s.splash, life:.35});
+        for (let k = 0; k < 14; k++){ const a = rnd(0, TAU), v = rnd(40, 160); G.fx.push({kind:'p', x:s.x1, y:s.y1, vx:Math.cos(a) * v, vy:Math.sin(a) * v, life:.45, col:k % 2 ? '#ffb347' : '#555'}); }
+        for (const e of G.enemies){ const [ex, ey] = posAt(e.d), d = Math.hypot(ex - s.x1, ey - s.y1); if (d <= s.splash) damage(e, s.dmg * (1 - d / s.splash * .5)); }
+        shake = Math.max(shake, 3); Hub.tone(90, .2, 'sawtooth', .035, 0, 45);
+      }
+    }
+  }
+  G.shots = G.shots.filter(s => !s.done);
+  for (const f of G.fx){ f.life -= dt; if (f.kind === 'p'){ f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .92; f.vy *= .92; } }
+  G.fx = G.fx.filter(f => f.life > 0);
+  for (const f of G.floats){ f.t += dt; f.y -= 30 * dt; }
+  G.floats = G.floats.filter(f => f.t < 1.2);
+  // Welle vorbei?
+  if (G.waveActive && !G.spawnQ.length && !G.enemies.length){
+    G.waveActive = false;
+    const bonus = 20 + G.wave * 3; G.gold += bonus; floatTxt(WW / 2, WH / 2, `Welle geschafft! +${bonus}`, '#6be3a1', true);
+    if (G.wave >= MAX_WAVE) return win();
+    if (G.auto) setTimeout(() => { if (G && !G.waveActive && !G.over) callWave(); }, 1200);
+  }
+  bannerT -= dt; shake = Math.max(0, shake - dt * 30);
+}
+let shake = 0;
+function floatTxt(x, y, txt, col, big){ G.floats.push({x, y, txt, col, t:0, big}); }
+function lose(){
+  G.over = true;
+  Hub.score('turm', G.score, {label:'Punkte', silent:true});
+  Hub.dialog({title:'Die Verteidigung ist gefallen', center:true, dismiss:false, html:`<p>Du hast <b>${G.wave - 1}</b> Wellen überstanden und <b>${G.score.toLocaleString('de-DE')}</b> Punkte erzielt.</p>`, buttons:[{label:'Karten', value:'maps'}, {label:'Nochmal', value:'retry', primary:true}]})
+    .then(v => v === 'retry' ? startMap(G.mi) : showMaps());
+}
+function win(){
+  G.over = true; G.won = true;
+  const stars = G.lives >= G.m.lives ? 3 : G.lives >= G.m.lives / 2 ? 2 : 1;
+  const st = Hub.read('turm_stars', {}); st[G.mi] = Math.max(st[G.mi] || 0, stars); Hub.write('turm_stars', st);
+  G.score += G.lives * 500;
+  Hub.score('turm', G.score, {label:'Punkte'});
+  Hub.achieve('turm', 'win' + G.mi, `${G.m.name} verteidigt`, `Überstehe alle 30 Wellen auf „${G.m.name}“`);
+  if (stars === 3) Hub.achieve('turm', 'perfect', 'Festung', 'Gewinne eine Karte ohne ein Leben zu verlieren');
+  Hub.sfx('ach');
+  Hub.dialog({title:'Sieg!', center:true, dismiss:false, html:`<p style="font-size:34px;color:#ffcf5a;letter-spacing:6px">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</p><p>Alle ${MAX_WAVE} Wellen abgewehrt mit <b>${G.lives}</b> Leben übrig.<br>Punkte: <b>${G.score.toLocaleString('de-DE')}</b></p>`, buttons:[{label:'Karten', value:'maps', primary:true}]}).then(showMaps);
+}
+
+// ---------- Zeichnen ----------
+function drawTower(x, y, type, lv, a, flash, ghost){
+  const c = TW[type].col;
+  ctx.save(); ctx.translate(x, y);
+  if (!ghost){ ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(3, 14, 18, 7, 0, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = '#4a505c'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-18, -12, 36, 30, 7) : ctx.rect(-18, -12, 36, 30); ctx.fill();
+  ctx.fillStyle = '#5c6372'; ctx.fillRect(-18, -12, 36, 6);
+  for (let k = 0; k < lv; k++){ ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(-10 + k * 10, 13, 3, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0, -4, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.arc(-4, -8, 5, 0, TAU); ctx.fill();
+  ctx.rotate(a);
+  if (type === 'gun'){ ctx.fillStyle = '#2a2f3a'; ctx.fillRect(4, -9, 18, 5); ctx.fillRect(4, 0, 18, 5); if (flash > 0){ ctx.fillStyle = '#ffe38a'; ctx.beginPath(); ctx.arc(24, -2, 6, 0, TAU); ctx.fill(); } }
+  if (type === 'mortar'){ ctx.fillStyle = '#2a2f3a'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-2, -12, 16, 16, 4) : ctx.rect(-2, -12, 16, 16); ctx.fill(); }
+  if (type === 'tesla'){ ctx.rotate(-a); ctx.strokeStyle = '#efe0ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(0, -24); ctx.stroke(); ctx.fillStyle = flash > 0 ? '#fff' : '#e8d4ff'; ctx.beginPath(); ctx.arc(0, -26, 5, 0, TAU); ctx.fill(); }
+  if (type === 'frost'){ ctx.rotate(-a + performance.now() / 900); ctx.strokeStyle = '#eaffff'; ctx.lineWidth = 2.4; for (let k = 0; k < 3; k++){ ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(-9, -4); ctx.lineTo(9, -4); ctx.stroke(); } }
+  ctx.restore();
+}
+function drawEnemy(e){
+  const [x, y, ang] = posAt(e.d), wob = Math.sin(e.wob) * 1.5;
+  ctx.save(); ctx.translate(x, y + wob);
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(2, e.r * .8, e.r, e.r * .4, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = e.hit > 0 ? '#fff' : e.col;
+  if (e.type === 'tank'){ ctx.rotate(ang); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-e.r, -e.r * .8, e.r * 2, e.r * 1.6, 5) : ctx.rect(-e.r, -e.r * .8, e.r * 2, e.r * 1.6); ctx.fill(); ctx.fillStyle = '#5a606c'; ctx.fillRect(-2, -3, e.r + 6, 6); }
+  else if (e.type === 'boss'){ ctx.beginPath(); for (let k = 0; k < 10; k++){ const a = k / 10 * TAU + e.wob * .1, r = k % 2 ? e.r * .7 : e.r; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-6, -4, 4, 0, TAU); ctx.arc(6, -4, 4, 0, TAU); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(0, 0, e.r, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(-e.r * .35, -e.r * .35, e.r * .35, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#1a1a22'; ctx.beginPath(); ctx.arc(Math.cos(ang) * e.r * .4 - 2, Math.sin(ang) * e.r * .4 - 2, 2, 0, TAU); ctx.arc(Math.cos(ang) * e.r * .4 + 3, Math.sin(ang) * e.r * .4 - 2, 2, 0, TAU); ctx.fill(); }
+  if (e.slow < 1){ ctx.strokeStyle = 'rgba(160,230,255,.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, e.r + 3, 0, TAU); ctx.stroke(); }
+  ctx.restore();
+  if (e.hp < e.max){ const w = e.r * 2.2; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - w / 2, y - e.r - 10, w, 4); ctx.fillStyle = e.hp / e.max > .5 ? '#3fd28b' : e.hp / e.max > .25 ? '#ffd23f' : '#ff5d6c'; ctx.fillRect(x - w / 2, y - e.r - 10, w * e.hp / e.max, 4); }
+}
+function draw(){
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (!G){ ctx.fillStyle = '#0d140c'; ctx.fillRect(0, 0, WW, WH); return; }
+  if (shake) ctx.translate(rnd(-shake, shake) * .4, rnd(-shake, shake) * .4);
+  ctx.drawImage(bgC, 0, 0);
+  // Bau-Vorschau
+  if (build && hover){
+    const ok = canBuild(hover.x, hover.y) && G.gold >= TW[build].cost, L = TW[build].lv[0];
+    const x = hover.x * T + T / 2, y = hover.y * T + T / 2;
+    ctx.fillStyle = ok ? 'rgba(255,255,255,.12)' : 'rgba(255,60,60,.12)'; ctx.beginPath(); ctx.arc(x, y, L.range, 0, TAU); ctx.fill();
+    ctx.strokeStyle = ok ? 'rgba(255,255,255,.5)' : 'rgba(255,90,90,.6)'; ctx.setLineDash([6, 6]); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = ok ? 'rgba(255,255,255,.2)' : 'rgba(255,60,60,.3)'; ctx.fillRect(hover.x * T, hover.y * T, T, T);
+    ctx.globalAlpha = .65; drawTower(x, y, build, 0, -Math.PI / 2, 0, true); ctx.globalAlpha = 1;
+  }
+  if (sel){ const L = TW[sel.type].lv[sel.lv], x = sel.gx * T + T / 2, y = sel.gy * T + T / 2; ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.beginPath(); ctx.arc(x, y, L.range, 0, TAU); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 2; ctx.stroke(); }
+  const ents = [...G.enemies.map(e => ({y:posAt(e.d)[1], f:() => drawEnemy(e)})), ...G.towers.map(t => ({y:t.gy * T + T / 2, f:() => drawTower(t.gx * T + T / 2, t.gy * T + T / 2, t.type, t.lv, t.a, t.flash)}))];
+  ents.sort((a, b) => a.y - b.y).forEach(o => o.f());
+  for (const s of G.shots){
+    if (s.kind === 'bullet'){ ctx.fillStyle = '#ffe38a'; ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, TAU); ctx.fill(); }
+    else { const p = s.t / s.dur, x = s.x0 + (s.x1 - s.x0) * p, y = s.y0 + (s.y1 - s.y0) * p - Math.sin(p * Math.PI) * 90; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(s.x0 + (s.x1 - s.x0) * p, s.y0 + (s.y1 - s.y0) * p, 6, 3, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#2a2f3a'; ctx.beginPath(); ctx.arc(x, y, 7, 0, TAU); ctx.fill(); }
+  }
+  for (const f of G.fx){
+    if (f.kind === 'p'){ ctx.globalAlpha = Math.max(0, f.life * 2); ctx.fillStyle = f.col; ctx.fillRect(f.x - 2.5, f.y - 2.5, 5, 5); }
+    if (f.kind === 'ring'){ ctx.globalAlpha = f.life * 2; ctx.strokeStyle = `rgba(${f.col},.8)`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 - f.life * 1.4 + .3), 0, TAU); ctx.stroke(); }
+    if (f.kind === 'boom'){ ctx.globalAlpha = f.life * 2.5; ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1.2 - f.life * 2), 0, TAU); ctx.fill(); }
+    if (f.kind === 'bolt'){ ctx.globalAlpha = f.life * 6; ctx.strokeStyle = '#e8d4ff'; ctx.lineWidth = 3; ctx.shadowColor = '#c77bff'; ctx.shadowBlur = 14; ctx.beginPath();
+      f.pts.forEach(([x, y], k) => { if (!k){ ctx.moveTo(x, y); return; } const [px, py] = f.pts[k - 1]; for (let s = 1; s <= 4; s++){ const q = s / 4; ctx.lineTo(px + (x - px) * q + (s < 4 ? rnd(-7, 7) : 0), py + (y - py) * q + (s < 4 ? rnd(-7, 7) : 0)); } }); ctx.stroke(); ctx.shadowBlur = 0; }
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'center';
+  for (const f of G.floats){ ctx.globalAlpha = Math.max(0, 1 - f.t / 1.2); ctx.font = `700 ${f.big ? 30 : 15}px Bahnschrift, sans-serif`; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); }
+  ctx.globalAlpha = 1;
+  if (bannerT > 0){ ctx.globalAlpha = Math.min(1, bannerT); ctx.font = '700 52px Bahnschrift, sans-serif'; ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(bannerTxt, WW / 2, WH * .4); ctx.fillStyle = '#fff'; ctx.fillText(bannerTxt, WW / 2, WH * .4); ctx.globalAlpha = 1; }
+  if (speed === 0){ ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, WW, WH); ctx.fillStyle = '#fff'; ctx.font = '700 46px Bahnschrift'; ctx.fillText('PAUSE', WW / 2, WH / 2); }
+}
+
+// ---------- Oberfläche ----------
+(function buildDock(){
+  $('towers').innerHTML = Object.entries(TW).map(([k, t]) => `<button class="tw" data-t="${k}" style="--c:${t.col}"><kbd>${t.key}</kbd><canvas width="88" height="88"></canvas><div><b>${t.name}</b><small>${t.cost} Gold</small></div></button>`).join('');
+  document.querySelectorAll('.tw').forEach(b => {
+    // Turm in die Schaltfläche zeichnen: ctx kurz auf die kleine Leinwand umleiten
+    const real = ctx; ctx = b.querySelector('canvas').getContext('2d');
+    ctx.save(); ctx.scale(1.7, 1.7); drawTower(26, 30, b.dataset.t, 0, -Math.PI / 4, 0, true); ctx.restore();
+    ctx = real;
+    b.onclick = () => { Hub.audio(); build = build === b.dataset.t ? null : b.dataset.t; sel = null; renderSel(); ui(); };
+  });
+})();
+function ui(){
+  if (!G) return;
+  bar.set('gold', G.gold); bar.set('lives', G.lives); bar.set('wave', `${G.wave}/${MAX_WAVE}`); bar.set('score', G.score.toLocaleString('de-DE'));
+  document.querySelectorAll('.tw').forEach(b => { b.classList.toggle('on', build === b.dataset.t); b.classList.toggle('poor', G.gold < TW[b.dataset.t].cost); });
+  const wb = $('waveBtn');
+  wb.innerHTML = G.wave >= MAX_WAVE ? 'Letzte Welle' : G.waveActive ? `${I('zap')}Welle ${G.wave + 1} früher (+${10 + G.wave * 2})` : `${I('play')}Welle ${G.wave + 1} starten`;
+  wb.disabled = G.wave >= MAX_WAVE || G.over;
+}
+function renderSel(){
+  const box = $('sel');
+  if (!G) { box.innerHTML = ''; return; }
+  if (!sel){
+    box.innerHTML = build ? `<b class="t">${TW[build].name}</b><span>Klick auf ein freies Grasfeld, um zu bauen.</span><span style="color:var(--muted)">Rechtsklick / Esc = abbrechen</span>`
+      : `<span>Wähle einen Turm unten links (Tasten <kbd>1</kbd>–<kbd>4</kbd>) und bau ihn aufs Gras.</span><label style="display:flex;gap:8px;align-items:center;margin-left:auto">Auto-Welle <span class="h-switch ${G.auto ? 'on' : ''}" id="autoSw"></span></label>`;
+    const sw = $('autoSw'); if (sw) sw.onclick = () => { G.auto = !G.auto; renderSel(); };
+    return;
+  }
+  const t = TW[sel.type], L = t.lv[sel.lv], nx = t.lv[sel.lv + 1];
+  const val = sel.spent * .7;
+  box.innerHTML = `<b class="t">${t.name} · Stufe ${sel.lv + 1}</b>
+    <span>Schaden ${L.dmg}${L.chain ? ` ×${L.chain}` : ''}${L.slow ? ` · Bremst ${Math.round((1 - L.slow) * 100)} %` : ''} · Reichweite ${L.range}</span>
+    <div class="seg" id="modeSeg">${[['first', 'Erster'], ['strong', 'Stärkster'], ['near', 'Nächster']].map(([k, l]) => `<button data-m="${k}" class="${sel.mode === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${nx ? `<button class="h-btn sm primary" id="upBtn" ${G.gold < nx.cost ? 'disabled' : ''}>${I('up')}Verbessern · ${nx.cost}</button>` : '<span style="color:#ffd34d;font-weight:700">MAX</span>'}
+    <button class="h-btn sm danger" id="sellBtn">Verkaufen +${Math.round(val)}</button>`;
+  if (sel.type === 'frost') $('modeSeg').style.display = 'none';
+  $('modeSeg').onclick = e => { const b = e.target.closest('button'); if (b){ sel.mode = b.dataset.m; renderSel(); } };
+  if (nx) $('upBtn').onclick = upgrade;
+  $('sellBtn').onclick = sellSel;
+}
+function upgrade(){
+  if (!sel) return; const nx = TW[sel.type].lv[sel.lv + 1];
+  if (!nx || G.gold < nx.cost) return;
+  G.gold -= nx.cost; sel.spent += nx.cost; sel.lv++; Hub.sfx('ok');
+  if (sel.lv === 2) Hub.achieve('turm', 'max', 'Ingenieur', 'Verbessere einen Turm auf die höchste Stufe');
+  renderSel(); ui();
+}
+function sellSel(){ if (!sel) return; G.gold += Math.round(sel.spent * .7); G.towers = G.towers.filter(t => t !== sel); sel = null; Hub.tone(400, .1, 'triangle', .04); renderSel(); ui(); }
+function cellFromEvent(e){ const r = cv.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * WW, y = (e.clientY - r.top) / r.height * WH; return {x:Math.floor(x / T), y:Math.floor(y / T)}; }
+cv.addEventListener('pointermove', e => { if (G) hover = cellFromEvent(e); });
+cv.addEventListener('pointerleave', () => hover = null);
+cv.addEventListener('contextmenu', e => { e.preventDefault(); build = null; sel = null; renderSel(); ui(); });
+cv.addEventListener('pointerdown', e => {
+  if (!G || G.over || e.button !== 0) return;
+  Hub.audio();
+  const c = cellFromEvent(e);
+  const tw = G.towers.find(t => t.gx === c.x && t.gy === c.y);
+  if (tw){ sel = tw; build = null; renderSel(); ui(); return; }
+  if (build){
+    if (!canBuild(c.x, c.y)) { Hub.tone(180, .08, 'square', .03); return; }
+    if (G.gold < TW[build].cost){ Hub.toast('Zu wenig Gold', `${TW[build].name} kostet ${TW[build].cost}`, 'coins'); return; }
+    G.gold -= TW[build].cost;
+    G.towers.push({type:build, gx:c.x, gy:c.y, lv:0, cool:0, a:-Math.PI / 2, mode:'first', spent:TW[build].cost});
+    Hub.tone(520, .08, 'triangle', .05); Hub.tone(780, .08, 'triangle', .04, .06);
+    for (let k = 0; k < 10; k++) G.fx.push({kind:'p', x:c.x * T + T / 2, y:c.y * T + T / 2 + 10, vx:rnd(-60, 60), vy:rnd(-80, -10), life:.4, col:'#d2b07a'});
+    if (G.towers.length >= 15) Hub.achieve('turm', 't15', 'Baumeister', 'Baue 15 Türme in einer Partie');
+    if (!e.shiftKey && G.gold < TW[build].cost) build = null;
+    ui(); return;
+  }
+  sel = null; renderSel();
+});
+$('waveBtn').onclick = () => { Hub.audio(); callWave(); };
+$('speed').onclick = e => { const b = e.target.closest('button'); if (!b) return; speed = +b.dataset.v; document.querySelectorAll('#speed button').forEach(x => x.classList.toggle('on', x === b)); };
+addEventListener('keydown', e => {
+  if (!G) return;
+  const k = e.key.toLowerCase();
+  const t = Object.keys(TW).find(x => TW[x].key === k); if (t){ build = build === t ? null : t; sel = null; renderSel(); ui(); }
+  if (k === ' '){ e.preventDefault(); callWave(); }
+  if (k === 'escape'){ build = null; sel = null; renderSel(); ui(); }
+  if (k === 'u') upgrade(); if (k === 's') sellSel();
+});
+// ---------- Kartenwahl ----------
+function showMaps(){
+  const st = Hub.read('turm_stars', {});
+  $('maps').innerHTML = MAPS.map((m, i) => `<div class="map" data-i="${i}"><canvas width="480" height="288"></canvas><div><b>${m.name}</b><small>${m.diff} · ${m.lives} Leben · ${m.gold} Startgold</small><span class="st">${'★'.repeat(st[i] || 0)}${'☆'.repeat(3 - (st[i] || 0))}</span></div></div>`).join('');
+  document.querySelectorAll('.map').forEach(el => {
+    const i = +el.dataset.i; const keep = G; startMapPreview(i, el.querySelector('canvas')); G = keep;
+    el.onclick = () => { Hub.audio(); startMap(i); };
+  });
+  $('ov').classList.remove('hide');
+}
+function startMapPreview(i, c){
+  const m = MAPS[i]; const tmp = {mi:i, m, deco:[]};
+  const pts = m.wp.map(([x, y]) => [x * T + T / 2, y * T + T / 2]); const segs = []; let tot = 0;
+  for (let k = 0; k < pts.length - 1; k++){ const [x0, y0] = pts[k], [x1, y1] = pts[k + 1], L = Math.hypot(x1 - x0, y1 - y0); segs.push({x0, y0, x1, y1, L, d0:tot}); tot += L; }
+  tmp.segs = segs; tmp.total = tot; tmp.pathSet = new Set();
+  const r = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(i * 97 + 7);
+  for (let k = 0; k < 26; k++) tmp.deco.push({x:Math.floor(r() * GW), y:Math.floor(r() * GH), s:.6 + r() * .5, ox:r() * 20 - 10, oy:r() * 20 - 10});
+  G = tmp; const bg = renderBg(); c.getContext('2d').drawImage(bg, 0, 0, 480, 288);
+}
+// ---------- Schleife ----------
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  for (let k = 0; k < speed; k++) update(dt);
+  draw();
+  if (G && Math.floor(now / 200) !== Math.floor((now - dt * 1000) / 200)) ui();
+  requestAnimationFrame(frame);
+}
+showMaps();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

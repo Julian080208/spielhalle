@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon-Flipper</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden;background:#06030f}
+body{display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:24px;padding:10px}
+#cv{height:100%;max-width:100%;aspect-ratio:600/1000;border-radius:20px;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 0 0 8px #120a24,0 30px 80px rgba(0,0,0,.8);touch-action:none}
+.side{width:230px;display:flex;flex-direction:column;gap:12px}
+.dmd{background:#140700;border-radius:14px;padding:16px;border:1px solid #3a1a00;box-shadow:inset 0 0 30px rgba(255,120,0,.15)}
+.dmd small{display:block;color:#ff9a3d;opacity:.7;font-size:11px;letter-spacing:2px;font-weight:700}
+.dmd b{display:block;font-family:Consolas,monospace;font-size:30px;color:#ffb347;text-shadow:0 0 12px rgba(255,150,40,.8);letter-spacing:1px}
+.dmd .msg{font-family:Consolas,monospace;color:#ffb347;font-size:15px;min-height:20px;text-shadow:0 0 8px rgba(255,150,40,.7)}
+.keys{font-size:13px;color:var(--text-2);line-height:1.9}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:rgba(6,3,15,.72);backdrop-filter:blur(4px)}
+.ov.hide{display:none}
+.ov h1{margin:0;font-family:var(--font-display);font-size:64px;letter-spacing:4px;background:linear-gradient(90deg,#ff3dbb,#ffb347,#3fe6ff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 22px rgba(255,61,187,.45))}
+.ov p{color:var(--text-2);margin:0;max-width:440px}
+@media (max-width:900px){.side{display:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="side">
+    <div class="dmd"><small>PUNKTE</small><b id="dScore">0</b></div>
+    <div class="dmd"><small>KUGEL</small><b id="dBall">1 / 3</b><small style="margin-top:8px">MULTIPLIKATOR</small><b id="dMult">×1</b></div>
+    <div class="dmd"><div class="msg" id="dMsg">BEREIT</div></div>
+    <div class="keys"><kbd>←</kbd> / <kbd>A</kbd> linker Flipper<br><kbd>→</kbd> / <kbd>D</kbd> rechter Flipper<br><kbd>Leertaste</kbd> / <kbd>↓</kbd> halten = Abschuss<br><kbd>P</kbd> Pause</div>
+  </div>
+  <canvas id="cv" width="600" height="1000"></canvas>
+  <div class="ov" id="ov"><h1>NEON-FLIPPER</h1><p id="ovText">Bumper, Schleudern, Zielscheiben, Bahnen und Multiball – halte die Kugel im Spiel!</p>
+    <p style="font-size:13px"><kbd>←</kbd> <kbd>→</kbd> Flipper · <kbd>Leertaste</kbd> halten und loslassen zum Abschießen · Touch: linke/rechte Hälfte</p>
+    <div style="display:flex;gap:10px"><button class="h-btn lg" id="goParty">👥 Partyrunde</button><button class="h-btn primary lg" id="go">Spiel starten</button></div><p id="partyLine" style="font-size:13px"></p></div>
+  <div id="pBan" style="position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;pointer-events:none"></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('flipper');
+const bar = Hub.bar({id:'flipper', title:'Neon-Flipper', stats:[['score', 'Punkte'], ['ball', 'Kugel'], ['mult', 'Multi'], ['best', 'Rekord']], actions:['help', 'pause', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Neon-Flipper', html:'<p><b>Abschuss:</b> Halte <kbd>Leertaste</kbd> oder <kbd>↓</kbd> gedrückt und lass los – je länger, desto kräftiger.</p><p><b>Bahnen oben</b> (3 Lichter): alle anfahren → Multiplikator +1. <b>Zielscheiben</b> links: alle drei umwerfen → 5 000 Punkte × Multi. <b>Kugelfang</b> rechts: Jackpot – beim dritten Mal startet der <b>Multiball</b>!</p><p>In den ersten Sekunden nach dem Abschuss rettet dich die <b>Kugelrettung</b>. Bei 100 000 Punkten gibt es eine Extrakugel.</p>'}));
+bar.on('pause', () => paused = !paused);
+
+const $ = id => document.getElementById(id), cv = $('cv'), ctx = cv.getContext('2d');
+const W = 600, H = 1000, BR = 11, GRAV = 1500, SUB = 10, VMAX = 2700;
+// ---------- Tischgeometrie ----------
+const walls = [];
+const seg = (ax, ay, bx, by, o = {}) => walls.push({ax, ay, bx, by, rest:.45, ...o});
+// Bogen oben
+const ARC = {x:305, y:265, r:265};
+let prev = null;
+for (let k = 0; k <= 32; k++){ const a = Math.PI + k / 32 * Math.PI, p = [ARC.x + Math.cos(a) * ARC.r, ARC.y + Math.sin(a) * ARC.r]; if (prev) seg(prev[0], prev[1], p[0], p[1]); prev = p; }
+seg(40, 265, 40, 800); seg(40, 800, 183, 889);                 // links
+seg(570, 265, 570, 985); seg(522, 330, 522, 985); seg(522, 985, 570, 985); // Abschussbahn
+seg(522, 800, 379, 889);                                       // rechts unten
+seg(522, 330, 570, 300, {oneway:true});                        // Einwegklappe
+// Schleudern
+const SLING = [{a:[100, 690], b:[100, 780], c:[165, 815]}, {a:[462, 690], b:[462, 780], c:[397, 815]}];
+SLING.forEach((s, i) => { seg(...s.a, ...s.b); seg(...s.b, ...s.c); seg(...s.a, ...s.c, {kick:950, sling:i}); });
+// Bahnen oben
+const LANES = [245, 305, 365];
+[215, 275, 335, 395].forEach(x => seg(x, 62, x, 118, {rest:.3}));
+const posts = [[215, 118, 5], [275, 118, 5], [335, 118, 5], [395, 118, 5]];
+const BUMPERS = [{x:220, y:290, r:30}, {x:370, y:290, r:30}, {x:295, y:395, r:30}];
+const TARGETS = [{ax:96, ay:500, bx:124, by:500}, {ax:130, ay:500, bx:158, by:500}, {ax:164, ay:500, bx:192, by:500}];
+const SAUCER = {x:452, y:480, r:15};
+const FL = [{px:185, py:900, rest:.52, up:-.48, len:86, a:.52, w:0, key:false, dir:1}, {px:377, py:900, rest:Math.PI - .52, up:Math.PI + .48, len:86, a:Math.PI - .52, w:0, key:false, dir:-1}];
+
+let balls, score, ballNo, mult, lanes, targets, saucerHits, extraGiven, state = 'menu', paused = false, plunger = 0, plungerHeld = false, saveT = 0, best = Hub.best('flipper') || 0;
+let saucerCool = 0, flash = {}, msgT = 0, lastT = 0, t = 0, parts = [], tableArt = null, tilt = 0, captured = null, ballsLost = 0;
+
+function newBallInLane(){ balls.push({x:546, y:960 - BR, vx:0, vy:0, lane:true}); }
+let FP = null, fpi = 0;   // Partyrunde: Spieler und aktueller Index
+const FKEYS = ['score', 'ballNo', 'mult', 'extraGiven', 'saucerHits'];
+function fpSave(){ if (!FP) return; FKEYS.forEach(k => FP[fpi][k] = window.__fl[k]()); }
+function partyBanner(pp, sub){
+  const b = $('pBan'); b.style.display = 'flex';
+  b.innerHTML = `<div style="padding:22px 40px;border-radius:26px;background:linear-gradient(135deg,${pp.color},rgba(0,0,0,.6));box-shadow:0 0 70px ${pp.color};text-align:center;color:#fff"><div style="font-size:60px;font-family:'Segoe UI Emoji'">${pp.avatar}</div><div style="font-family:var(--font-display);font-size:58px;font-weight:700;line-height:1">${pp.name}</div><div style="font-size:20px;font-weight:700;margin-top:6px">${sub}</div></div>`;
+  Hub.tone(523, .1, 'triangle', .05); Hub.tone(784, .12, 'triangle', .05, .1);
+  clearTimeout(b._t); b._t = setTimeout(() => b.style.display = 'none', 1800);
+}
+function fpLoad(i){
+  fpi = i; const q = FP[i];
+  score = q.score; ballNo = q.ballNo; mult = q.mult; extraGiven = q.extraGiven; saucerHits = q.saucerHits;
+  lanes = [0, 0, 0]; targets = [1, 1, 1];
+  partyBanner(q, `Kugel ${Math.min(ballNo, 3)} von 3`); msg(`${q.name.toUpperCase()} – KUGEL ${ballNo}`); upd();
+}
+function startParty(){
+  const act = Hub.party.active().slice(0, 6);
+  if (act.length < 2){ Hub.toast('Partyrunde leer', 'Lege im Partyraum fest, wer dabei ist.', 'user'); return; }
+  FP = act.map(pp => ({...pp, score:0, ballNo:1, mult:1, extraGiven:false, saucerHits:0}));
+  $('ov').classList.add('hide'); reset(); state = 'play'; paused = false; fpLoad(0); Hub.sfx('click');
+}
+function reset(){ balls = []; score = 0; ballNo = 1; mult = 1; lanes = [0, 0, 0]; targets = [1, 1, 1]; saucerHits = 0; extraGiven = false; captured = null; newBallInLane(); msg('KUGEL 1 – ABSCHUSS!'); upd(); }
+function msg(t){ $('dMsg').textContent = t; msgT = 3; }
+function upd(){
+  bar.set('score', Hub.fmt(score)); bar.set('ball', `${Math.min(ballNo, 3)}/3`); bar.set('mult', '×' + mult); bar.set('best', Hub.fmt(Math.max(best, score)));
+  $('dScore').textContent = Hub.fmt(score); $('dBall').textContent = FP ? `${FP[fpi].name} · ${Math.min(ballNo, 3)}/3` : `${Math.min(ballNo, 3)} / 3`; $('dMult').textContent = '×' + mult;
+}
+function add(v){
+  score += v * mult; upd();
+  if (!extraGiven && score >= 100000){ extraGiven = true; ballNo--; msg('EXTRAKUGEL!'); Hub.sfx('ach'); }
+  if (score >= 250000) Hub.achieve('flipper', 's250', 'Flipper-Ass', 'Erreiche 250 000 Punkte im Flipper');
+  if (score >= 1000000) Hub.achieve('flipper', 's1m', 'Flipper-Legende', 'Erreiche 1 Million Punkte im Flipper');
+}
+
+// ---------- Physik ----------
+function collide(b, ax, ay, bx, by, rad, rest, sx = 0, sy = 0){
+  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+  let k = ((b.x - ax) * dx + (b.y - ay) * dy) / L2; k = Math.max(0, Math.min(1, k));
+  const px = ax + dx * k, py = ay + dy * k; let nx = b.x - px, ny = b.y - py; const d = Math.hypot(nx, ny), rr = BR + rad;
+  if (d >= rr || d < 1e-6) return null;
+  nx /= d; ny /= d; b.x = px + nx * rr; b.y = py + ny * rr;
+  const rvx = b.vx - sx, rvy = b.vy - sy, vn = rvx * nx + rvy * ny;
+  if (vn < 0){ b.vx -= (1 + rest) * vn * nx; b.vy -= (1 + rest) * vn * ny; }
+  return {nx, ny, vn, px, py, k};
+}
+function circle(b, x, y, r, rest){
+  const dx = b.x - x, dy = b.y - y, d = Math.hypot(dx, dy), rr = BR + r;
+  if (d >= rr || d < 1e-6) return null;
+  const nx = dx / d, ny = dy / d; b.x = x + nx * rr; b.y = y + ny * rr;
+  const vn = b.vx * nx + b.vy * ny;
+  if (vn < 0){ b.vx -= (1 + rest) * vn * nx; b.vy -= (1 + rest) * vn * ny; }
+  return {nx, ny, vn};
+}
+function stepFlippers(dt){
+  FL.forEach(f => {
+    const target = f.key ? f.up : f.rest, sp = f.key ? 26 : 16, before = f.a;
+    const d = target - f.a; f.a += Math.sign(d) * Math.min(Math.abs(d), sp * dt);
+    f.w = (f.a - before) / dt;
+  });
+}
+function physics(dt){
+  stepFlippers(dt);
+  for (const b of balls){
+    if (b === captured) continue;
+    if (b.x > 522 && b.y > 340) b.lane = true;
+    if (b.lane && b.vy >= 0 && b.y >= 960 - BR - 1 - plunger * 40 && b.x > 522){ b.y = 960 - BR - plunger * 40; b.x = 546; b.vx = 0; b.vy = 0; continue; }
+    b.vy += GRAV * dt;
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.x < 522) b.lane = false;
+    for (const w of walls){
+      if (w.oneway && b.vy < 0) continue;
+      if (w.target != null && !targets[w.target]) continue;
+      const c = collide(b, w.ax, w.ay, w.bx, w.by, 0, w.rest);
+      if (!c) continue;
+      if (w.kick && -c.vn > 120){ b.vx += c.nx * w.kick * .6; b.vy += c.ny * w.kick * .6; flash['s' + w.sling] = .15; add(50); Hub.tone(240, .06, 'square', .05, 0, 520); }
+      else if (-c.vn > 250) Hub.tone(120 + Math.random() * 40, .03, 'triangle', Math.min(.05, -c.vn / 30000));
+    }
+    posts.forEach(([x, y, r]) => circle(b, x, y, r, .5));
+    BUMPERS.forEach((bp, i) => {
+      const c = circle(b, bp.x, bp.y, bp.r, .4);
+      if (c){ const s = Math.max(780, Math.hypot(b.vx, b.vy)); const vn = b.vx * c.nx + b.vy * c.ny; b.vx += c.nx * (s - vn) * .9; b.vy += c.ny * (s - vn) * .9; flash['b' + i] = .14; add(100); Hub.tone(520 + i * 90, .06, 'square', .05, 0, 880); spark(bp.x + c.nx * bp.r, bp.y + c.ny * bp.r, '#ff3dbb', 8); }
+    });
+    TARGETS.forEach((tg, i) => {
+      if (!targets[i]) return;
+      const c = collide(b, tg.ax, tg.ay, tg.bx, tg.by, 3, .4);
+      if (c && -c.vn > 60){
+        targets[i] = 0; add(500); Hub.tone(700, .08, 'triangle', .05); spark((tg.ax + tg.bx) / 2, tg.ay, '#3fe6ff', 10);
+        if (!targets.some(Boolean)){ add(5000); msg('ZIELE KOMPLETT! +5000'); Hub.sfx('ok'); setTimeout(() => targets = [1, 1, 1], 1500); Hub.achieve('flipper', 'tg', 'Alles umgenietet', 'Wirf alle drei Zielscheiben um'); }
+      }
+    });
+    FL.forEach(f => {
+      const tx = f.px + Math.cos(f.a) * f.len, ty = f.py + Math.sin(f.a) * f.len;
+      // Oberflächengeschwindigkeit am Kontaktpunkt
+      const k = Math.max(0, Math.min(1, ((b.x - f.px) * (tx - f.px) + (b.y - f.py) * (ty - f.py)) / (f.len * f.len)));
+      const cx = f.px + (tx - f.px) * k, cy = f.py + (ty - f.py) * k, rad = 10 - k * 4;
+      collide(b, f.px, f.py, tx, ty, rad, .28, -f.w * (cy - f.py), f.w * (cx - f.px));
+    });
+    // Bahnen
+    if (b.y > 70 && b.y < 110) LANES.forEach((x, i) => { if (Math.abs(b.x - x) < 18 && !lanes[i]){ lanes[i] = 1; add(1000); Hub.tone(880, .08, 'triangle', .05); Hub.tone(1100, .08, 'triangle', .04, .06);
+      if (lanes.every(Boolean)){ mult = Math.min(8, mult + 1); add(2000); msg(`MULTIPLIKATOR ×${mult}!`); Hub.sfx('ach'); setTimeout(() => lanes = [0, 0, 0], 900); if (mult >= 5) Hub.achieve('flipper', 'm5', 'Multiplikator ×5', 'Erreiche einen fünffachen Multiplikator'); } } });
+    // Kugelfang
+    if (!captured && saucerCool <= 0 && Math.hypot(b.x - SAUCER.x, b.y - SAUCER.y) < SAUCER.r && Math.hypot(b.vx, b.vy) < 1300){
+      captured = b; b.x = SAUCER.x; b.y = SAUCER.y; b.vx = b.vy = 0; saucerHits++;
+      const jp = 2500 * Math.min(4, saucerHits); add(jp); msg(`JACKPOT! ${Hub.fmt(jp * mult)}`); Hub.tone(300, .4, 'sawtooth', .04, 0, 900);
+      setTimeout(() => {
+        if (saucerHits % 3 === 0 && balls.length < 3){ msg('MULTIBALL!'); Hub.sfx('ach'); Hub.achieve('flipper', 'multi', 'Multiball!', 'Starte den Multiball'); for (let k = 0, n = 3 - balls.length; k < n; k++) balls.push({x:SAUCER.x - 20 - k * 26, y:SAUCER.y - 30, vx:-500 - k * 200, vy:-700, lane:false}); saveT = 8; }
+        saucerCool = 2.5;
+        if (captured){ captured.vx = -620; captured.vy = -820; captured.y -= 4; const c = captured; setTimeout(() => { if (captured === c) captured = null; }, 250); }
+        Hub.tone(200, .15, 'square', .05, 0, 600);
+      }, 1100);
+    }
+    // Geschwindigkeit begrenzen
+    const v = Math.hypot(b.vx, b.vy); if (v > VMAX){ b.vx *= VMAX / v; b.vy *= VMAX / v; }
+  }
+  // Ausgelaufen?
+  for (let i = balls.length - 1; i >= 0; i--) if (balls[i].y > H + 30){
+    const b = balls.splice(i, 1)[0];
+    if (saveT > 0 && balls.length === 0){ msg('KUGEL GERETTET!'); newBallInLane(); Hub.tone(660, .2, 'triangle', .05); continue; }
+    if (balls.length === 0) drain();
+  }
+}
+function drain(){
+  Hub.tone(300, .5, 'sawtooth', .04, 0, 80);
+  ballNo++; upd();
+  if (FP){
+    fpSave();
+    let n = -1; for (let k = 1; k <= FP.length; k++){ const j = (fpi + k) % FP.length; if (FP[j].ballNo <= 3){ n = j; break; } }
+    if (n < 0) return partyOver();
+    fpLoad(n); newBallInLane(); return;
+  }
+  if (ballNo > 3) return gameOver();
+  msg(`KUGEL ${ballNo}`); newBallInLane();
+}
+async function partyOver(){
+  state = 'over';
+  const rank = FP.slice().sort((a, b) => b.score - a.score);
+  Hub.sfx('ach'); Hub.achieve('flipper', 'party', 'Flipperturnier', 'Spiele Flipper mit der Partyrunde');
+  const r = await Hub.dialog({title:`🏆 ${rank[0].name} ist Flipperkönig!`, center:true, dismiss:false,
+    html:rank.map((q, k) => `<p style="font-size:18px">${['🥇', '🥈', '🥉'][k] || (k + 1) + '.'} <b style="color:${q.color}">${q.avatar} ${q.name}</b>: ${Hub.fmt(q.score)} Punkte</p>`).join(''),
+    buttons:[{label:'Zur Spielhalle', value:'home'}, {label:'Neue Runde', primary:true, value:'new'}]});
+  if (r === 'new') startParty(); else location.href = '../Launcher.html';
+}
+function gameOver(){
+  state = 'over';
+  const rec = Hub.score('flipper', score, {label:'Punkte'}); best = Math.max(best, score); upd();
+  Hub.sfx('bad');
+  $('ovText').innerHTML = `Spiel vorbei – <b>${Hub.fmt(score)}</b> Punkte.${rec.record && score > 0 ? '<br><b style="color:#ffd23f">Neuer Rekord!</b>' : ''}`;
+  $('go').textContent = 'Nochmal'; $('ov').classList.remove('hide');
+}
+function launch(){
+  const b = balls.find(b => b.lane && b.x > 522 && b.y > 900);
+  if (!b){ plunger = 0; return; }
+  b.vy = -(1250 + 1100 * plunger); b.vx = 0; saveT = 7;
+  Hub.tone(150, .2, 'sawtooth', .05, 0, 500);
+  plunger = 0;
+}
+function spark(x, y, col, n){ for (let k = 0; k < n; k++){ const a = Math.random() * 6.283, s = 80 + Math.random() * 260; parts.push({x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s, t:.4, col}); } }
+
+// ---------- Tischgrafik ----------
+function buildArt(){
+  tableArt = document.createElement('canvas'); tableArt.width = W; tableArt.height = H;
+  const c = tableArt.getContext('2d');
+  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1c0a3a'); g.addColorStop(.6, '#0e0624'); g.addColorStop(1, '#05020e'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  // Raster
+  c.strokeStyle = 'rgba(160,80,255,.08)'; c.lineWidth = 1;
+  for (let x = 0; x < W; x += 30){ c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+  for (let y = 0; y < H; y += 30){ c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+  // Logo
+  c.save(); c.translate(285, 610); c.rotate(-.12); c.textAlign = 'center';
+  c.font = '800 64px Bahnschrift'; c.fillStyle = 'rgba(255,61,187,.12)'; c.fillText('NEON', 0, 0); c.fillStyle = 'rgba(63,230,255,.10)'; c.fillText('FLIPPER', 0, 60); c.restore();
+  // Sonnenkreis
+  const sg = c.createRadialGradient(295, 395, 10, 295, 395, 200); sg.addColorStop(0, 'rgba(255,61,187,.18)'); sg.addColorStop(1, 'rgba(255,61,187,0)'); c.fillStyle = sg; c.fillRect(0, 150, W, 500);
+  // Außerhalb des Bogens abdunkeln
+  c.save(); c.globalCompositeOperation = 'destination-in'; c.beginPath(); c.arc(ARC.x, ARC.y, ARC.r, Math.PI, 0); c.lineTo(570, H); c.lineTo(40, H); c.closePath(); c.fill();
+  c.globalCompositeOperation = 'destination-over'; c.fillStyle = '#05020c'; c.fillRect(0, 0, W, H); c.restore();
+  // Abschussbahn
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(522, 330, 48, 655);
+  // Wände
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  walls.forEach(w => { if (w.oneway) return; c.strokeStyle = w.kick ? 'rgba(0,0,0,0)' : '#7a5cff'; c.lineWidth = 6; c.shadowColor = '#7a5cff'; c.shadowBlur = 12; c.beginPath(); c.moveTo(w.ax, w.ay); c.lineTo(w.bx, w.by); c.stroke(); });
+  c.shadowBlur = 0;
+  // Pfeile in den Bahnen
+  c.fillStyle = 'rgba(255,179,71,.18)';
+  [[120, 420], [470, 420]].forEach(([x, y]) => { c.beginPath(); c.moveTo(x, y); c.lineTo(x - 14, y + 26); c.lineTo(x + 14, y + 26); c.fill(); });
+}
+function drawFlipper(f){
+  const tx = f.px + Math.cos(f.a) * f.len, ty = f.py + Math.sin(f.a) * f.len;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = '#ff3dbb'; ctx.shadowColor = '#ff3dbb'; ctx.shadowBlur = f.key ? 22 : 10; ctx.lineWidth = 18;
+  ctx.beginPath(); ctx.moveTo(f.px, f.py); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.shadowBlur = 0; ctx.strokeStyle = '#ffd0f0'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(f.px, f.py); ctx.lineTo(tx, ty); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(f.px, f.py, 4, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function draw(){
+  ctx.drawImage(tableArt, 0, 0);
+  // Schleudern
+  SLING.forEach((s, i) => {
+    const f = flash['s' + i] > 0;
+    ctx.fillStyle = f ? 'rgba(255,255,255,.5)' : 'rgba(255,179,71,.18)';
+    ctx.beginPath(); ctx.moveTo(...s.a); ctx.lineTo(...s.b); ctx.lineTo(...s.c); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = f ? '#fff' : '#ffb347'; ctx.lineWidth = 6; ctx.shadowColor = '#ffb347'; ctx.shadowBlur = f ? 26 : 10;
+    ctx.beginPath(); ctx.moveTo(...s.a); ctx.lineTo(...s.c); ctx.stroke(); ctx.shadowBlur = 0;
+  });
+  // Bahn-Lichter
+  LANES.forEach((x, i) => { ctx.fillStyle = lanes[i] ? '#3fe6ff' : 'rgba(63,230,255,.15)'; ctx.shadowColor = '#3fe6ff'; ctx.shadowBlur = lanes[i] ? 18 : 0; ctx.beginPath(); ctx.arc(x, 145, 8, 0, 7); ctx.fill(); }); ctx.shadowBlur = 0;
+  // Multiplikator-Lichter
+  for (let k = 1; k <= 8; k++){ ctx.fillStyle = k <= mult ? '#ffb347' : 'rgba(255,179,71,.14)'; ctx.font = '700 13px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('×' + k, 160 + k * 28, 700 + Math.sin(k * .8) * 0); }
+  // Bumper
+  BUMPERS.forEach((bp, i) => {
+    const f = flash['b' + i] > 0;
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(bp.x + 4, bp.y + 6, bp.r, 0, 7); ctx.fill();
+    const g = ctx.createRadialGradient(bp.x - 8, bp.y - 10, 4, bp.x, bp.y, bp.r); g.addColorStop(0, f ? '#fff' : '#ff9ae0'); g.addColorStop(1, f ? '#ff3dbb' : '#9a1a6e');
+    ctx.fillStyle = g; ctx.shadowColor = '#ff3dbb'; ctx.shadowBlur = f ? 40 : 14; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bp.x, bp.y, bp.r * .6, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = '700 12px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('100', bp.x, bp.y + 4);
+  });
+  // Zielscheiben
+  TARGETS.forEach((tg, i) => {
+    ctx.fillStyle = targets[i] ? '#3fe6ff' : 'rgba(63,230,255,.12)'; ctx.shadowColor = '#3fe6ff'; ctx.shadowBlur = targets[i] ? 14 : 0;
+    ctx.fillRect(tg.ax, tg.ay - 5, tg.bx - tg.ax, 10); ctx.shadowBlur = 0;
+  });
+  // Kugelfang
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(SAUCER.x, SAUCER.y, SAUCER.r + 4, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(255,210,63,${.5 + Math.sin(t * 6) * .4})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(SAUCER.x, SAUCER.y, SAUCER.r + 9, 0, 7); ctx.stroke();
+  ctx.fillStyle = '#ffd23f'; ctx.font = '700 11px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('JACKPOT', SAUCER.x, SAUCER.y + 40);
+  for (let k = 0; k < 3; k++){ ctx.fillStyle = k < saucerHits % 3 ? '#ffd23f' : 'rgba(255,210,63,.18)'; ctx.beginPath(); ctx.arc(SAUCER.x - 14 + k * 14, SAUCER.y + 52, 4, 0, 7); ctx.fill(); }
+  // Pfosten
+  posts.forEach(([x, y, r]) => { ctx.fillStyle = '#d9c8ff'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); });
+  // Klappe
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(522, 330); ctx.lineTo(570, 300); ctx.stroke();
+  // Flipper
+  FL.forEach(drawFlipper);
+  // Kolben
+  const py = 960 + plunger * 40;
+  ctx.fillStyle = '#5a4a7a'; ctx.fillRect(536, py, 20, 985 - py + 20);
+  ctx.fillStyle = '#ffb347'; ctx.fillRect(532, py, 28, 8);
+  if (plungerHeld){ ctx.fillStyle = `hsl(${120 - plunger * 120},90%,55%)`; ctx.fillRect(578, 985 - plunger * 200, 10, plunger * 200); }
+  // Kugeln
+  balls.forEach(b => {
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(b.x + 3, b.y + 5, BR, 0, 7); ctx.fill();
+    const g = ctx.createRadialGradient(b.x - 4, b.y - 4, 1, b.x, b.y, BR); g.addColorStop(0, '#ffffff'); g.addColorStop(.5, '#c8cbd8'); g.addColorStop(1, '#5a5e70');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, BR, 0, 7); ctx.fill();
+  });
+  parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.t / .4); ctx.fillStyle = p.col; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); }); ctx.globalAlpha = 1;
+  // Kugelrettung
+  if (saveT > 0 && state === 'play'){ ctx.fillStyle = `rgba(63,210,139,${.5 + Math.sin(t * 10) * .4})`; ctx.font = '700 14px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('KUGELRETTUNG', 281, 975); }
+  // Anzeige im Tisch
+  ctx.fillStyle = 'rgba(255,179,71,.9)'; ctx.font = '700 22px Consolas, monospace'; ctx.textAlign = 'center'; ctx.shadowColor = '#ff9a2e'; ctx.shadowBlur = 10;
+  ctx.fillText(Hub.fmt(score), 300, 220); ctx.shadowBlur = 0;
+  if (paused){ ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#fff'; ctx.font = '700 40px Bahnschrift'; ctx.fillText('PAUSE', W / 2, H / 2); }
+}
+function loop(now){
+  const dt = Math.min(.033, (now - lastT) / 1000 || 0); lastT = now;
+  if (state === 'play' && !paused){
+    t += dt;
+    if (plungerHeld) plunger = Math.min(1, plunger + dt * 1.1);
+    for (let s = 0; s < SUB; s++) physics(dt / SUB);
+    if (saucerCool > 0) saucerCool -= dt;
+    if (saveT > 0 && !balls.some(b => b.lane)) saveT -= dt;
+    for (const k in flash) flash[k] -= dt;
+    if (msgT > 0){ msgT -= dt; if (msgT <= 0) $('dMsg').textContent = ''; }
+  }
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.t -= dt; }); parts = parts.filter(p => p.t > 0);
+  if (balls) draw();
+  requestAnimationFrame(loop);
+}
+// ---------- Eingabe ----------
+const flip = (i, on) => { if (state !== 'play') return; if (on && !FL[i].key) Hub.tone(i ? 190 : 170, .05, 'square', .035, 0, 90); FL[i].key = on; };
+addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (['ArrowLeft', 'KeyA', 'ShiftLeft'].includes(e.code)){ flip(0, true); e.preventDefault(); }
+  if (['ArrowRight', 'KeyD', 'ShiftRight'].includes(e.code)){ flip(1, true); e.preventDefault(); }
+  if (e.code === 'Space' || e.code === 'ArrowDown' || e.code === 'KeyS'){
+    e.preventDefault();
+    if (!$('ov').classList.contains('hide')){ $('go').click(); return; }
+    plungerHeld = true;
+  }
+  if (e.code === 'KeyP' || e.code === 'Escape') paused = !paused;
+});
+addEventListener('keyup', e => {
+  if (['ArrowLeft', 'KeyA', 'ShiftLeft'].includes(e.code)) flip(0, false);
+  if (['ArrowRight', 'KeyD', 'ShiftRight'].includes(e.code)) flip(1, false);
+  if ((e.code === 'Space' || e.code === 'ArrowDown' || e.code === 'KeyS') && plungerHeld){ plungerHeld = false; launch(); }
+});
+const touches = new Map();
+cv.addEventListener('pointerdown', e => {
+  const r = cv.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  if (fx > .86 && fy > .6){ plungerHeld = true; touches.set(e.pointerId, 'p'); return; }
+  const i = fx < .5 ? 0 : 1; flip(i, true); touches.set(e.pointerId, i);
+});
+addEventListener('pointerup', e => { const v = touches.get(e.pointerId); if (v === 'p'){ plungerHeld = false; launch(); } else if (v != null) flip(v, false); touches.delete(e.pointerId); });
+$('go').onclick = () => { FP = null; $('ov').classList.add('hide'); reset(); state = 'play'; paused = false; Hub.sfx('click'); };
+$('goParty').onclick = startParty;
+$('partyLine').textContent = Hub.party.active().length >= 2 ? 'Partyrunde: ' + Hub.party.active().map(pp => pp.name).join(', ') + ' – abwechselnd je eine Kugel' : '';
+window.__fl = {score:() => score, ballNo:() => ballNo, mult:() => mult, extraGiven:() => extraGiven, saucerHits:() => saucerHits};
+if (Hub.party.wantsParty('flipper')) setTimeout(startParty, 300);
+buildArt(); reset(); state = 'menu';
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2048</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+:root{--bg:#120f1e;--panel:#1f1a33;--line:#382f5c;--text:#f3eeff;--muted:#a59cc9}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:radial-gradient(circle at 50% 0%,#2e2452,#120f1e 65%);color:var(--text);font-family:system-ui,"Segoe UI",Roboto,sans-serif;user-select:none;overflow:hidden;touch-action:none}
+.bar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--line)}
+.back{color:var(--text);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-weight:700}
+h1{font-size:20px;margin:0}
+main{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 58px);gap:14px;padding:10px}
+.top{display:flex;gap:10px;align-items:center;width:min(480px,92vw)}
+.st{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 14px;text-align:center;min-width:90px;position:relative}
+.st small{display:block;font-size:11px;color:var(--muted);font-weight:800;letter-spacing:1px}
+.st b{font-size:22px;font-variant-numeric:tabular-nums}
+.add{position:absolute;left:50%;top:0;font-weight:900;color:#7cf9a8;animation:add .8s ease-out forwards;pointer-events:none}
+@keyframes add{from{transform:translate(-50%,0);opacity:1}to{transform:translate(-50%,-40px);opacity:0}}
+.sp{flex:1}
+.btn{border:0;border-radius:10px;padding:9px 14px;font-weight:800;font-size:14px;background:#3a2f63;color:var(--text);cursor:pointer}
+.btn.ok{background:linear-gradient(180deg,#ffd463,#f29100);color:#2a1600}
+#board{position:relative;width:min(480px,92vw,calc(100vh - 220px));aspect-ratio:1;background:#2a2347;border-radius:16px;padding:2.5%}
+.cellbg{position:absolute;width:21.25%;aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,.06)}
+.tile{position:absolute;width:21.25%;aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;
+  transition:left .1s ease-in-out,top .1s ease-in-out;z-index:2}
+.tile span{display:block}
+.tile.new span{animation:appear .18s ease-out}
+.tile.merged span{animation:pop .2s ease-out}
+.tile.merged{z-index:3}
+@keyframes appear{from{transform:scale(0)}}
+@keyframes pop{50%{transform:scale(1.22)}}
+.ov{position:absolute;inset:0;background:rgba(18,15,30,.82);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;text-align:center}
+.ov.hide{display:none}
+.ov h2{font-size:40px;margin:0 0 8px}
+.hint{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div class="st"><small>PUNKTE</small><b id="score">0</b></div>
+    <div class="st"><small>REKORD</small><b id="best">0</b></div>
+    <div class="sp"></div>
+    <button class="btn" id="undo" title="Letzten Zug zurücknehmen">↶ Zurück (<span id="undoN">3</span>)</button>
+    <button class="btn ok" id="new">Neues Spiel</button>
+  </div>
+  <div id="board"><div class="ov hide" id="ov"></div></div>
+  <div class="hint">Pfeiltasten / WASD oder wischen · Gleiche Zahlen verschmelzen · Schaffst du 2048?</div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('g2048');
+const hbar = Hub.bar({id:'g2048', title:'2048', actions:['help', 'sound', 'full']});
+hbar.on('help', () => Hub.dialog({title:'2048', html:`<p>Schiebe alle Kacheln mit den <b>Pfeiltasten</b> oder durch Wischen. Zwei gleiche Zahlen verschmelzen zu ihrer Summe. Erreiche die <b>2048</b>!</p><p>Du hast drei Rückgängig-Joker pro Spiel (<kbd>Strg</kbd>+<kbd>Z</kbd>).</p>`}));
+
+
+const $ = id => document.getElementById(id);
+const boardEl = $('board');
+const COLORS = {2:['#eee4da','#3a2d20'],4:['#ede0c8','#3a2d20'],8:['#f2b179','#fff'],16:['#f59563','#fff'],32:['#f67c5f','#fff'],64:['#f65e3b','#fff'],
+  128:['#edcf72','#fff'],256:['#edcc61','#fff'],512:['#edc850','#fff'],1024:['#c56cf0','#fff'],2048:['#ff3fa4','#fff'],4096:['#3fd8ff','#fff'],8192:['#3ddc84','#fff']};
+function getHS(){ try { return (JSON.parse(localStorage.getItem('arcade_hs')) || {}).g2048 || 0; } catch(e){ return 0; } }
+function setHS(v){ try { const d = JSON.parse(localStorage.getItem('arcade_hs')) || {}; if (v > (d.g2048 || 0)){ d.g2048 = v; localStorage.setItem('arcade_hs', JSON.stringify(d)); return true; } } catch(e){} return false; }
+let ac;
+function beep(f, d = .08, type = 'sine', v = .05, delay = 0){
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = f; g.gain.setValueAtTime(Math.max(1e-4, v * Hub.vol()), t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d); } catch(e){}
+}
+for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++){
+  const d = document.createElement('div'); d.className = 'cellbg'; d.style.left = pos(c); d.style.top = pos(r); boardEl.appendChild(d);
+}
+function pos(i){ return (2.5 + i * 23.75) + '%'; }
+let tiles, score, history, undos, won, over, nid = 1, busy = false;
+function newGame(){
+  tiles && tiles.forEach(t => t.el.remove());
+  tiles = []; score = 0; history = []; undos = 3; won = false; over = false;
+  addRandom(); addRandom();
+  $('ov').classList.add('hide'); upd();
+}
+function addRandom(){
+  const empty = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (!tiles.some(t => t.r === r && t.c === c)) empty.push([r, c]);
+  if (!empty.length) return;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  makeTile(r, c, Math.random() < .9 ? 2 : 4, 'new');
+}
+function makeTile(r, c, v, cls){
+  const el = document.createElement('div');
+  el.className = 'tile ' + (cls || '');
+  el.innerHTML = '<span></span>';
+  boardEl.appendChild(el);
+  const t = {id:nid++, r, c, v, el};
+  tiles.push(t); paint(t);
+  return t;
+}
+function paint(t){
+  const [bg, fg] = COLORS[t.v] || ['#222', '#fff'];
+  t.el.style.left = pos(t.c); t.el.style.top = pos(t.r);
+  t.el.style.background = bg; t.el.style.color = fg;
+  t.el.style.boxShadow = t.v >= 128 ? `0 0 ${Math.min(30, Math.log2(t.v) * 2)}px ${bg}` : 'none';
+  const w = boardEl.clientWidth * .2125;
+  t.el.style.fontSize = (w * (t.v < 100 ? .45 : t.v < 1000 ? .38 : .3)) + 'px';
+  t.el.firstChild.textContent = t.v;
+}
+function move(dr, dc){
+  if (busy || over) return;
+  const snapshot = {tiles:tiles.map(t => ({r:t.r, c:t.c, v:t.v})), score};
+  const order = [0, 1, 2, 3];
+  const rows = dr === 1 ? [...order].reverse() : order, cols = dc === 1 ? [...order].reverse() : order;
+  const at = (r, c) => tiles.find(t => t.r === r && t.c === c && !t.dead);
+  let moved = false, gained = 0, maxNew = 0;
+  const mergedInto = new Set();
+  for (const r of rows) for (const c of cols){
+    const t = at(r, c); if (!t) continue;
+    let nr = r, nc = c;
+    while (true){
+      const tr = nr + dr, tc = nc + dc;
+      if (tr < 0 || tr > 3 || tc < 0 || tc > 3) break;
+      const o = at(tr, tc);
+      if (!o){ nr = tr; nc = tc; continue; }
+      if (o.v === t.v && !mergedInto.has(o.id)){
+        nr = tr; nc = tc;
+        t.dead = true; o.v *= 2; mergedInto.add(o.id); gained += o.v; maxNew = Math.max(maxNew, o.v);
+        o.pending = true;
+      }
+      break;
+    }
+    if (nr !== r || nc !== c){ moved = true; t.r = nr; t.c = nc; }
+  }
+  if (!moved) return;
+  history.push(snapshot); if (history.length > 20) history.shift();
+  busy = true;
+  tiles.forEach(t => { t.el.style.left = pos(t.c); t.el.style.top = pos(t.r); t.el.classList.remove('new', 'merged'); });
+  setTimeout(() => {
+    tiles.filter(t => t.dead).forEach(t => t.el.remove());
+    tiles = tiles.filter(t => !t.dead);
+    tiles.filter(t => t.pending).forEach(t => { t.pending = false; paint(t); void t.el.offsetWidth; t.el.classList.add('merged'); });
+    score += gained;
+    if (gained){ showAdd(gained); beep(300 + Math.log2(maxNew) * 60, .1, 'triangle', .06); } else beep(180, .04, 'sine', .03);
+    addRandom(); upd(); busy = false;
+    if (tiles.some(t => t.v >= 1024)) Hub.achieve('g2048', 't1024', 'Fast geschafft', 'Erreiche die Kachel 1024');
+    if (!won && tiles.some(t => t.v >= 2048)){ won = true; Hub.achieve('g2048', 't2048', '2048!', 'Erreiche die Kachel 2048'); beep(523, .2, 'triangle', .06); beep(784, .3, 'triangle', .06, .15); showOv('🎉', 'Du hast 2048 geschafft!', '<button class="btn ok" onclick="hideOv()">Weiterspielen</button> <button class="btn" onclick="newGame()">Neues Spiel</button>'); }
+    if (!canMove()){ over = true; const rec = setHS(score); Hub.score('g2048', score, {label:'Punkte', silent:true}); showOv('😵', 'Keine Züge mehr!', `<p>Punkte: <b>${score}</b>${rec ? '<br><b style="color:#ffc940">🏆 NEUER REKORD!</b>' : ''}</p><button class="btn ok" onclick="newGame()">Nochmal</button> ${undos ? '<button class="btn" onclick="undo()">↶ Zurück</button>' : ''}`); }
+  }, 110);
+}
+function canMove(){
+  if (tiles.length < 16) return true;
+  const g = {}; tiles.forEach(t => g[t.r * 4 + t.c] = t.v);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++){ const v = g[r * 4 + c]; if (c < 3 && g[r * 4 + c + 1] === v) return true; if (r < 3 && g[(r + 1) * 4 + c] === v) return true; }
+  return false;
+}
+function undo(){
+  if (!history.length || !undos || busy) return;
+  const s = history.pop(); undos--;
+  tiles.forEach(t => t.el.remove()); tiles = [];
+  s.tiles.forEach(t => makeTile(t.r, t.c, t.v));
+  score = s.score; over = false; hideOv(); upd();
+}
+function upd(){
+  $('score').textContent = score; $('best').textContent = Math.max(getHS(), score); $('undoN').textContent = undos;
+  $('undo').disabled = !undos || !history.length;
+  setHS(score);
+}
+function showAdd(v){ const d = document.createElement('div'); d.className = 'add'; d.textContent = '+' + v; $('score').parentNode.appendChild(d); setTimeout(() => d.remove(), 800); }
+function showOv(icon, title, html){ $('ov').innerHTML = `<div style="font-size:60px">${icon}</div><h2>${title}</h2>${html}`; $('ov').classList.remove('hide'); }
+function hideOv(){ $('ov').classList.add('hide'); }
+addEventListener('keydown', e => {
+  const m = {arrowup:[-1,0], w:[-1,0], arrowdown:[1,0], s:[1,0], arrowleft:[0,-1], a:[0,-1], arrowright:[0,1], d:[0,1]}[e.key.toLowerCase()];
+  if (m){ e.preventDefault(); if ($('ov').classList.contains('hide')) move(...m); }
+  if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) undo();
+});
+let ts = null;
+boardEl.addEventListener('pointerdown', e => ts = {x:e.clientX, y:e.clientY});
+addEventListener('pointerup', e => {
+  if (!ts) return;
+  const dx = e.clientX - ts.x, dy = e.clientY - ts.y; ts = null;
+  if (Math.hypot(dx, dy) < 30 || !$('ov').classList.contains('hide')) return;
+  Math.abs(dx) > Math.abs(dy) ? move(0, Math.sign(dx)) : move(Math.sign(dy), 0);
+});
+addEventListener('resize', () => tiles.forEach(paint));
+$('new').onclick = newGame;
+$('undo').onclick = undo;
+newGame();
+</script>
+</body>
+</html>

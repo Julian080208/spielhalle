@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Früchte-Feuer</title>
+<link rel="stylesheet" href="shared/hub.css">
+</head>
+<body>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<script src="shared/slots.js"></script>
+<script>
+Hub.init('fruechte'); Hub.casinoInit();
+const bar = Hub.bar({id:'fruechte', title:'Früchte-Feuer', actions:['help', 'sound', 'full']});
+const RULES = 'Klassischer Früchte-Automat mit <b>20 Gewinnlinien</b>. Das <b>WILD</b> ersetzt alle Symbole außer dem Stern. 3 oder mehr <b>Sterne</b> irgendwo zahlen sofort und starten das <b>Glücksrad</b> mit Multiplikatoren bis ×100!';
+bar.on('help', () => Hub.dialog({title:'Früchte-Feuer', html:`<p>${RULES}</p><p><kbd>Leertaste</kbd> dreht. <i>Gespielt wird nur mit Spielgeld-Chips.</i></p>`}));
+const symbols = {
+  wild:{name:'Wild', wild:true, txt:'WILD', fs:.3, col:['#fff6b0', '#ff7a00'], plate:['rgba(255,120,0,.35)', 'rgba(120,20,0,.2)'], pays:{3:75, 4:375, 5:1500}},
+  star:{name:'Stern', scatter:true, emoji:'⭐', scatterPays:{3:3, 4:15, 5:75}, plate:['rgba(255,220,60,.25)', 'rgba(0,0,0,0)']},
+  seven:{name:'Sieben', txt:'7', fs:.7, col:['#ff8a8a', '#c4101f'], pays:{3:40, 4:150, 5:750}},
+  melon:{name:'Melone', emoji:'🍉', pays:{3:25, 4:75, 5:300}},
+  grape:{name:'Trauben', emoji:'🍇', pays:{3:25, 4:75, 5:300}},
+  bell:{name:'Glocke', emoji:'🔔', pays:{3:15, 4:45, 5:180}},
+  plum:{name:'Pflaume', emoji:'🍑', pays:{3:9, 4:30, 5:120}},
+  orange:{name:'Orange', emoji:'🍊', pays:{3:8, 4:22, 5:90}},
+  lemon:{name:'Zitrone', emoji:'🍋', pays:{3:8, 4:22, 5:90}},
+  cherry:{name:'Kirsche', emoji:'🍒', pays:{2:2, 3:6, 4:18, 5:75}},
+};
+const mk = o => Object.entries(o).flatMap(([k, n]) => Array(n).fill(k));
+const sh = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const strip = (w, st) => sh(mk({wild:w, star:st, seven:2, melon:3, grape:3, bell:4, plum:5, orange:6, lemon:6, cherry:6}));
+window.slot = HubSlot({
+  id:'fruechte', title:'Früchte-Feuer', logoText:'🔥 FRÜCHTE-FEUER 🔥', gamble:true, feature:'wheel', rules:RULES,
+  theme:{bg:'radial-gradient(1200px 700px at 50% 30%,#6a1020,#1a0408 70%)', frame:'#ff5a1f', frameBg:'linear-gradient(180deg,#ff8a3d,#8a1a08)', accent:'#ffd23f', glow:'rgba(255,120,40,.6)', reelBg:'#1a0508'},
+  symbols, bets:[10, 20, 50, 100, 200, 500, 1000], wheelSegs:[5, 10, 20, 8, 50, 12, 15, 100, 6, 25],
+  strips:[strip(1, 1), strip(2, 2), strip(2, 1), strip(2, 2), strip(1, 1)],
+  lines:[[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [1, 0, 0, 0, 1], [1, 2, 2, 2, 1], [0, 0, 1, 2, 2], [2, 2, 1, 0, 0], [1, 2, 1, 0, 1],
+         [1, 0, 1, 2, 1], [0, 1, 1, 1, 0], [2, 1, 1, 1, 2], [0, 1, 0, 1, 0], [2, 1, 2, 1, 2], [1, 1, 0, 1, 1], [1, 1, 2, 1, 1], [0, 0, 2, 0, 0], [2, 2, 0, 2, 2], [0, 2, 0, 2, 0]],
+  drawBg(c, w, h, t){ for (let k = 0; k < 14; k++){ const x = (k * 97 + t * 20) % w, y = h - ((k * 61 + t * 60 * (1 + k % 3)) % h); c.fillStyle = `rgba(255,${120 + k * 8},40,.06)`; c.beginPath(); c.arc(x, y, 8 + k % 5 * 4, 0, 7); c.fill(); } },
+});
+</script>
+</body>
+</html>

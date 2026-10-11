@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stapelturm</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden;background:#111}
+body{display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation}
+#cv{width:100%;height:100%;display:block}
+.hud{position:absolute;top:30px;left:0;right:0;text-align:center;pointer-events:none}
+.hud b{font-family:var(--font-display);font-size:84px;color:#fff;text-shadow:0 4px 30px rgba(0,0,0,.25)}
+.hud div{color:rgba(255,255,255,.8);font-weight:700;letter-spacing:2px;font-size:14px;min-height:20px}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:12px;padding-bottom:12vh;text-align:center;pointer-events:none}
+.ov.hide{display:none}
+.ov h1{margin:0;font-family:var(--font-display);font-size:60px;letter-spacing:6px;color:#fff;text-shadow:0 4px 30px rgba(0,0,0,.3)}
+.ov p{color:rgba(255,255,255,.85);margin:0;font-weight:600}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas>
+  <div class="hud"><b id="sc">0</b><div id="combo"></div></div>
+  <div class="ov" id="ov"><h1>STAPELTURM</h1><p id="ovText">Klicken oder Leertaste, um den Block abzusetzen.</p><p style="font-size:13px;opacity:.75">Perfekt gestapelt? Dann wächst der Block wieder!</p></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('stapel');
+const bar = Hub.bar({id:'stapel', title:'Stapelturm', stats:[['best', 'Rekord'], ['perf', 'Perfekt in Folge']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Stapelturm', html:'<p>Ein Block gleitet hin und her. <b>Klicke</b> (oder drücke <kbd>Leertaste</kbd>), um ihn auf den Turm fallen zu lassen. Was übersteht, wird abgeschnitten – der Turm wird schmaler.</p><p>Triffst du <b>genau</b>, gibt es eine Perfekt-Serie. Ab drei perfekten Treffern in Folge wächst der Block wieder ein Stück.</p>'}));
+
+const $ = id => document.getElementById(id), cv = $('cv'), ctx = cv.getContext('2d');
+const BH = 26, START = 220;
+let stack, cur, falling, state = 'menu', camY = 0, t = 0, lastT = 0, combo = 0, maxCombo = 0, hue0 = Math.random() * 360, best = Hub.best('stapel') || 0, ripples = [], W, H, S;
+
+function resize(){ const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = r.width * d; cv.height = r.height * d; W = r.width; H = r.height; ctx.setTransform(d, 0, 0, d, 0, 0); S = Math.min(W, H) / 900; }
+addEventListener('resize', resize);
+function reset(){
+  stack = [{x:0, z:0, w:START, d:START, y:0}];
+  for (let k = 1; k <= 0; k++) stack.push({...stack[0], y:k});
+  combo = 0; maxCombo = 0; falling = []; ripples = []; camY = 0; hue0 = Math.random() * 360;
+  spawn(); $('sc').textContent = '0'; $('combo').textContent = ''; bar.set('best', best); bar.set('perf', 0);
+}
+function spawn(){
+  const top = stack[stack.length - 1], axis = stack.length % 2 ? 'x' : 'z';
+  cur = {...top, y:top.y + 1, axis, t:0, speed:1.6 + Math.min(1.6, stack.length * .03)};
+  cur[axis] = -340;
+}
+const color = (y, l = 0) => `hsl(${(hue0 + y * 5) % 360},${62}%,${58 + l}%)`;
+function place(){
+  if (state !== 'play') return;
+  const top = stack[stack.length - 1], ax = cur.axis, size = ax === 'x' ? 'w' : 'd';
+  const delta = cur[ax] - top[ax], over = Math.abs(delta);
+  if (over >= top[size]){
+    // daneben
+    falling.push({...cur, vy:0, rot:0});
+    state = 'over'; Hub.sfx('bad'); return gameOver();
+  }
+  if (over < 5){
+    cur[ax] = top[ax]; combo++; maxCombo = Math.max(maxCombo, combo);
+    Hub.tone(440 * Math.pow(2, Math.min(combo, 12) / 12), .12, 'triangle', .06);
+    ripples.push({...cur, t:0});
+    if (combo >= 3){ const grow = Math.min(START, cur[size] + 12); cur[size] = grow; }
+    $('combo').textContent = combo >= 2 ? `PERFEKT ×${combo}` : 'PERFEKT';
+    if (combo >= 5) Hub.achieve('stapel', 'p5', 'Präzisionsarbeit', 'Stapele 5 Blöcke perfekt in Folge');
+    if (combo >= 10) Hub.achieve('stapel', 'p10', 'Millimeterarbeit', 'Stapele 10 Blöcke perfekt in Folge');
+  } else {
+    combo = 0; $('combo').textContent = '';
+    const keep = top[size] - over;
+    const piece = {...cur};
+    // abgeschnittenes Stück
+    piece[size] = over;
+    const nc = top[ax] + delta / 2;
+    piece[ax] = nc + Math.sign(delta) * (keep / 2 + over / 2); cur[ax] = nc;
+    cur[size] = keep;
+    falling.push({...piece, vy:0, vr:(Math.random() - .5) * 3, rot:0});
+    Hub.tone(300, .08, 'triangle', .05);
+  }
+  stack.push({x:cur.x, z:cur.z, w:cur.w, d:cur.d, y:cur.y});
+  const sc = stack.length - 1;
+  $('sc').textContent = sc; bar.set('perf', maxCombo);
+  if (sc === 25) Hub.achieve('stapel', 's25', 'Hochhaus', 'Stapele 25 Blöcke');
+  if (sc === 50) Hub.achieve('stapel', 's50', 'Wolkenkratzer', 'Stapele 50 Blöcke');
+  spawn();
+}
+function gameOver(){
+  const sc = stack.length - 1;
+  const rec = Hub.score('stapel', sc, {label:'Blöcke'}); best = Math.max(best, sc); bar.set('best', best);
+  $('ovText').innerHTML = `${sc} Blöcke${rec.record && sc > 0 ? ' – <b>neuer Rekord!</b>' : ''}<br><span style="font-size:13px;opacity:.8">Klicken für eine neue Runde</span>`;
+  $('ov').classList.remove('hide');
+  setTimeout(() => state = 'dead', 400);
+}
+// ---------- Isometrische Darstellung ----------
+function iso(x, y, z){ return [W / 2 + (x - z) * .866 * S, H * .62 + ((x + z) * .5 - y) * S]; }
+function box(b, y0, hl = 0){
+  const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, yb = y0, yt = y0 + BH;
+  const P = (x, y, z) => iso(x, y - camY, z);
+  const top = [P(x0, yt, z0), P(x1, yt, z0), P(x1, yt, z1), P(x0, yt, z1)];
+  const right = [P(x1, yt, z0), P(x1, yt, z1), P(x1, yb, z1), P(x1, yb, z0)];
+  const left = [P(x0, yt, z1), P(x1, yt, z1), P(x1, yb, z1), P(x0, yb, z1)];
+  const poly = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); };
+  poly(right, color(b.y, -14 + hl)); poly(left, color(b.y, -6 + hl)); poly(top, color(b.y, 6 + hl));
+}
+function draw(){
+  const g = ctx.createLinearGradient(0, 0, 0, H), hh = (hue0 + stack.length * 5) % 360;
+  g.addColorStop(0, `hsl(${hh},45%,${72}%)`); g.addColorStop(1, `hsl(${(hh + 40) % 360},40%,${45}%)`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const from = Math.max(0, stack.length - 40);
+  for (let k = from; k < stack.length; k++) box(stack[k], stack[k].y * BH);
+  // Ringe bei Perfekt
+  ripples.forEach(r => {
+    const a = 1 - r.t, s = 1 + r.t * .4, y = r.y * BH + BH - camY;
+    const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => iso(r.x + sx * r.w / 2 * s, y, r.z + sz * r.d / 2 * s));
+    ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 3; ctx.beginPath(); pts.forEach(([x, yy], k) => k ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy)); ctx.closePath(); ctx.stroke();
+  });
+  if (cur && state !== 'dead' && state !== 'over') box(cur, cur.y * BH, 4);
+  falling.forEach(f => box(f, f.y * BH + f.fy));
+}
+function loop(now){
+  const dt = Math.min(.033, (now - lastT) / 1000 || 0); lastT = now; t += dt;
+  if (state === 'play' && cur){
+    cur.t += dt * cur.speed;
+    cur[cur.axis] = stack[stack.length - 1][cur.axis] + Math.sin(cur.t - Math.PI / 2) * -340 * -1;
+  }
+  const target = Math.max(0, (stack.length - 6) * BH);
+  camY += (target - camY) * Math.min(1, dt * 4);
+  falling.forEach(f => { f.vy += 1400 * dt; f.fy = (f.fy || 0) - f.vy * dt; });
+  falling = falling.filter(f => f.fy > -1400);
+  ripples.forEach(r => r.t += dt * 1.8); ripples = ripples.filter(r => r.t < 1);
+  if (W) draw();
+  requestAnimationFrame(loop);
+}
+function act(){
+  if (state === 'menu' || state === 'dead'){ $('ov').classList.add('hide'); reset(); state = 'play'; Hub.sfx('click'); return; }
+  place();
+}
+$('stage').addEventListener('pointerdown', e => { if (e.target.closest('.h-bar')) return; act(); });
+addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); act(); } });
+resize(); reset(); cur = null;
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

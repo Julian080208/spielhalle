@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%}
+body{display:flex;flex-direction:column;background:radial-gradient(1200px 800px at 50% 20%,#2a1650,#0a0618 70%)}
+main{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:16px;overflow:auto}
+.top{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+.seg{display:flex;gap:3px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:4px}
+.seg button{height:32px;padding:0 13px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--text);color:#111}
+.players{display:flex;gap:14px}
+.pl{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid var(--border-2);transition:.2s}
+.pl.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.25);background:rgba(var(--accent-rgb),.12)}
+.pl b{font-family:var(--font-display);font-size:24px}
+.pl span{font-size:13px;color:var(--text-2);font-weight:600}
+#grid{display:grid;gap:var(--gap);perspective:1000px}
+.card{position:relative;width:var(--cs);height:var(--cs);cursor:pointer;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.3,1.3,.5,1)}
+.card.up,.card.done{transform:rotateY(180deg)}
+.card .f,.card .b{position:absolute;inset:0;border-radius:14px;backface-visibility:hidden;display:flex;align-items:center;justify-content:center}
+.card .b{background:linear-gradient(135deg,#7c6cff,#c45cff);box-shadow:0 6px 16px rgba(0,0,0,.4),inset 0 0 0 3px rgba(255,255,255,.25)}
+.card .b::after{content:'';position:absolute;inset:9px;border-radius:9px;border:2px dashed rgba(255,255,255,.35);background:radial-gradient(circle,rgba(255,255,255,.18) 2px,transparent 3px) 0 0/14px 14px}
+.card:hover .b{filter:brightness(1.12)}
+.card .f{transform:rotateY(180deg);background:linear-gradient(160deg,#fffdf7,#efe8ff);box-shadow:0 6px 16px rgba(0,0,0,.4);font-size:calc(var(--cs) * .56);font-family:"Segoe UI Emoji"}
+.card.done .f{animation:pop .5s ease;box-shadow:0 0 0 3px #3fd28b,0 6px 18px rgba(63,210,139,.4)}
+.card.done.p2 .f{box-shadow:0 0 0 3px #ff8a3d,0 6px 18px rgba(255,138,61,.4)}
+.card.done.pc .f{box-shadow:0 0 0 4px var(--oc),0 6px 18px var(--oc)}
+.pl .pav{font-size:22px;font-family:'Segoe UI Emoji'}
+.pl.on{border-color:var(--oc,var(--accent));box-shadow:0 0 0 3px color-mix(in srgb,var(--oc,var(--accent)) 35%,transparent);background:color-mix(in srgb,var(--oc,var(--accent)) 18%,transparent)}
+.whoTurn{font-family:var(--font-display);font-size:24px;min-height:30px}
+html.tv .top,html.tv .players,html.tv .whoTurn{zoom:var(--tvz,1.3)}
+.card.done{cursor:default}
+@keyframes pop{40%{transform:rotateY(180deg) scale(1.15)}}
+.card.miss .f{animation:shk .35s}
+@keyframes shk{25%{transform:rotateY(180deg) translateX(-5px)}75%{transform:rotateY(180deg) translateX(5px)}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div class="seg" id="mode"><button data-m="party">👥 Partyrunde</button><button data-m="solo">Solo</button><button data-m="ai">Gegen KI</button><button data-m="pvp">2 Spieler</button></div>
+    <div class="seg" id="size"><button data-s="12">12 Karten</button><button data-s="20">20</button><button data-s="30">30</button><button data-s="42">42</button></div>
+    <div class="seg" id="theme"><button data-t="tiere">Tiere</button><button data-t="essen">Essen</button><button data-t="welt">Weltraum</button><button data-t="sport">Sport</button></div>
+  </div>
+  <div class="whoTurn" id="whoTurn"></div><div class="players" id="players"></div>
+  <div id="grid"></div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('memory');
+const bar = Hub.bar({id:'memory', title:'Memory', stats:[['moves', 'Züge'], ['time', 'Zeit'], ['best', 'Bestwert']], actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Memory', html:'<p>Decke zwei Karten auf. Zeigen sie das gleiche Bild, darfst du sie behalten und <b>nochmal</b> ziehen. Sonst werden sie wieder umgedreht.</p><p><b>Solo:</b> Schaffe es mit möglichst wenigen Zügen. <b>Gegen KI:</b> Der Computer hat ein gutes, aber kein perfektes Gedächtnis. Wer am Ende mehr Paare hat, gewinnt.</p>'}));
+
+const $ = id => document.getElementById(id);
+const THEMES = {
+  tiere:['🐶', '🐱', '🦊', '🐼', '🐸', '🦁', '🐵', '🐧', '🦉', '🐙', '🦋', '🐢', '🦄', '🐝', '🐳', '🦒', '🐨', '🦜', '🐬', '🦔', '🐞'],
+  essen:['🍕', '🍔', '🍟', '🌭', '🍩', '🍪', '🍦', '🍓', '🍉', '🍌', '🍇', '🥨', '🧀', '🥕', '🌽', '🍒', '🥐', '🍫', '🧁', '🍍', '🥑'],
+  welt:['🚀', '🛸', '🌍', '🌙', '☀️', '⭐', '🪐', '☄️', '👽', '🛰️', '🌌', '🔭', '👩‍🚀', '🌠', '🌑', '🌈', '⚡', '🔥', '💫', '🌋', '❄️'],
+  sport:['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏓', '🏸', '🥊', '⛳', '🎳', '🏒', '🥏', '🛹', '🚴', '🏊', '⛷️', '🏆', '🥇', '🎯', '🏹'],
+};
+const opts = Object.assign({mode:'solo', size:20, theme:'tiere'}, Hub.read('memory_opts', {}));
+let PP = null, cards, open = [], cur = 0, scores, moves, lock = false, startT = 0, timerOn = false, elapsed = 0, aiMem, gen = 0;
+
+function newGame(){
+  gen++;
+  const n = opts.size / 2, pool = THEMES[opts.theme].slice().sort(() => Math.random() - .5).slice(0, n);
+  const deck = [...pool, ...pool].sort(() => Math.random() - .5);
+  cards = deck.map((e, i) => ({i, e, up:false, done:false, owner:0}));
+  PP = opts.mode === 'party' ? Hub.party.active().slice(0, 6) : null; if (PP && PP.length < 2){ PP = null; opts.mode = 'pvp'; }
+  open = []; cur = 0; scores = PP ? PP.map(() => 0) : [0, 0]; moves = 0; lock = false; timerOn = false; elapsed = 0; aiMem = new Map();
+  const cols = {12:4, 20:5, 30:6, 42:7}[opts.size];
+  const g = $('grid'); g.style.gridTemplateColumns = `repeat(${cols},var(--cs))`;
+  const rows = opts.size / cols;
+  const avail = Math.min((innerWidth - 60) / cols, (innerHeight - 220) / rows);
+  const cs = Math.max(56, Math.min(130, Math.floor(avail * .88)));
+  g.style.setProperty('--cs', cs + 'px'); g.style.setProperty('--gap', Math.round(cs * .12) + 'px');
+  g.innerHTML = cards.map(c => `<div class="card" data-i="${c.i}"><div class="b"></div><div class="f">${c.e}</div></div>`).join('');
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === opts.mode));
+  document.querySelectorAll('#size button').forEach(b => b.classList.toggle('on', +b.dataset.s === opts.size));
+  document.querySelectorAll('#theme button').forEach(b => b.classList.toggle('on', b.dataset.t === opts.theme));
+  renderPlayers(); bar.set('moves', 0); bar.set('time', '0:00');
+  const b = Hub.read('memory_best', {})[opts.size]; bar.set('best', b ? b + ' Züge' : '–');
+}
+function renderPlayers(){
+  if (PP){
+    $('players').innerHTML = PP.map((pp, k) => `<div class="pl ${k === cur ? 'on' : ''}" style="--oc:${pp.color}"><span class="pav">${pp.avatar}</span><span>${pp.name}</span><b>${scores[k]}</b></div>`).join('');
+    $('whoTurn').innerHTML = `<span style="color:${PP[cur].color}">${PP[cur].avatar} ${PP[cur].name}</span> ist dran`;
+    return;
+  }
+  $('whoTurn').innerHTML = '';
+  const names = opts.mode === 'solo' ? ['Paare'] : opts.mode === 'ai' ? ['Du', 'Computer'] : ['Spieler 1', 'Spieler 2'];
+  $('players').innerHTML = names.map((n, k) => `<div class="pl ${opts.mode !== 'solo' && k === cur ? 'on' : ''}"><span>${n}</span><b>${scores[k]}</b></div>`).join('');
+}
+function el(i){ return $('grid').querySelector(`.card[data-i="${i}"]`); }
+function flip(i){
+  const c = cards[i]; c.up = true; el(i).classList.add('up'); open.push(i);
+  Hub.tone(500 + open.length * 120, .05, 'triangle', .04);
+  aiMem.set(i, c.e);
+}
+async function pickCard(i){
+  const c = cards[i];
+  if (lock || c.up || c.done) return;
+  if (!timerOn){ timerOn = true; startT = performance.now(); }
+  flip(i);
+  if (open.length < 2) return;
+  lock = true; moves++; bar.set('moves', moves);
+  const [a, b] = open.map(k => cards[k]), g = gen;
+  if (a.e === b.e){
+    await wait(380); if (g !== gen) return;
+    [a, b].forEach(x => { x.done = true; x.owner = cur; aiMem.delete(x.i); const e = el(x.i); e.classList.add('done'); if (PP){ e.classList.add('pc'); e.style.setProperty('--oc', PP[cur].color); } else if (cur === 1) e.classList.add('p2'); });
+    scores[cur]++; open = []; lock = false;
+    Hub.tone(880, .08, 'triangle', .05); Hub.tone(1320, .1, 'triangle', .05, .07);
+    renderPlayers();
+    if (cards.every(x => x.done)) return finish();
+    if (opts.mode === 'ai' && cur === 1) aiTurn();
+  } else {
+    await wait(opts.mode === 'solo' ? 750 : 1000); if (g !== gen) return;
+    open.forEach(k => { cards[k].up = false; const e = el(k); e.classList.remove('up'); });
+    open = []; Hub.tone(260, .08, 'sine', .03);
+    if (opts.mode !== 'solo'){ cur = (cur + 1) % scores.length; renderPlayers(); if (PP) Hub.tone(660, .08, 'triangle', .04); }
+    lock = false;
+    if (opts.mode === 'ai' && cur === 1) aiTurn();
+  }
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function aiTurn(){
+  const g = gen;
+  await wait(700); if (g !== gen) return;
+  // Vergessen
+  for (const k of [...aiMem.keys()]) if (Math.random() < .12) aiMem.delete(k);
+  const known = [...aiMem.entries()].filter(([k]) => !cards[k].done);
+  let first = null, second = null;
+  const seen = {};
+  for (const [k, e] of known){ if (seen[e] != null){ first = seen[e]; second = k; break; } seen[e] = k; }
+  const hidden = cards.filter(c => !c.done && !c.up).map(c => c.i);
+  const unknown = hidden.filter(k => !aiMem.has(k));
+  if (first == null) first = (unknown.length ? unknown : hidden)[Math.floor(Math.random() * (unknown.length || hidden.length))];
+  lock = false; await pickCardAI(first); if (g !== gen) return;
+  await wait(650); if (g !== gen) return;
+  if (second == null){
+    const e = cards[first].e, match = [...aiMem.entries()].find(([k, v]) => v === e && k !== first && !cards[k].done);
+    if (match) second = match[0];
+    else { const pool = cards.filter(c => !c.done && !c.up && !aiMem.has(c.i)).map(c => c.i); const pool2 = pool.length ? pool : cards.filter(c => !c.done && !c.up).map(c => c.i); second = pool2[Math.floor(Math.random() * pool2.length)]; }
+  }
+  await pickCardAI(second);
+}
+function pickCardAI(i){ lock = false; return pickCard(i); }
+function finish(){
+  timerOn = false; Hub.sfx('ach');
+  const secs = Math.round(elapsed);
+  let title, txt;
+  if (opts.mode === 'solo'){
+    const bests = Hub.read('memory_best', {}), rec = !bests[opts.size] || moves < bests[opts.size];
+    if (rec){ bests[opts.size] = moves; Hub.write('memory_best', bests); }
+    Hub.score('memory', moves, {lower:true, label:'Züge', silent:true});
+    title = 'Geschafft!'; txt = `${opts.size / 2} Paare in <b>${moves}</b> Zügen und ${Hub.fmtTime(secs)}.${rec ? '<br><b style="color:#ffd23f">Neuer Bestwert für diese Größe!</b>' : ''}`;
+    if (moves <= opts.size / 2 * 1.5 && opts.size >= 20) Hub.achieve('memory', 'mind', 'Elefantengedächtnis', 'Löse 20+ Karten mit höchstens 1,5 Zügen pro Paar');
+    if (opts.size === 42) Hub.achieve('memory', 'big', 'Gedächtnis-Marathon', 'Löse Memory mit 42 Karten');
+  } else if (PP){
+    const rank = PP.map((pp, k) => ({pp, s:scores[k]})).sort((a, b) => b.s - a.s);
+    title = rank[0].s === rank[1].s ? 'Unentschieden an der Spitze!' : `🏆 ${rank[0].pp.name} gewinnt!`;
+    txt = rank.map((r, i) => `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} <b style="color:${r.pp.color}">${r.pp.avatar} ${r.pp.name}</b>: ${r.s} Paare`).join('<br>');
+    Hub.achieve('memory', 'party', 'Gedächtnis-Party', 'Spiele Memory mit der Partyrunde');
+  } else {
+    const [a, b] = scores, names = opts.mode === 'ai' ? ['Du', 'Der Computer'] : ['Spieler 1', 'Spieler 2'];
+    title = a === b ? 'Unentschieden!' : `${names[a > b ? 0 : 1]} gewinnt!`;
+    txt = `${a} : ${b} Paare`;
+    if (opts.mode === 'ai' && a > b) Hub.achieve('memory', 'ai', 'Besser als die Maschine', 'Besiege den Computer im Memory');
+  }
+  Hub.achieve('memory', 'first', 'Alles aufgedeckt', 'Beende eine Runde Memory');
+  setTimeout(async () => { const r = await Hub.dialog({title, center:true, html:`<p>${txt}</p>`, buttons:[{label:'Nochmal', primary:true, value:1}]}); if (r === 1) newGame(); }, 600);
+}
+setInterval(() => { if (timerOn){ elapsed = (performance.now() - startT) / 1000; const s = Math.floor(elapsed); bar.set('time', `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); } }, 500);
+$('grid').addEventListener('click', e => { const c = e.target.closest('.card'); if (!c || (opts.mode === 'ai' && cur === 1)) return; pickCard(+c.dataset.i); });
+const setOpt = (k, v) => { opts[k] = v; Hub.write('memory_opts', opts); newGame(); };
+$('mode').onclick = e => e.target.dataset.m && setOpt('mode', e.target.dataset.m);
+$('size').onclick = e => e.target.dataset.s && setOpt('size', +e.target.dataset.s);
+$('theme').onclick = e => e.target.dataset.t && setOpt('theme', e.target.dataset.t);
+if (Hub.party.wantsParty('memory')) opts.mode = 'party';
+newGame();
+</script>
+</body>
+</html>

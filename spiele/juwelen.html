@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juwelen</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 20%,#3a1468,#12061f 70%)}
+main{flex:1;display:flex;align-items:center;justify-content:center;gap:28px;padding:18px;min-height:0}
+#cv{height:min(calc(100vh - 110px),calc(100vw - 380px));aspect-ratio:1;border-radius:22px;touch-action:none;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08)}
+.side{width:260px;display:flex;flex-direction:column;gap:12px}
+.card{padding:16px;border-radius:16px;background:rgba(18,10,32,.7);border:1px solid rgba(255,255,255,.08)}
+.card small{display:block;font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#a99ac9}
+.card b{font-family:var(--font-display);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+.prog{height:10px;border-radius:6px;background:rgba(0,0,0,.4);overflow:hidden;margin-top:10px}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#c77bff,#ff5d8f);transition:width .4s var(--ease)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:820px){ main{flex-direction:column} #cv{height:auto;width:min(94vw,520px)} .side{width:min(94vw,520px);flex-direction:row;flex-wrap:wrap} .side > *{flex:1} }
+</style>
+</head>
+<body>
+<main>
+  <canvas id="cv" width="800" height="800"></canvas>
+  <div class="side">
+    <div class="card"><small>Level <span id="lvl">1</span></small><b id="score">0</b><div class="prog"><i id="prog"></i></div><small style="margin-top:6px;text-transform:none;letter-spacing:0" id="goal"></small></div>
+    <div class="two"><div class="card"><small>Züge</small><b id="moves">25</b></div><div class="card"><small>Rekord</small><b id="best">0</b></div></div>
+    <button class="h-btn" id="hintBtn"></button>
+    <button class="h-btn primary lg" id="newBtn"></button>
+  </div>
+</main>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script>
+Hub.init('juwelen');
+const bar = Hub.bar({id:'juwelen', title:'Juwelen', actions:['help', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Juwelen', html:'<p>Tausche zwei benachbarte Steine, um <b>drei oder mehr gleiche</b> in eine Reihe zu bringen.</p><p><b>4 in einer Reihe</b> erzeugt eine Bombe (sprengt die Umgebung). <b>L- oder T-Form</b> erzeugt ebenfalls eine Bombe. <b>5 in einer Reihe</b> erzeugt einen Regenbogen-Stein – tausch ihn mit einer Farbe, um alle Steine dieser Farbe zu entfernen.</p><p>Erreiche die Zielpunktzahl, bevor die Züge ausgehen!</p>'}));
+const $ = id => document.getElementById(id), I = Hub.icon;
+$('newBtn').innerHTML = I('refresh') + 'Neues Spiel'; $('hintBtn').innerHTML = I('sparkles') + 'Tipp zeigen';
+const cv = $('cv'), ctx = cv.getContext('2d');
+const N = 8, S = 100, TYPES = 6;
+const COL = [['#ff4d6a', '#a3102e', '#ffb0bd'], ['#3fd28b', '#0d6a39', '#b6f5d4'], ['#4f9dff', '#143a9a', '#bcd8ff'], ['#ffd23f', '#a07000', '#fff1b0'], ['#c77bff', '#5a1f90', '#ead2ff'], ['#ff8a3d', '#a24000', '#ffd0ad']];
+let G, gems = [], parts = [], pops = [], state = 'idle', sel = null, combo = 0, idleT = 0, hintPair = null, best = Hub.best('juwelen') || 0;
+
+// ---------- Formen ----------
+const SHAPES = [
+  [[0, -1], [.95, -.31], [.59, .81], [-.59, .81], [-.95, -.31]],
+  [[0, -1], [.87, -.5], [.87, .5], [0, 1], [-.87, .5], [-.87, -.5]],
+  [[0, -1], [1, 0], [0, 1], [-1, 0]],
+  null,
+  [[-.7, -.75], [.7, -.75], [1, 0], [.7, .75], [-.7, .75], [-1, 0]],
+  [[0, -1], [.3, -.32], [1, -.22], [.46, .24], [.62, 1], [0, .56], [-.62, 1], [-.46, .24], [-1, -.22], [-.3, -.32]],
+];
+function path(t, r){
+  ctx.beginPath();
+  if (!SHAPES[t]){ ctx.arc(0, 0, r * .9, 0, 7); return; }
+  SHAPES[t].forEach(([x, y], k) => k ? ctx.lineTo(x * r, y * r) : ctx.moveTo(x * r, y * r)); ctx.closePath();
+}
+function drawGem(g, now){
+  const x = g.x * S + S / 2, y = g.y * S + S / 2, r = S * .38 * g.sc;
+  if (r <= .5) return;
+  ctx.save(); ctx.translate(x, y); ctx.globalAlpha = g.a;
+  if (g.sp === 'rainbow'){
+    const gr = ctx.createConicGradient ? ctx.createConicGradient(now / 600, 0, 0) : null;
+    if (gr){ COL.forEach((c, k) => gr.addColorStop(k / 6, c[0])); gr.addColorStop(1, COL[0][0]); }
+    ctx.fillStyle = gr || '#fff'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(0, 0, r * .35, 0, 7); ctx.fill();
+    ctx.restore(); return;
+  }
+  const [a, b, c] = COL[g.t];
+  ctx.translate(0, 3); ctx.fillStyle = 'rgba(0,0,0,.35)'; path(g.t, r); ctx.fill(); ctx.translate(0, -3);
+  const gr = ctx.createLinearGradient(-r, -r, r, r); gr.addColorStop(0, c); gr.addColorStop(.35, a); gr.addColorStop(1, b);
+  ctx.fillStyle = gr; path(g.t, r); ctx.fill();
+  ctx.save(); ctx.scale(.58, .58); ctx.translate(-r * .12, -r * .2); ctx.fillStyle = 'rgba(255,255,255,.28)'; path(g.t, r); ctx.fill(); ctx.restore();
+  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(-r * .35, -r * .42, r * .1, 0, 7); ctx.fill();
+  if (g.sp === 'bomb'){
+    const p = .5 + .5 * Math.sin(now / 160);
+    ctx.strokeStyle = `rgba(255,255,255,${.5 + p * .5})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, r * 1.08, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); for (let k = 0; k < 8; k++){ const an = k / 8 * 6.283 + now / 500, rr = k % 2 ? r * .18 : r * .36; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); } ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---------- Spiel ----------
+const LEVELS = l => ({goal:Math.round((1500 + l * 900 + l * l * 120) / 50) * 50, moves:Math.max(18, 26 - Math.floor(l / 2))});
+function newGame(){ G = {level:1, score:0, levelStart:0}; startLevel(); }
+function startLevel(){
+  const L = LEVELS(G.level);
+  G.goal = G.levelStart + L.goal; G.moves = L.moves;
+  gems = []; sel = null; combo = 0; hintPair = null; state = 'idle';
+  const grid = [];
+  for (let r = 0; r < N; r++){ grid.push([]); for (let c = 0; c < N; c++){ let t; do { t = Math.floor(Math.random() * TYPES); } while ((c >= 2 && grid[r][c - 1].t === t && grid[r][c - 2].t === t) || (r >= 2 && grid[r - 1][c].t === t && grid[r - 2][c].t === t)); grid[r].push({t, x:c, y:r - N - 2 - Math.random(), r, c, sc:1, a:1, sp:null, vy:0}); } }
+  G.grid = grid;
+  if (!findMove()) return startLevel();
+  state = 'fall';
+  ui();
+}
+const at = (r, c) => (r >= 0 && r < N && c >= 0 && c < N) ? G.grid[r][c] : null;
+function findMatches(){
+  const marked = new Set(), groups = [];
+  for (let r = 0; r < N; r++){ let run = [G.grid[r][0]]; for (let c = 1; c <= N; c++){ const g = c < N ? G.grid[r][c] : null; if (g && run[0] && g.t === run[0].t && g.sp !== 'rainbow' && run[0].sp !== 'rainbow') run.push(g); else { if (run.length >= 3) groups.push({cells:run.slice(), dir:'h'}); run = [g]; } } }
+  for (let c = 0; c < N; c++){ let run = [G.grid[0][c]]; for (let r = 1; r <= N; r++){ const g = r < N ? G.grid[r][c] : null; if (g && run[0] && g.t === run[0].t && g.sp !== 'rainbow' && run[0].sp !== 'rainbow') run.push(g); else { if (run.length >= 3) groups.push({cells:run.slice(), dir:'v'}); run = [g]; } } }
+  groups.forEach(gr => gr.cells.forEach(g => marked.add(g)));
+  return {groups, marked};
+}
+function findMove(){
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) for (const [dr, dc] of [[0, 1], [1, 0]]){
+    const a = at(r, c), b = at(r + dr, c + dc); if (!a || !b) continue;
+    if (a.sp === 'rainbow' || b.sp === 'rainbow') return [a, b];
+    swapGrid(a, b); const m = findMatches().marked.size; swapGrid(a, b);
+    if (m) return [a, b];
+  }
+  return null;
+}
+function swapGrid(a, b){ G.grid[a.r][a.c] = b; G.grid[b.r][b.c] = a; [a.r, b.r] = [b.r, a.r]; [a.c, b.c] = [b.c, a.c]; }
+function trySwap(a, b){
+  if (state !== 'idle' || G.moves <= 0) return;
+  if (Math.abs(a.r - b.r) + Math.abs(a.c - b.c) !== 1) return;
+  hintPair = null; idleT = 0; sel = null;
+  swapGrid(a, b);
+  state = 'swap'; G.swapPair = [a, b]; combo = 0;
+  Hub.tone(500, .05, 'triangle', .04);
+}
+function afterSwap(){
+  const [a, b] = G.swapPair;
+  if (a.sp === 'rainbow' || b.sp === 'rainbow'){
+    const rb = a.sp === 'rainbow' ? a : b, other = rb === a ? b : a;
+    const kill = new Set([rb]);
+    if (other.sp === 'rainbow') G.grid.flat().forEach(g => kill.add(g));
+    else G.grid.flat().forEach(g => { if (g.t === other.t) kill.add(g); });
+    G.moves--; shake = 12; Hub.sfx('ach');
+    popText('REGENBOGEN!', 4, 4);
+    explode([...kill], 1.5);
+    return;
+  }
+  const m = findMatches();
+  if (!m.marked.size){ swapGrid(a, b); state = 'swapBack'; Hub.tone(200, .08, 'square', .03); return; }
+  G.moves--;
+  resolve(m, [a, b]);
+}
+function resolve(m, swapped){
+  combo++;
+  const kill = new Set(m.marked), create = [];
+  // Spezialsteine aus großen Gruppen
+  const counts = new Map();
+  m.groups.forEach(gr => gr.cells.forEach(g => counts.set(g, (counts.get(g) || 0) + 1)));
+  for (const gr of m.groups){
+    const pivot = (swapped && gr.cells.find(g => swapped.includes(g))) || gr.cells[Math.floor(gr.cells.length / 2)];
+    if (gr.cells.length >= 5) create.push({g:pivot, sp:'rainbow'});
+    else if (gr.cells.length === 4) create.push({g:pivot, sp:'bomb'});
+  }
+  for (const [g, n] of counts) if (n > 1 && !create.some(c => c.g === g)) create.push({g, sp:'bomb'});
+  // Bomben in den Treffern zünden
+  const queue = [...kill].filter(g => g.sp === 'bomb');
+  while (queue.length){
+    const b = queue.pop();
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++){ const g = at(b.r + dr, b.c + dc); if (g && !kill.has(g)){ kill.add(g); if (g.sp === 'bomb') queue.push(g); } }
+    shake = Math.max(shake, 8); Hub.tone(90, .3, 'sawtooth', .05, 0, 40);
+  }
+  create.forEach(c => { kill.delete(c.g); });
+  create.forEach(c => { c.g.sp = c.sp; c.g.sc = 1.4; });
+  explode([...kill], 1);
+  if (create.length) Hub.tone(1100, .2, 'sine', .05, 0, 1600);
+}
+function explode(list, mult){
+  const pts = Math.round(list.length * 20 * combo * mult);
+  G.score += pts;
+  let cx = 0, cy = 0; list.forEach(g => { cx += g.c; cy += g.r; }); cx /= list.length; cy /= list.length;
+  pops.push({x:cx, y:cy, txt:'+' + pts, t:0});
+  if (combo >= 2) popText(['', '', 'Gut!', 'Super!', 'Fantastisch!', 'Unglaublich!', 'GÖTTLICH!'][Math.min(6, combo)], cx, cy - .8);
+  list.forEach(g => {
+    g.dying = true;
+    const [a, , c] = g.sp === 'rainbow' ? ['#fff', 0, '#fff'] : COL[g.t];
+    for (let k = 0; k < 7; k++) parts.push({x:g.c * S + S / 2, y:g.r * S + S / 2, vx:(Math.random() - .5) * 600, vy:(Math.random() - .7) * 600, life:.7, col:k % 2 ? a : c, s:4 + Math.random() * 6});
+  });
+  [0, 4, 7, 12].forEach((n, k) => Hub.tone(440 * Math.pow(2, (n + combo * 2) / 12), .1, 'triangle', .04, k * .03));
+  state = 'dying'; G.dieT = .18;
+  ui();
+}
+function collapse(){
+  for (let c = 0; c < N; c++){
+    const col = [];
+    for (let r = N - 1; r >= 0; r--){ const g = G.grid[r][c]; if (!g.dying) col.push(g); }
+    let spawn = 0;
+    for (let r = N - 1; r >= 0; r--){
+      let g = col[N - 1 - r];
+      if (!g){ spawn++; g = {t:Math.floor(Math.random() * TYPES), x:c, y:-spawn - .3, r, c, sc:1, a:1, sp:null, vy:0}; }
+      g.r = r; g.c = c; G.grid[r][c] = g;
+    }
+  }
+  state = 'fall';
+}
+function settled(){ return G.grid.flat().every(g => Math.abs(g.x - g.c) < .01 && Math.abs(g.y - g.r) < .01); }
+let shake = 0;
+function update(dt){
+  idleT += dt;
+  for (const g of G.grid.flat()){
+    if (g.dying){ g.sc = Math.max(0, g.sc - dt * 7); continue; }
+    if (g.sc > 1) g.sc = Math.max(1, g.sc - dt * 2);
+    const dx = g.c - g.x;
+    g.x += Math.sign(dx) * Math.min(Math.abs(dx), dt * 9);
+    if (g.y < g.r){ g.vy += 40 * dt; g.y = Math.min(g.r, g.y + g.vy * dt); if (g.y === g.r){ g.vy = 0; } }
+    else if (g.y > g.r){ g.y = Math.max(g.r, g.y - dt * 9); }
+  }
+  if (state === 'swap' && settled()) afterSwap();
+  else if (state === 'swapBack' && settled()) state = 'idle';
+  else if (state === 'dying'){ G.dieT -= dt; if (G.dieT <= 0) collapse(); }
+  else if (state === 'fall' && settled()){
+    const m = findMatches();
+    if (m.marked.size) resolve(m, null);
+    else {
+      state = 'idle';
+      if (G.score >= G.goal) return levelUp();
+      if (G.moves <= 0) return gameOver();
+      if (!findMove()){ popText('Neu gemischt!', 3.5, 3.5); const all = G.grid.flat(); for (let k = all.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [all[k].t, all[j].t] = [all[j].t, all[k].t]; } }
+    }
+  }
+  if (state === 'idle' && idleT > 6 && !hintPair) hintPair = findMove();
+  for (const p of parts){ p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 900 * dt; }
+  parts = parts.filter(p => p.life > 0);
+  for (const p of pops) p.t += dt;
+  pops = pops.filter(p => p.t < 1.1);
+  shake = Math.max(0, shake - dt * 30);
+}
+function popText(txt, x, y){ pops.push({x, y, txt, t:0, big:true}); }
+function levelUp(){
+  const bonus = G.moves * 150;
+  G.score += bonus; Hub.sfx('ach');
+  if (G.level === 3) Hub.achieve('juwelen', 'l3', 'Schatzsucher', 'Erreiche Level 4');
+  if (G.level === 8) Hub.achieve('juwelen', 'l8', 'Juwelier', 'Erreiche Level 9');
+  Hub.dialog({title:`Level ${G.level} geschafft!`, center:true, html:`<p>Übrige Züge: <b>${G.moves}</b> × 150 = <b>+${bonus}</b> Bonus<br>Punkte: <b>${G.score.toLocaleString('de-DE')}</b></p>`, buttons:[{label:`Weiter zu Level ${G.level + 1}`, primary:true}], dismiss:false})
+    .then(() => { G.level++; G.levelStart = G.score; startLevel(); });
+}
+function gameOver(){
+  const r = Hub.score('juwelen', G.score, {label:'Punkte'});
+  best = Math.max(best, G.score); ui();
+  if (G.score >= 20000) Hub.achieve('juwelen', 's20k', 'Edelstein-Millionär', 'Erziele 20.000 Punkte');
+  Hub.dialog({title:'Keine Züge mehr', center:true, html:`<p>Level <b>${G.level}</b> · <b>${G.score.toLocaleString('de-DE')}</b> Punkte${r.record ? '<br><b style="color:#ffcf5a">Neuer Rekord!</b>' : ''}</p>`, buttons:[{label:'Nochmal', primary:true}], dismiss:false}).then(newGame);
+}
+function ui(){
+  $('lvl').textContent = G.level; $('score').textContent = G.score.toLocaleString('de-DE'); $('moves').textContent = G.moves;
+  $('best').textContent = Math.max(best, G.score).toLocaleString('de-DE');
+  $('goal').textContent = `Ziel: ${G.goal.toLocaleString('de-DE')} Punkte`;
+  $('prog').style.width = Math.min(100, (G.score - G.levelStart) / (G.goal - G.levelStart) * 100) + '%';
+  $('moves').style.color = G.moves <= 5 ? '#ff8a95' : '';
+}
+function draw(now){
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#160a28'; ctx.fillRect(0, 0, 800, 800);
+  if (shake) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++){ ctx.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.065)'; ctx.fillRect(c * S, r * S, S, S); }
+  if (sel){ ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(sel.c * S, sel.r * S, S, S); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.strokeRect(sel.c * S + 3, sel.r * S + 3, S - 6, S - 6); }
+  if (hintPair && state === 'idle'){ const p = .5 + .5 * Math.sin(now / 180); hintPair.forEach(g => { ctx.strokeStyle = `rgba(255,220,120,${p})`; ctx.lineWidth = 4; ctx.strokeRect(g.c * S + 6, g.r * S + 6, S - 12, S - 12); }); }
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 800, 800); ctx.clip();
+  for (const g of G.grid.flat()){
+    if (g === sel){ const s0 = g.sc; g.sc = 1 + .06 * Math.sin(now / 120); drawGem(g, now); g.sc = s0; }
+    else drawGem(g, now);
+  }
+  ctx.restore();
+  for (const p of parts){ ctx.globalAlpha = Math.max(0, p.life / .7); ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.s * p.life, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1; ctx.textAlign = 'center';
+  for (const p of pops){
+    const a = Math.min(1, 2 - p.t * 2), y = p.y * S + S / 2 - p.t * 60;
+    ctx.globalAlpha = Math.max(0, a); ctx.font = `700 ${p.big ? 54 : 34}px Bahnschrift, Segoe UI`;
+    ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(30,8,50,.85)'; ctx.strokeText(p.txt, p.x * S + S / 2, y);
+    ctx.fillStyle = p.big ? '#ffe28a' : '#fff'; ctx.fillText(p.txt, p.x * S + S / 2, y);
+  }
+  ctx.globalAlpha = 1;
+}
+// ---------- Eingabe ----------
+let down = null;
+function cellAt(e){ const r = cv.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * 800, y = (e.clientY - r.top) / r.height * 800; return at(Math.floor(y / S), Math.floor(x / S)); }
+cv.addEventListener('pointerdown', e => { Hub.audio(); const g = cellAt(e); if (!g || state !== 'idle') return; down = {g, x:e.clientX, y:e.clientY}; });
+cv.addEventListener('pointermove', e => {
+  if (!down) return;
+  const dx = e.clientX - down.x, dy = e.clientY - down.y, th = cv.getBoundingClientRect().width / N * .35;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < th) return;
+  const [dr, dc] = Math.abs(dx) > Math.abs(dy) ? [0, Math.sign(dx)] : [Math.sign(dy), 0];
+  const o = at(down.g.r + dr, down.g.c + dc); if (o) trySwap(down.g, o);
+  down = null;
+});
+addEventListener('pointerup', e => {
+  if (!down) return;
+  const g = down.g; down = null;
+  if (sel && sel !== g && Math.abs(sel.r - g.r) + Math.abs(sel.c - g.c) === 1){ trySwap(sel, g); return; }
+  sel = sel === g ? null : g; Hub.tone(800, .03, 'sine', .03);
+});
+$('newBtn').onclick = newGame;
+$('hintBtn').onclick = () => { hintPair = findMove(); idleT = 0; };
+let last = performance.now();
+function frame(now){ const dt = Math.min(.033, (now - last) / 1000); last = now; update(dt); draw(now); requestAnimationFrame(frame); }
+newGame();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

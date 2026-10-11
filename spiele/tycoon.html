@@ -1,0 +1,1965 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tycoon Imperium</title>
+<style>
+:root{
+  --bg:#0f1220;--panel:#171b2f;--panel2:#1f2440;--line:#2c3354;
+  --text:#e8ebff;--muted:#8a91b8;--gold:#ffc940;--green:#3ddc84;--blue:#4c8dff;--red:#ff5c6c;--purple:#b57cff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 20% 0%,#1d2342,var(--bg) 60%) fixed;color:var(--text);
+  font-family:system-ui,"Segoe UI",Roboto,sans-serif;min-height:100vh;user-select:none;overflow-x:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+a{color:inherit}
+
+/* ---------- Kopfzeile ---------- */
+header{position:sticky;top:0;z-index:5;background:rgba(15,18,32,.94);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);padding:8px 20px;display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;justify-content:space-between}
+.brand{font-weight:800;font-size:20px;letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+.brand small{display:block;font-weight:600;font-size:12px;color:var(--gold)}
+.back{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:var(--panel);
+  border:1px solid var(--line);text-decoration:none;font-size:14px}
+.wallet{text-align:center}
+.money{font-size:30px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.1;display:inline-block}
+.money.bump{animation:bumpk .22s}
+@keyframes bumpk{50%{transform:scale(1.1)}}
+.rate{color:var(--green);font-size:14px;font-variant-numeric:tabular-nums}
+.hright{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gems{background:#13284d;border:1px solid #2f5fb3;border-radius:20px;padding:7px 12px;font-weight:800;color:#8fd3ff;font-variant-numeric:tabular-nums}
+.gems.pop{animation:bumpk .3s}
+.buymode{display:flex;gap:4px;background:var(--panel);padding:4px;border-radius:10px;border:1px solid var(--line)}
+.buymode button{border:0;background:transparent;padding:6px 12px;border-radius:7px;font-weight:700;color:var(--muted)}
+.buymode button.on{background:var(--blue);color:#fff}
+.iconbtn{border:1px solid var(--line);background:var(--panel);border-radius:10px;width:40px;height:40px;font-size:18px}
+.iconbtn.off{opacity:.45}
+.effects{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.effects:empty{display:none}
+.chip{background:#2b2350;border:1px solid #5b3fa8;color:#e3d2ff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.bad{background:#3a1d28;border-color:#8a3346;color:#ffc2cc}
+
+main{display:grid;grid-template-columns:1fr 400px;gap:20px;max-width:1380px;margin:0 auto;padding:16px 20px}
+main.shake{animation:shake .45s}
+@keyframes shake{20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(3px,4px)}}
+.left{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* ---------- Skyline ---------- */
+.skywrap{position:relative;height:190px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+#sky{width:100%;height:100%;display:block}
+.rankbox{position:absolute;left:12px;top:10px;background:rgba(10,12,28,.65);backdrop-filter:blur(4px);border-radius:10px;
+  padding:6px 10px;font-size:12px;min-width:190px}
+.rankbox b{font-size:15px;color:var(--gold)}
+.rb{height:6px;background:#0008;border-radius:4px;overflow:hidden;margin:4px 0 2px}
+.rb div{height:100%;background:linear-gradient(90deg,var(--gold),#ff8a00);width:0}
+.rankbox .muted{font-size:11px}
+
+/* ---------- Aktionsleiste ---------- */
+.actionbar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:8px 10px;
+  text-align:left;display:flex;gap:8px;align-items:center;min-width:0}
+.tile .ti{font-size:28px;flex:none}
+.tile .tx{display:flex;flex-direction:column;min-width:0;flex:1}
+.tile .tt{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .ts{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.tile.ready{border-color:var(--gold);animation:glow 1.2s infinite}
+@keyframes glow{50%{box-shadow:0 0 16px rgba(255,201,64,.5)}}
+.fbar{display:block;height:7px;background:#0008;border-radius:5px;overflow:hidden;margin-top:4px}
+.fbar span{display:block;height:100%;background:linear-gradient(90deg,#ff8a00,#ff3d3d);width:0;transition:width .1s}
+.fbar.gold span{background:linear-gradient(90deg,var(--gold),#ffe08a)}
+body.fever .card .icon{border-color:#ff5c2c;box-shadow:0 0 18px #ff5c2c}
+body.fever::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 80px rgba(255,80,20,.55);animation:fev .35s infinite alternate}
+@keyframes fev{to{box-shadow:inset 0 0 130px rgba(255,150,20,.75)}}
+
+/* ---------- Geschäfte ---------- */
+.list{display:flex;flex-direction:column;gap:10px}
+.card{display:grid;grid-template-columns:76px 1fr auto;gap:14px;align-items:center;
+  background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+  transition:border-color .3s}
+.card.hot{border-color:#8a5cff;box-shadow:0 0 18px rgba(138,92,255,.25)}
+.card.paused{border-color:#8a3346}
+.card.locked .icon{filter:grayscale(1) brightness(.6);border-color:var(--line)}
+.card.locked .mid{opacity:.55}
+.card.hidden{display:none}
+.icon{width:76px;height:76px;border-radius:50%;font-size:38px;border:3px solid var(--gold);background:#2a2f52;
+  position:relative;transition:transform .07s;display:flex;align-items:center;justify-content:center}
+.icon:active{transform:scale(.88)}
+.icon.idle{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(255,201,64,.28)}}
+.owned{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:var(--blue);font-size:12px;
+  font-weight:800;padding:1px 9px;border-radius:10px;white-space:nowrap}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.name{font-weight:700;font-size:16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.stars{color:var(--gold);font-size:11px;letter-spacing:-1px}
+.payout{color:var(--gold);font-weight:700;font-variant-numeric:tabular-nums;font-size:14px}
+.bar{position:relative;height:26px;background:#0b0e1b;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.fill{height:100%;background:linear-gradient(90deg,#24a862,#3ddc84);width:0}
+.paused .fill{background:#8a3346}
+.fill.turbo{width:100%!important;background:repeating-linear-gradient(45deg,#24a862 0 12px,#3ddc84 12px 24px);
+  background-size:34px 34px;animation:slide .5s linear infinite}
+@keyframes slide{to{background-position:34px 0}}
+.bar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;
+  font-size:13px;font-weight:600;text-shadow:0 1px 2px #000;font-variant-numeric:tabular-nums}
+.ms{font-size:12px;color:var(--muted);margin-top:5px}
+.ms progress{width:90px;height:6px;vertical-align:middle;accent-color:var(--gold)}
+.actions{display:flex;flex-direction:column;gap:6px;min-width:150px}
+.btn{border:0;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;line-height:1.25;
+  background:#2a3050;color:var(--muted);transition:filter .1s}
+.btn b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.btn.ok{background:linear-gradient(180deg,#ffb52e,#f29100);color:#2a1800}
+.btn:hover:not(:disabled){filter:brightness(1.1)}
+.btn.mgr.ok{background:linear-gradient(180deg,#6aa2ff,#3b74e6);color:#fff}
+.btn.done{background:transparent;border:1px dashed var(--line);color:var(--green);cursor:default}
+.btn.purple{background:linear-gradient(180deg,#c99bff,#8c4fe6);color:#fff}
+.btn.blue{background:linear-gradient(180deg,#6aa2ff,#3b74e6);color:#fff}
+.btn.gray{background:#2a3050;color:var(--text)}
+.btn.green{background:linear-gradient(180deg,#4fe39a,#1fae63);color:#03240f}
+.btn.red{background:linear-gradient(180deg,#ff7d8a,#e0384b);color:#fff}
+
+/* ---------- Seitenleiste ---------- */
+aside{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:sticky;top:84px}
+.tabs{display:grid;grid-template-columns:repeat(8,1fr);border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:transparent;padding:7px 1px;font-weight:700;color:var(--muted);font-size:10px;position:relative}
+.tabs button i{display:block;font-style:normal;font-size:18px}
+.tabs button.on{color:var(--text);box-shadow:inset 0 -3px 0 var(--gold);background:#1c2140}
+.tabs .dot{position:absolute;top:4px;right:6px;width:9px;height:9px;border-radius:50%;background:var(--red);display:none}
+.tabs .dot.on{display:block}
+.tab{padding:12px;display:none;max-height:calc(100vh - 170px);overflow:auto}
+.tab.on{display:block}
+.up{display:flex;align-items:center;gap:10px;padding:9px;border-radius:10px;background:var(--panel2);margin-bottom:8px}
+.up .ic{font-size:24px;width:32px;text-align:center;flex:none}
+.up .t{flex:1;min-width:0}
+.up .t div:first-child{font-weight:700;font-size:14px}
+.up .t div:last-child{font-size:12px;color:var(--muted)}
+.up .btn{min-width:96px}
+.up.owned{opacity:.6}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.big{font-size:28px;font-weight:800;color:var(--purple);font-variant-numeric:tabular-nums}
+.stat{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px;gap:10px}
+.stat span:last-child{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.wide{width:100%;margin-top:10px;padding:11px}
+.btn.danger{background:#3a2030;color:var(--red)}
+h3{margin:16px 0 8px;font-size:15px}
+.invbox{background:linear-gradient(135deg,#2a1f52,#1f2440);border:1px solid #5b3fa8;border-radius:12px;padding:12px;margin-bottom:10px}
+.invrow{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.prog{height:8px;background:#0008;border-radius:5px;overflow:hidden;margin:8px 0 4px}
+.prog div{height:100%;background:linear-gradient(90deg,#c99bff,#8c4fe6);width:0}
+.prog.g div{background:linear-gradient(90deg,#4fe39a,#1fae63)}
+.tip{background:#1d3a2a;border:1px solid #2f7a4f;color:#bff5d5;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:8px;display:none}
+.tip.on{display:block}
+
+/* Missionen */
+.mission{background:var(--panel2);border-radius:12px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--line)}
+.mission.done{border-color:var(--green);box-shadow:0 0 12px rgba(61,220,132,.25)}
+.mission .mt{font-weight:700;font-size:14px}
+.mission .mr{font-size:12px;color:var(--gold);margin-top:2px}
+.mission .mp{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mbtns{display:flex;gap:6px;margin-top:6px}
+.mbtns .btn{flex:1}
+
+/* Karten */
+.cardgrid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;perspective:600px}
+.pcard{--rc:#9aa4c7;--rg:rgba(154,164,199,.2);width:88px;height:122px;border-radius:10px;border:2px solid var(--rc);
+  background:linear-gradient(180deg,#2a3058,#171b33);box-shadow:0 0 14px var(--rg);position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;animation:flip .5s both}
+.r-rare{--rc:#4c8dff;--rg:rgba(76,141,255,.4)}
+.r-epic{--rc:#b57cff;--rg:rgba(181,124,255,.5)}
+.r-legendary{--rc:#ffc940;--rg:rgba(255,201,64,.7)}
+.r-legendary .pi{animation:shine 1.2s ease-in-out infinite alternate}
+@keyframes shine{to{filter:drop-shadow(0 0 8px #ffc940)}}
+.pcard .pi{font-size:34px}
+.pcard .pn{font-size:11px;font-weight:700;text-align:center;padding:0 4px;line-height:1.2;margin-top:4px}
+.pcard .pr{font-size:9px;color:var(--rc);font-weight:800;text-transform:uppercase;margin-top:3px;letter-spacing:.5px}
+.pcard .badge{position:absolute;top:-9px;right:-7px;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:8px}
+@keyframes flip{from{transform:rotateY(90deg) scale(.6);opacity:0}}
+.colgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.colgrid .pcard{width:auto;height:auto;padding:8px 2px;animation:none}
+.colgrid .pcard .pi{font-size:26px}
+.colgrid .pcard.unk{filter:grayscale(1);opacity:.3}
+.lvlbar{width:80%;height:4px;background:#0008;border-radius:3px;overflow:hidden;margin-top:4px}
+.lvlbar div{height:100%;background:var(--rc)}
+.chestrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chest{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center}
+.chest .ci{font-size:32px}
+.chest .cn{font-weight:700;font-size:12px}
+.chest .cc{font-size:12px;color:var(--muted)}
+.chest .btn{width:100%;margin-top:4px;padding:5px 4px;font-size:12px}
+
+/* Rivalen */
+.riv{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;margin-bottom:6px;background:var(--panel2)}
+.riv.me{background:linear-gradient(90deg,#3a3016,#1f2440);border:1px solid var(--gold)}
+.riv.beaten{opacity:.5}
+.riv .rn{width:26px;text-align:center;font-weight:800;color:var(--muted)}
+.riv .ri{font-size:24px}
+.riv .rt{flex:1;min-width:0}
+.riv .rt div:first-child{font-weight:700;font-size:14px}
+.riv .rt div:last-child{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.achgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}
+.ach{aspect-ratio:1;border-radius:10px;background:#11142a;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+  font-size:24px;filter:grayscale(1);opacity:.35;position:relative}
+.ach.got{filter:none;opacity:1;background:linear-gradient(180deg,#3b3260,#241f45);border-color:var(--gold)}
+.ach small{position:absolute;bottom:1px;right:4px;font-size:10px;font-weight:800;color:var(--gold)}
+
+.stock{background:var(--panel2);border-radius:12px;padding:10px;margin-bottom:10px}
+.sh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sh b{font-size:15px}
+.sp{font-weight:800;font-variant-numeric:tabular-nums}
+.up-c{color:var(--green)} .dn-c{color:var(--red)}
+.spark{width:100%;height:46px;display:block;margin:6px 0}
+.sinfo{font-size:12px;color:var(--muted);margin-bottom:6px;font-variant-numeric:tabular-nums}
+.sbtns{display:flex;gap:6px}
+.sbtns .btn{flex:1;padding:6px 4px;font-size:12px}
+
+/* ---------- Effekte ---------- */
+.float{position:fixed;pointer-events:none;font-weight:800;color:var(--gold);text-shadow:0 2px 4px #000;
+  animation:up 1s ease-out forwards;z-index:20;font-size:16px;white-space:nowrap}
+.float.click{color:#9fd0ff;font-size:14px}
+@keyframes up{to{transform:translateY(-60px);opacity:0}}
+.pcoin{position:fixed;z-index:25;pointer-events:none;font-size:20px;transition:transform .65s cubic-bezier(.5,-.4,.7,1),opacity .65s}
+#toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:30;align-items:center;width:max-content;max-width:92vw}
+.toast{background:#262c4d;border:1px solid var(--line);padding:10px 18px;border-radius:12px;font-weight:600;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);animation:tin .25s ease-out;text-align:center}
+.toast.good{border-color:var(--green);background:#16352a}
+.toast.bad{border-color:var(--red);background:#3a1d28}
+.toast.gold{border-color:var(--gold);background:#3a3016}
+.toast.purple{border-color:var(--purple);background:#2b2350}
+@keyframes tin{from{transform:translateY(20px);opacity:0}}
+#coin{position:fixed;font-size:54px;cursor:pointer;z-index:15;display:none;filter:drop-shadow(0 0 14px gold);
+  animation:bob 1s ease-in-out infinite;border:0;background:none;padding:0}
+@keyframes bob{50%{transform:translateY(-10px) rotate(10deg)}}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:40;padding:16px}
+.modal.on{display:flex}
+.modal .box{background:var(--panel2);border:1px solid var(--line);border-radius:18px;padding:24px;max-width:420px;width:100%;text-align:center;
+  animation:pop .25s ease-out;max-height:94vh;overflow:auto}
+.modal .box.wide{max-width:600px}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+.modal .mi{font-size:56px;line-height:1}
+.modal h2{margin:8px 0 10px}
+.modal p{line-height:1.5}
+.conf{position:fixed;top:-12px;width:8px;height:13px;z-index:60;pointer-events:none;animation:fall 2s linear forwards}
+@keyframes fall{to{transform:translate(var(--dx),105vh) rotate(800deg)}}
+.wheelwrap{position:relative;width:300px;max-width:100%;margin:0 auto}
+#wheelCv{width:100%;height:auto;display:block}
+.pointer{position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:32px;color:#fff;text-shadow:0 2px 6px #000}
+.wheelres{margin-top:10px;font-size:16px;min-height:24px;color:var(--text)}
+.daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0}
+.day{background:#11142a;border:1px solid var(--line);border-radius:8px;padding:6px 2px;font-size:11px;color:var(--text);line-height:1.4}
+.day.past{opacity:.45}
+.day.now{border-color:var(--gold);background:#3a3016;box-shadow:0 0 12px rgba(255,201,64,.45)}
+
+@media(max-width:1020px){
+  main{grid-template-columns:1fr;padding:12px}
+  .tab{max-height:none}
+  .panel{position:static}
+}
+@media(max-width:620px){
+  .card{grid-template-columns:60px 1fr;padding:10px}
+  .icon{width:60px;height:60px;font-size:30px}
+  .actions{grid-column:1/-1;flex-direction:row}
+  .actions .btn{flex:1}
+  .money{font-size:24px}
+  header{padding:8px 12px}
+  .skywrap{height:150px}
+  .actionbar{grid-template-columns:repeat(2,1fr)}
+  .tabs{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+<style>/* Spielhalle-Hinweise */
+#h-toasts,.h-toast{--border-2:rgba(255,255,255,.12);--sh-2:0 10px 40px rgba(0,0,0,.55);--ease:cubic-bezier(.2,.8,.2,1);--text-2:#b4b9c8;--accent-rgb:124,108,255;--accent-2:#a594ff;--bg:#08090d;color:#eceef4;font-family:'Segoe UI',system-ui,sans-serif}
+.h-fade{--bg:#08090d}
+.ico{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico.f{fill:currentColor;stroke:none}
+#h-toasts{position:fixed;right:18px;bottom:18px;z-index:1000;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}
+.h-toast{display:flex;align-items:center;gap:12px;min-width:260px;max-width:380px;padding:12px 16px 12px 12px;border-radius:14px;background:rgba(22,24,32,.92);backdrop-filter:blur(12px);
+  border:1px solid var(--border-2);box-shadow:var(--sh-2);animation:h-tin .35s var(--ease);pointer-events:auto}
+.h-toast.out{animation:h-tout .3s ease forwards}
+.h-toast .ti{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(var(--accent-rgb),.2);color:var(--accent-2)}
+.h-toast.ach .ti{background:linear-gradient(135deg,#ffd76a,#f0a020);color:#3a2400}
+.h-toast b{display:block;font-size:14px}
+.h-toast span{font-size:13px;color:var(--text-2)}
+@keyframes h-tin{from{transform:translateX(30px);opacity:0}}
+@keyframes h-tout{to{transform:translateX(30px);opacity:0}}
+.h-fade{position:fixed;inset:0;z-index:2000;background:var(--bg);pointer-events:none;animation:h-fadeout .45s ease forwards}
+@keyframes h-fadeout{to{opacity:0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><a class="back" href="../Launcher.html" title="Zurück zum Launcher">◀</a><div>🏙️ Tycoon Imperium<small id="rankTitle">Tellerwäscher</small></div></div>
+  <div class="wallet">
+    <div class="money" id="money">0 €</div>
+    <div class="rate" id="rate">+0 €/s</div>
+  </div>
+  <div class="hright">
+    <button class="gems" id="gemsBtn" title="Diamanten – zum Shop">💎 <span id="gems">0</span></button>
+    <div class="buymode" id="buymode">
+      <button data-m="1" class="on">x1</button><button data-m="10">x10</button><button data-m="100">x100</button><button data-m="max">MAX</button>
+    </div>
+    <button class="iconbtn off" id="music" title="Musik an/aus">🎵</button>
+    <button class="iconbtn" id="mute" title="Ton an/aus">🔊</button>
+  </div>
+  <div class="effects" id="effects"></div>
+</header>
+
+<main id="main">
+  <div class="left">
+    <div class="skywrap">
+      <canvas id="sky"></canvas>
+      <div class="rankbox">
+        Rang: <b id="rankName">Tellerwäscher</b>
+        <div class="rb"><div id="rankFill"></div></div>
+        <div class="muted" id="rankNext"></div>
+      </div>
+    </div>
+    <div class="actionbar">
+      <button class="tile" id="tWheel"><span class="ti">🎡</span><span class="tx"><span class="tt">Glücksrad</span><span class="ts" id="tWheelS"></span></span></button>
+      <button class="tile" id="tFever" title="Klick ganz schnell auf deine Geschäfte!"><span class="ti">🔥</span><span class="tx"><span class="tt">Fieber-Modus</span><span class="ts" id="tFeverS">Schnell klicken!</span><span class="fbar"><span id="tFeverB"></span></span></span></button>
+      <button class="tile" id="tRival"><span class="ti" id="tRivalI">🧒</span><span class="tx"><span class="tt" id="tRivalN"></span><span class="ts" id="tRivalS"></span><span class="fbar gold"><span id="tRivalB"></span></span></span></button>
+      <button class="tile" id="tChest"><span class="ti">🎁</span><span class="tx"><span class="tt">Truhen</span><span class="ts" id="tChestS"></span></span></button>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+  <aside>
+    <div class="panel">
+      <div class="tabs" id="tabs">
+        <button data-t="upgrades" class="on"><i>⬆️</i>Upgrades<span class="dot" id="dot-upgrades"></span></button>
+        <button data-t="missions"><i>🎯</i>Missionen<span class="dot" id="dot-missions"></span></button>
+        <button data-t="cards"><i>🃏</i>Karten<span class="dot" id="dot-cards"></span></button>
+        <button data-t="investors"><i>💼</i>Investor<span class="dot" id="dot-investors"></span></button>
+        <button data-t="market"><i>📈</i>Börse</button>
+        <button data-t="rivals"><i>🥇</i>Rivalen</button>
+        <button data-t="ach"><i>🏆</i>Erfolge</button>
+        <button data-t="stats"><i>📊</i>Statistik</button>
+      </div>
+      <div class="tab on" id="tab-upgrades">
+        <button class="btn blue" id="buyAllUp" style="width:100%;margin-bottom:10px;padding:9px">⬆️ Alle leistbaren Upgrades kaufen</button>
+        <div id="uplist"></div>
+      </div>
+
+      <div class="tab" id="tab-missions">
+        <div class="muted" id="missHead"></div>
+        <div class="prog g"><div id="missProg"></div></div>
+        <div id="missions" style="margin-top:10px"></div>
+      </div>
+
+      <div class="tab" id="tab-cards">
+        <h3 style="margin-top:0">🎁 Deine Truhen</h3>
+        <div class="chestrow" id="chests"></div>
+        <h3>💎 Diamanten-Shop</h3>
+        <div id="gemshop"></div>
+        <h3>🃏 Manager-Karten <span class="muted" id="colCount"></span></h3>
+        <p class="muted" style="margin-top:0">Doppelte Karten machen eine Karte stärker. Jede Stufe einer Geschäfts-Karte <b>verdoppelt</b> dessen Gewinn!</p>
+        <div class="colgrid" id="collection"></div>
+      </div>
+
+      <div class="tab" id="tab-investors">
+        <div class="invbox">
+          <div class="invrow">
+            <div><div class="muted">Deine Investoren</div><div class="big" id="invCount">0</div></div>
+            <div style="text-align:right"><div class="muted">Bonus auf alles</div><div class="big" id="invBonus" style="color:var(--green)">+0 %</div></div>
+          </div>
+        </div>
+        <div class="invbox">
+          <div class="muted">Wenn du jetzt neu startest, bekommst du:</div>
+          <div class="big" id="invClaim">+0</div>
+          <div class="prog"><div id="invProg"></div></div>
+          <div class="muted" id="invNext"></div>
+          <button class="btn wide" id="prestige">💼 Neu starten &amp; Investoren holen</button>
+          <div class="tip" id="invTip"></div>
+        </div>
+        <p class="muted">Ein Neustart setzt Geld, Geschäfte, Manager, Upgrades und Aktien zurück. Investoren, Diamanten, Karten, Erfolge und gekaufte Vorteile bleiben <b>für immer</b>. Jeder Investor gibt +2 % auf alle Gewinne.</p>
+        <h3>🛍️ Investoren-Shop (dauerhafte Vorteile)</h3>
+        <p class="muted" style="margin-top:0">Bezahlt wird mit Investoren – die verlassen dafür dein Team (dein Bonus sinkt entsprechend).</p>
+        <div id="shop"></div>
+      </div>
+
+      <div class="tab" id="tab-market">
+        <p class="muted" style="margin-top:0">Kauf Aktien, wenn sie billig sind, und verkauf sie teuer! Kurse ändern sich alle 2 Sekunden. Gewinne zählen auch für deine Investoren.</p>
+        <div id="stocks"></div>
+      </div>
+
+      <div class="tab" id="tab-rivals">
+        <p class="muted" style="margin-top:0">Die reichsten Leute der Welt – gemessen am <b>Gesamtverdienst</b>. Überhol sie alle und kassiere Diamanten!</p>
+        <div id="rivals"></div>
+      </div>
+
+      <div class="tab" id="tab-ach">
+        <div class="muted" id="achHead"></div>
+        <div class="achgrid" id="achgrid" style="margin-top:10px"></div>
+      </div>
+
+      <div class="tab" id="tab-stats">
+        <div id="stats"></div>
+        <button class="btn danger wide" id="reset">🗑️ Spielstand komplett löschen</button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<button id="coin" title="Klick mich!">🪙</button>
+<div id="toasts"></div>
+<div class="modal" id="modal"><div class="box" id="mBox"><div class="mi" id="mIcon"></div><h2 id="mTitle"></h2><div class="muted" id="mText"></div><div id="mBtns"></div></div></div>
+
+<script src="shared/hub.js"></script>
+<script>
+// =====================================================================
+//  SPIELDATEN
+// =====================================================================
+const UNITS = ['','',' Mio',' Mrd',' Bio',' Brd',' Trio',' Trd',' Quad',' Quadrd',' Quint',' Quintrd',' Sext',' Sextrd',' Sept',' Septrd'];
+const BIZ = [
+  {name:'Limonadenstand', icon:'🍋', cost:4,      mul:1.07, time:1,    rev:1,      mgr:1000,   color:'#f5d742'},
+  {name:'Eisdiele',       icon:'🍦', cost:60,     mul:1.15, time:3,    rev:60,     mgr:15000,  color:'#f7a8c8'},
+  {name:'Autowaschanlage',icon:'🚗', cost:720,    mul:1.14, time:6,    rev:540,    mgr:1e5,    color:'#5bb8f5'},
+  {name:'Pizzeria',       icon:'🍕', cost:8640,   mul:1.13, time:12,   rev:4320,   mgr:5e5,    color:'#e8643c'},
+  {name:'Fitnessstudio',  icon:'🏋️', cost:103680, mul:1.12, time:24,   rev:51840,  mgr:1.2e6,  color:'#7bd88f'},
+  {name:'Hotel',          icon:'🏨', cost:1.24416e6, mul:1.11, time:48,  rev:622080, mgr:1e7,  color:'#c9a0ff'},
+  {name:'Filmstudio',     icon:'🎬', cost:1.492992e7, mul:1.10, time:96, rev:7.46496e6, mgr:1.11e8, color:'#ff8fa3'},
+  {name:'Bank',           icon:'🏦', cost:1.7915904e8, mul:1.09, time:192, rev:8.957952e7, mgr:5.55e8, color:'#d9d9d9'},
+  {name:'Ölkonzern',      icon:'🛢️', cost:2.14990848e9, mul:1.08, time:384, rev:1.07495424e9, mgr:1e10, color:'#6f6f8f'},
+  {name:'Tech-Konzern',   icon:'💻', cost:2.579890176e10, mul:1.07, time:768, rev:2.9668737e10, mgr:1e11, color:'#4ce0d2'},
+  {name:'Freizeitpark',   icon:'🎢', cost:3.6e11, mul:1.07, time:1000, rev:4.2e11, mgr:1.5e12, color:'#ffb347'},
+  {name:'Fluglinie',      icon:'✈️', cost:5e12,   mul:1.07, time:1500, rev:6e12,   mgr:2e13,   color:'#9ec5ff'},
+  {name:'Roboterfabrik',  icon:'🤖', cost:7e13,   mul:1.07, time:2000, rev:9e13,   mgr:3e14,   color:'#b0bec5'},
+  {name:'Mondbasis',      icon:'🌙', cost:1e15,   mul:1.06, time:3000, rev:1.4e15, mgr:5e15,   color:'#e6e6a0'},
+  {name:'Mars-Kolonie',   icon:'🪐', cost:1.5e16, mul:1.06, time:4000, rev:2.2e16, mgr:8e16,   color:'#ff7043'},
+];
+const MILESTONES = [10, 25, 50, 100, 200, 300, 400, 500, 750, 1000];
+const TIER_NAMES = ['Bessere Qualität','Werbung','Automatisierung','Premium-Marke','Weltmarke'];
+const GLOBAL_NAMES = ['Social-Media-Kampagne','TV-Werbung','Franchise-System','Börsengang','Weltkonzern','Monopol','Raumfahrt-Lizenz','Galaktisches Imperium'];
+
+const UPGRADES = [];
+BIZ.forEach((b, i) => {
+  for (let k = 0; k < TIER_NAMES.length; k++)
+    UPGRADES.push({id:`b${i}_${k}`, biz:i, mult:3, icon:b.icon, name:`${b.name}: ${TIER_NAMES[k]}`,
+      desc:`${b.name} Gewinn ×3`, cost:b.cost * Math.pow(10, 3 + 2*k)});
+});
+GLOBAL_NAMES.forEach((n, k) => UPGRADES.push({id:`g${k}`, biz:-1, mult:3, icon:'🌍', name:n,
+  desc:'ALLE Gewinne ×3', cost:5e5 * Math.pow(1000, k)}));
+UPGRADES.sort((a, b) => a.cost - b.cost);
+
+const PERKS = [
+  {id:'clickpow', icon:'👆', name:'Kraftklick',        desc:'Klicks auf laufende Geschäfte geben +30 % statt +10 % Fortschritt', cost:5},
+  {id:'startcash',icon:'💰', name:'Startkapital',      desc:'Jede neue Runde startet mit 25.000 €', cost:15},
+  {id:'luck',     icon:'🍀', name:'Glückspilz',        desc:'Goldene Münzen erscheinen doppelt so oft', cost:25},
+  {id:'offline',  icon:'🌙', name:'Nachtschicht',      desc:'Offline-Einnahmen bis 24 Stunden statt 8', cost:40},
+  {id:'cheapmgr', icon:'🕴️', name:'Headhunter',        desc:'Manager kosten 75 % weniger', cost:60},
+  {id:'automgr',  icon:'👨‍👩‍👧', name:'Familienbetrieb',   desc:'Starte jede Runde mit Managern für die ersten 3 Geschäfte', cost:120},
+  {id:'events',   icon:'✨', name:'Glückliche Fügung', desc:'Positive Ereignisse halten doppelt so lange', cost:200},
+  {id:'cheapbiz', icon:'🏷️', name:'Großeinkauf',       desc:'Alle Geschäfte 15 % billiger', cost:400},
+  {id:'x2',       icon:'💼', name:'Goldene Aktentasche', desc:'Alle Gewinne ×2', cost:300},
+  {id:'x5',       icon:'💎', name:'Diamant-Aktentasche', desc:'Alle Gewinne ×5', cost:3000},
+  {id:'x10',      icon:'👑', name:'Krone des Imperiums', desc:'Alle Gewinne ×10', cost:30000},
+];
+
+const RANKS = [[0,'Tellerwäscher'],[1e3,'Straßenhändler'],[1e5,'Kleinunternehmer'],[1e6,'Millionär'],[1e8,'Großunternehmer'],
+  [1e9,'Milliardär'],[1e11,'Tycoon'],[1e12,'Billionär'],[1e14,'Magnat'],[1e15,'Mogul'],[1e18,'Weltherrscher'],
+  [1e21,'Planetenbesitzer'],[1e24,'Galaktischer Imperator'],[1e30,'Herrscher des Universums']];
+
+const STOCKS = [
+  {sym:'LIMO', name:'Limo AG',       icon:'🍋', p:100, vol:0.025},
+  {sym:'PIZZ', name:'Pizza Holding', icon:'🍕', p:60,  vol:0.04},
+  {sym:'TNV',  name:'TechNova',      icon:'💻', p:250, vol:0.06},
+  {sym:'OIL',  name:'Petrol Corp',   icon:'🛢️', p:80,  vol:0.035},
+  {sym:'MARS', name:'MarsX',         icon:'🚀', p:20,  vol:0.11},
+];
+
+// ---------- Karten ----------
+const RORDER = ['common','rare','epic','legendary'];
+const RNAME = {common:'Gewöhnlich', rare:'Selten', epic:'Episch', legendary:'Legendär'};
+const MGR_NAMES = ['Lena Limo','Enzo Eis','Willi Wasch','Paolo Pizza','Muskel-Max','Hotel-Hanna','Regisseur Rolf','Bankier Bruno',
+  'Ölbaron Otto','Hacker Hilde','Achterbahn-Achim','Pilotin Pia','RoboBoss 3000','Astronautin Ada','Mars-Kaiser Marco'];
+const CARDS = BIZ.map((b, i) => ({id:'c' + i, biz:i, icon:b.icon, name:MGR_NAMES[i],
+  rarity: i < 5 ? 'common' : i < 10 ? 'rare' : i < 14 ? 'epic' : 'legendary'}));
+CARDS.push(
+  {id:'cs_wolf',  sp:'wolf',  icon:'🐺', name:'Börsenwolf',    rarity:'rare'},
+  {id:'cs_click', sp:'click', icon:'👆', name:'Klick-König',   rarity:'epic'},
+  {id:'cs_luck',  sp:'luck',  icon:'🧚', name:'Glücksfee',     rarity:'epic'},
+  {id:'cs_gold',  sp:'gold',  icon:'🪿', name:'Goldene Gans',  rarity:'legendary'},
+  {id:'cs_time',  sp:'time',  icon:'⏳', name:'Zeitreisender', rarity:'legendary'},
+);
+const CHESTS = {
+  wood:{name:'Holztruhe',    icon:'📦', n:3, w:[70,24,5,1],    min:null,   cost:10},
+  gold:{name:'Goldtruhe',    icon:'🎁', n:5, w:[45,35,15,5],   min:'rare', cost:40},
+  dia: {name:'Diamanttruhe', icon:'💠', n:8, w:[20,40,28,12],  min:'epic', cost:120},
+};
+
+// ---------- Rivalen ----------
+const RIVALS = [
+  {name:'Nachbarskind Nico',   icon:'🧒', w:2e3,  quote:'Mamaaa! Der hat mehr Limonade als ich!'},
+  {name:'Kiosk-Karl',          icon:'🧔', w:5e4,  quote:'Na warte, mein Kiosk kommt zurück!'},
+  {name:'Pommes-Paula',        icon:'🍟', w:1e6,  quote:'Das ist doch Ketchup-Betrug!'},
+  {name:'Gieriger Gustav',     icon:'🤑', w:3e7,  quote:'Mein Geld! MEIN schönes Geld!'},
+  {name:'Baronin von Bling',   icon:'💍', w:1e9,  quote:'Wie gewöhnlich… und doch reicher als ich?!'},
+  {name:'Öl-Olaf',             icon:'🛢️', w:5e10, quote:'Ich hätte tiefer bohren sollen…'},
+  {name:'Tech-Tim',            icon:'🤓', w:1e12, quote:'Das muss ein Bug in der Simulation sein!'},
+  {name:'Madame Moneten',      icon:'💃', w:5e13, quote:'Ich verlange eine Neuauszählung!'},
+  {name:'Yacht-Yannick',       icon:'🛥️', w:1e15, quote:'Ich verkaufe meine siebte Yacht… vielleicht.'},
+  {name:'Gräfin Goldzahn',     icon:'🦷', w:5e16, quote:'Da bleibt mir glatt der Goldzahn stecken!'},
+  {name:'Roboter-Rudi',        icon:'🤖', w:1e18, quote:'FEHLER. FEHLER. ÜBERHOLT. PIEP.'},
+  {name:'Dr. Dukaten',         icon:'🎩', w:5e19, quote:'Mein Monokel ist mir ins Geldbad gefallen!'},
+  {name:'Mars-Magnat Max',     icon:'🚀', w:1e21, quote:'Houston, wir haben ein Problem.'},
+  {name:'Die Geheimloge',      icon:'👁️', w:1e24, quote:'Das war so nicht geplant…'},
+  {name:'Galaxo der Gierige',  icon:'👽', w:1e27, quote:'Blorp! Wie kann ein Mensch so reich sein?!'},
+  {name:'Das Universum selbst',icon:'🌌', w:1e30, quote:'…du bist jetzt mehr wert als ich. Respekt.'},
+];
+
+const DAILY = [{gems:5},{gems:8},{gems:10, wood:1},{gems:12},{gems:15, wood:1},{gems:20},{gems:30, gold:1}];
+const WHEEL_COST = 8, WHEEL_CD = 10 * 60;
+
+// ---------- Erfolge ----------
+const ACH = [];
+BIZ.forEach((b, i) => [25, 100, 250].forEach(n =>
+  ACH.push({id:`a_b${i}_${n}`, icon:b.icon, lvl:n, name:`${n}× ${b.name}`, desc:`Besitze ${n}× ${b.name}`, test:() => state.biz[i].owned >= n})));
+[[1e4,'Erste 10.000'],[1e6,'Millionär'],[1e9,'Milliardär'],[1e12,'Billionär'],[1e15,'Billiardär'],[1e18,'Trillionär'],[1e24,'Quadrillionär']]
+  .forEach(([v, n]) => ACH.push({id:`a_l${v}`, icon:'💰', name:n, desc:`Verdiene insgesamt ${eur(v)}`, test:() => state.lifetime >= v}));
+[[1e3,'Geldmaschine'],[1e6,'Gelddruckerei'],[1e9,'Geldvulkan'],[1e12,'Geld-Tsunami']]
+  .forEach(([v, n]) => ACH.push({id:`a_p${v}`, icon:'⚙️', name:n, desc:`Verdiene ${eur(v)} pro Sekunde`, test:() => totalPerSec() >= v}));
+[[100,'Fleißig'],[1000,'Klickmonster'],[10000,'Mausmörder']]
+  .forEach(([v, n]) => ACH.push({id:`a_c${v}`, icon:'👆', name:n, desc:`Klicke ${fmt(v)} Mal`, test:() => state.clicks >= v}));
+[[1,'Chef'],[5,'Abteilungsleiter'],[15,'Konzernchef']]
+  .forEach(([v, n]) => ACH.push({id:`a_m${v}`, icon:'👔', name:n, desc:`Stelle ${v} Manager ein`, test:() => mgrCount() >= v}));
+[[1,'Glückspilz'],[10,'Goldsucher'],[50,'Goldrausch']]
+  .forEach(([v, n]) => ACH.push({id:`a_g${v}`, icon:'🪙', name:n, desc:`Fange ${v} goldene Münzen`, test:() => state.coins >= v}));
+[[1,'Neuanfang'],[5,'Serien-Gründer'],[25,'Unsterblich']]
+  .forEach(([v, n]) => ACH.push({id:`a_r${v}`, icon:'💼', name:n, desc:`Starte ${v}× mit Investoren neu`, test:() => state.resets >= v}));
+[[5,'Krisenmanager'],[25,'Abgebrüht'],[100,'Nichts kann mich schocken']]
+  .forEach(([v, n]) => ACH.push({id:`a_e${v}`, icon:'📰', name:n, desc:`Erlebe ${v} Ereignisse`, test:() => state.eventsSeen >= v}));
+[[10,'Shopping'],[40,'Optimierer'],[UPGRADES.length,'Perfektionist']]
+  .forEach(([v, n]) => ACH.push({id:`a_u${v}`, icon:'⬆️', name:n, desc:`Kaufe ${v} Upgrades`, test:() => upCount() >= v}));
+[[5,'Sammler'],[12,'Kartenfan'],[CARDS.length,'Komplettist']]
+  .forEach(([v, n]) => ACH.push({id:`a_k${v}`, icon:'🃏', name:n, desc:`Sammle ${v} verschiedene Karten`, test:() => Object.keys(state.cards).length >= v}));
+ACH.push({id:'a_kl5', icon:'🌟', name:'Superkarte', desc:'Bring eine Karte auf Stufe 5', test:() => CARDS.some(c => lvlOf(c.id) >= 5)});
+[[10,'Auftragnehmer'],[50,'Profi'],[200,'Missionsmaschine']]
+  .forEach(([v, n]) => ACH.push({id:`a_q${v}`, icon:'🎯', name:n, desc:`Erledige ${v} Missionen`, test:() => state.missionsDone >= v}));
+[[3,'Aufsteiger'],[8,'Emporkömmling'],[RIVALS.length,'Nummer 1']]
+  .forEach(([v, n]) => ACH.push({id:`a_v${v}`, icon:'🥇', name:n, desc:`Überhole ${v} Rivalen`, test:() => Object.keys(state.beaten).length >= v}));
+[[10,'Dreher'],[50,'Glücksritter']]
+  .forEach(([v, n]) => ACH.push({id:`a_w${v}`, icon:'🎡', name:n, desc:`Dreh ${v}× am Glücksrad`, test:() => state.spins >= v}));
+[[1,'Heiß!'],[10,'Feuerteufel'],[50,'Inferno']]
+  .forEach(([v, n]) => ACH.push({id:`a_f${v}`, icon:'🔥', name:n, desc:`Starte ${v}× den Fieber-Modus`, test:() => state.fevers >= v}));
+ACH.push({id:'a_s1', icon:'📈', name:'Börsenhai', desc:'Verkaufe Aktien mit über 50 % Gewinn', test:() => state.bestTrade >= 0.5});
+ACH.push({id:'a_s2', icon:'🐺', name:'Wolf der Wall Street', desc:'Mache insgesamt 1 Mrd € Aktiengewinn', test:() => state.stockProfit >= 1e9});
+const ACH_BONUS = 0.02, ACH_GEMS = 3;
+const INVESTOR_BONUS = 0.02;
+const SAVE_KEY = 'tycoon_imperium_v1';
+
+// =====================================================================
+//  ZUSTAND
+// =====================================================================
+const state = {};
+function newRun(perks){
+  return {
+    money: perks.startcash ? 25000 : 0, runEarned:0, upgrades:{}, effects:[],
+    biz: BIZ.map((_, i) => ({owned: i === 0 ? 1 : 0, progress:0, running:false, manager: !!perks.automgr && i < 3})),
+    hold: STOCKS.map(() => ({shares:0, cost:0})),
+  };
+}
+function defaults(){
+  return Object.assign({
+    lifetime:0, investors:0, invClaimed:0, clicks:0, playTime:0, resets:0, buyMode:1, lastSeen:Date.now(),
+    muted:false, music:false, perks:{}, ach:{}, coins:0, eventsSeen:0, stockProfit:0, bestTrade:0, goodTrades:0, rankIdx:0, hints:{},
+    market: STOCKS.map(s => ({p:s.p, hist:[]})),
+    gems:0, cards:{}, chests:{wood:1, gold:0, dia:0}, chestsOpened:0, missions:[], missionsDone:0,
+    beaten:{}, spins:0, wheelAt:0, fevers:0, daily:{last:'', streak:0},
+  }, newRun({}));
+}
+Object.assign(state, defaults());
+
+// =====================================================================
+//  HILFSFUNKTIONEN
+// =====================================================================
+function fmt(n){
+  if (!isFinite(n)) return '∞';
+  if (n < 0) return '−' + fmt(-n);
+  if (n < 1e6) return n.toLocaleString('de-DE', {maximumFractionDigits: n < 100 ? 2 : 0});
+  const e = Math.floor(Math.log10(n) / 3);
+  if (e >= UNITS.length) return n.toExponential(2).replace('e+', 'e');
+  return (n / Math.pow(1000, e)).toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + UNITS[e];
+}
+function eur(n){ return fmt(n) + ' €'; }
+function fmtTime(s){
+  s = Math.max(0, Math.ceil(s));
+  if (s < 60) return s + 's';
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+  if (h) return `${h}h ${String(m).padStart(2,'0')}m`;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+const $ = id => document.getElementById(id);
+const hasPerk = id => !!state.perks[id];
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+function randn(){ return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random()); }
+function niceNum(x){
+  if (x < 10) return Math.ceil(x);
+  const p = Math.pow(10, Math.floor(Math.log10(x))), f = x / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+const upCount = () => Object.keys(state.upgrades).length;
+const mgrCount = () => state.biz.filter(s => s.manager).length;
+const ownedList = () => BIZ.map((_, i) => i).filter(i => state.biz[i].owned > 0);
+const firstLockedIdx = () => state.biz.findIndex(s => s.owned === 0);
+
+// =====================================================================
+//  SOUND & MUSIK
+// =====================================================================
+let actx;
+function beep(freq, dur = .08, type = 'sine', vol = .05, delay = 0){
+  if (state.muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur);
+  } catch(e){}
+}
+let lastCoinSfx = 0;
+const SFX = {
+  coin(){ const n = performance.now(); if (n - lastCoinSfx < 70) return; lastCoinSfx = n; beep(988,.05,'square',.025); beep(1319,.09,'square',.025,.05); },
+  click(){ beep(660 + Math.min(fever.meter, 100) * 4,.03,'triangle',.03); },
+  buy(){ beep(520,.06,'triangle',.05); beep(780,.06,'triangle',.04,.05); },
+  fanfare(){ [523,659,784,1047].forEach((f,k) => beep(f,.18,'triangle',.06,k*.1)); },
+  bad(){ beep(300,.2,'sawtooth',.035); beep(200,.3,'sawtooth',.035,.15); },
+  event(){ beep(700,.1,'sine',.05); beep(940,.12,'sine',.05,.12); },
+  gem(){ beep(1568,.08,'sine',.04); beep(2093,.12,'sine',.035,.06); },
+};
+const MEL = [0,2,4,7,4,2,5,4, 0,2,4,7,9,7,5,4], BASS = [0,0,5,5,3,3,4,4];
+const NOTE = k => 261.63 * Math.pow(2, [0,2,4,5,7,9,11,12,14,16][k] / 12);
+let musicStep = 0;
+setInterval(() => {
+  if (!state.music || state.muted || document.hidden) return;
+  const hi = feverOn() ? 2 : 1;
+  if (musicStep % 2 === 0 || Math.random() < .5) beep(NOTE(MEL[musicStep % 16]) * hi, .16, 'triangle', .014);
+  if (musicStep % 4 === 0) beep(NOTE(BASS[(musicStep / 4 | 0) % 8]) / 2, .4, 'sine', .03);
+  musicStep++;
+}, 210);
+
+// =====================================================================
+//  KARTEN-WERTE
+// =====================================================================
+const cardCount = id => state.cards[id] || 0;
+const cardLvl = n => n > 0 ? Math.min(10, Math.floor(Math.log2(n)) + 1) : 0;
+const lvlOf = id => cardLvl(cardCount(id));
+function cardEffect(c, L){
+  L = L || 1;
+  if (c.biz !== undefined) return `${BIZ[c.biz].name} Gewinn ×${fmt(Math.pow(2, L))}`;
+  return {wolf:`Aktiengewinne +${25*L} %`, click:`Klick-Kraft +${5*L} % · Fieber lädt schneller`,
+    luck:`Goldmünzen ${20*L} % häufiger`, gold:`ALLE Gewinne ×${fmt(1 + .5*L)}`, time:`Alle Geschäfte ${10*L} % schneller`}[c.sp];
+}
+
+// =====================================================================
+//  SPIELMECHANIK
+// =====================================================================
+const investorMult = () => 1 + state.investors * INVESTOR_BONUS;
+const achMult = () => 1 + Object.keys(state.ach).length * ACH_BONUS;
+const perkMult = () => (hasPerk('x2') ? 2 : 1) * (hasPerk('x5') ? 5 : 1) * (hasPerk('x10') ? 10 : 1);
+const cardMult = i => Math.pow(2, lvlOf('c' + i)) * (1 + 0.5 * lvlOf('cs_gold'));
+const speedMult = () => 1 + 0.1 * lvlOf('cs_time');
+function upgradeMult(i){
+  let m = 1;
+  for (const u of UPGRADES) if (state.upgrades[u.id] && (u.biz === i || u.biz === -1)) m *= u.mult;
+  return m;
+}
+function effMult(i){
+  const now = Date.now(); let m = 1;
+  for (const e of state.effects) if (e.mult && e.until > now && (e.biz === -1 || e.biz === i)) m *= e.mult;
+  return m;
+}
+function isPaused(i){ const now = Date.now(); return state.effects.some(e => e.pause && e.biz === i && e.until > now); }
+function milestonesReached(i){ return MILESTONES.filter(m => state.biz[i].owned >= m).length; }
+function bizTime(i){ return BIZ[i].time / Math.pow(2, milestonesReached(i)) / speedMult(); }
+function basePayout(i){ return BIZ[i].rev * state.biz[i].owned * upgradeMult(i) * investorMult() * achMult() * perkMult() * cardMult(i); }
+function payout(i){ return basePayout(i) * effMult(i); }
+function perSec(i){ const s = state.biz[i]; return s.manager && s.owned > 0 && !isPaused(i) ? payout(i) / bizTime(i) : 0; }
+const totalPerSec = () => BIZ.reduce((a, _, i) => a + perSec(i), 0);
+// Was die Firma ohne Boni verdienen *könnte* – Basis für Belohnungen
+const potentialPerSec = () => BIZ.reduce((a, _, i) => a + (state.biz[i].owned ? basePayout(i) / bizTime(i) : 0), 0);
+const income = sec => Math.max(10, potentialPerSec() * sec);
+const mgrCost = i => BIZ[i].mgr * (hasPerk('cheapmgr') ? 0.25 : 1);
+const bizDiscount = () => hasPerk('cheapbiz') ? 0.85 : 1;
+
+function costFor(i, n){
+  const b = BIZ[i];
+  return b.cost * bizDiscount() * Math.pow(b.mul, state.biz[i].owned) * (Math.pow(b.mul, n) - 1) / (b.mul - 1);
+}
+function maxAffordable(i){
+  const b = BIZ[i], c0 = b.cost * bizDiscount() * Math.pow(b.mul, state.biz[i].owned);
+  return Math.max(0, Math.floor(Math.log(state.money * (b.mul - 1) / c0 + 1) / Math.log(b.mul)));
+}
+function buyInfo(i){
+  const n = state.buyMode === 'max' ? Math.max(1, maxAffordable(i)) : state.buyMode;
+  return {n, cost: costFor(i, n)};
+}
+function earn(x){ state.money += x; state.runEarned += x; state.lifetime += x; }
+function spend(x){
+  if (x > state.money * 1.0000001) return false;
+  state.money = Math.max(0, state.money - x);
+  return true;
+}
+function addGems(n){ state.gems += n; const g = $('gemsBtn'); g.classList.remove('pop'); void g.offsetWidth; g.classList.add('pop'); SFX.gem(); }
+function spendGems(n){
+  if (state.gems < n){ toast('💎 Nicht genug Diamanten!', 'bad'); return false; }
+  state.gems -= n; return true;
+}
+
+function buy(i){
+  const {n, cost} = buyInfo(i);
+  const before = milestonesReached(i), wasLocked = state.biz[i].owned === 0;
+  if (!spend(cost)) return;
+  state.biz[i].owned += n;
+  SFX.buy();
+  if (wasLocked){ toast(`${BIZ[i].icon} ${BIZ[i].name} eröffnet!`, 'good'); confetti(30); }
+  if (milestonesReached(i) > before){ toast(`⚡ ${BIZ[i].name}: Meilenstein! Doppeltes Tempo!`, 'gold'); SFX.fanfare(); }
+}
+function hireManager(i){
+  const s = state.biz[i];
+  if (s.manager || s.owned === 0 || !spend(mgrCost(i))) return;
+  s.manager = true;
+  SFX.fanfare();
+  toast(`👔 Manager für ${BIZ[i].name} eingestellt – läuft jetzt automatisch!`, 'good');
+}
+
+// ---------- Klicken & Fieber ----------
+const fever = {meter:0, until:0};
+const feverOn = () => Date.now() < fever.until;
+function startFever(){
+  fever.meter = 0;
+  fever.until = Date.now() + 10000;
+  addEffect(-1, 5, 10, '🔥');
+  state.fevers++;
+  SFX.fanfare(); shake(); confetti(50);
+  toast('🔥🔥 FIEBER-MODUS! Alles ×5 und jeder Klick ist sofort fertig!', 'bad', 4000);
+}
+function work(i){
+  const s = state.biz[i];
+  if (s.owned === 0 || isPaused(i)) return;
+  state.clicks++;
+  if (!feverOn()){
+    fever.meter += 6 + 1.5 * lvlOf('cs_click');
+    if (fever.meter >= 100) startFever();
+  }
+  SFX.click();
+  if (feverOn()){ s.running = true; s.progress = Math.max(s.progress, 1); return; }
+  if (!s.running){ s.running = true; return; }
+  if (bizTime(i) < 0.25) return;
+  const p = (hasPerk('clickpow') ? 0.3 : 0.1) + 0.05 * lvlOf('cs_click');
+  s.progress += p;
+  floatAt(i, null, `⚡+${Math.round(p * 100)}%`);
+}
+function buyUpgrade(id, quiet){
+  const u = UPGRADES.find(x => x.id === id);
+  if (!u || state.upgrades[id] || !spend(u.cost)) return false;
+  state.upgrades[id] = true;
+  if (!quiet){ SFX.buy(); toast(`⬆️ ${u.name} – ${u.desc}`, 'gold'); buildUpgrades(); }
+  return true;
+}
+function buyAllUpgrades(){
+  let n = 0;
+  for (const u of UPGRADES) if (!state.upgrades[u.id] && state.money >= u.cost && buyUpgrade(u.id, true)) n++;
+  if (n){ SFX.fanfare(); toast(`⬆️ ${n} Upgrades gekauft!`, 'gold'); buildUpgrades(); }
+  else toast('Gerade ist kein Upgrade leistbar.', '');
+}
+
+// ---------- Investoren ----------
+const totalInvestors = () => Math.floor(10 * Math.sqrt(state.lifetime / 1e6));
+const claimable = () => Math.max(0, totalInvestors() - state.invClaimed);
+function lifetimeFor(inv){ return Math.pow(inv / 10, 2) * 1e6; }
+function prestige(){
+  const c = claimable();
+  if (c < 1) return;
+  showModal({icon:'💼', title:'Neu starten?',
+    text:`Du bekommst <b>${fmt(c)} neue Investoren</b> (+${fmt(c * INVESTOR_BONUS * 100)} % Gewinn für immer).<br><br>
+      Geld, Geschäfte, Manager, Upgrades und Aktien werden zurückgesetzt. Diamanten, Karten und Truhen bleiben.`,
+    buttons:[
+      {label:'🚀 Ja, neu starten!', cls:'purple', fn: doPrestige},
+      {label:'Abbrechen', cls:'gray'},
+    ]});
+}
+function doPrestige(){
+  const c = claimable();
+  state.investors += c;
+  state.invClaimed += c;
+  state.resets++;
+  Object.assign(state, newRun(state.perks));
+  state.missions = []; fillMissions();
+  buildUpgrades(); buildStocks(); buildShop(); buildMissions();
+  save();
+  confetti(120); SFX.fanfare();
+  toast(`💼 ${fmt(c)} neue Investoren! Bonus jetzt +${fmt(state.investors * INVESTOR_BONUS * 100)} %`, 'purple', 5000);
+}
+function buyPerk(id){
+  const p = PERKS.find(x => x.id === id);
+  if (!p || state.perks[id] || state.investors < p.cost) return;
+  showModal({icon:p.icon, title:p.name, text:`${p.desc}<br><br>Kostet <b>${fmt(p.cost)} Investoren</b> (−${fmt(p.cost * INVESTOR_BONUS * 100)} % Bonus).`,
+    buttons:[
+      {label:'Kaufen', cls:'purple', fn(){
+        if (state.investors < p.cost) return;
+        state.investors -= p.cost;
+        state.perks[id] = true;
+        if (id === 'automgr') for (let i = 0; i < 3; i++) state.biz[i].manager = true;
+        SFX.fanfare(); confetti(40);
+        toast(`${p.icon} ${p.name} freigeschaltet!`, 'purple');
+        buildShop();
+      }},
+      {label:'Abbrechen', cls:'gray'},
+    ]});
+}
+
+// ---------- Effekte ----------
+function addEffect(biz, mult, dur, icon){ state.effects.push({biz, mult, until: Date.now() + dur * 1000, icon}); }
+function pause(biz, dur){ state.effects.push({biz, pause:true, until: Date.now() + dur * 1000, icon:'🔥'}); }
+
+// =====================================================================
+//  SPIELSCHLEIFE
+// =====================================================================
+function tick(dt){
+  state.playTime += dt;
+  if (!feverOn()) fever.meter = Math.max(0, fever.meter - 14 * dt);
+  BIZ.forEach((b, i) => {
+    const s = state.biz[i];
+    if (s.owned === 0 || isPaused(i)) return;
+    if (s.manager) s.running = true;
+    if (!s.running) return;
+    const t = bizTime(i);
+    s.progress += dt / t;
+    if (s.progress >= 1){
+      if (s.manager){
+        const n = Math.floor(s.progress);
+        s.progress -= n;
+        const gain = payout(i) * n;
+        earn(gain);
+        if (t >= 0.6){ floatAt(i, gain); coinBurst(i, 1); }
+      } else {
+        s.progress = 0; s.running = false;
+        const gain = payout(i);
+        earn(gain);
+        floatAt(i, gain);
+        coinBurst(i, 3);
+        SFX.coin();
+      }
+    }
+  });
+}
+
+// =====================================================================
+//  OBERFLÄCHE: Geschäfte
+// =====================================================================
+const cards = [];
+function buildCards(){
+  const list = $('list');
+  BIZ.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `
+      <button class="icon">${b.icon}<span class="owned"></span></button>
+      <div class="mid">
+        <div class="top"><span class="name">${b.name}<span class="stars"></span><span class="chips"></span></span><span class="payout"></span></div>
+        <div class="bar"><div class="fill"></div><span><em></em><em></em></span></div>
+        <div class="ms"></div>
+      </div>
+      <div class="actions">
+        <button class="btn buy"></button>
+        <button class="btn mgr"></button>
+      </div>`;
+    list.appendChild(el);
+    const q = s => el.querySelector(s);
+    const ref = {el, icon:q('.icon'), owned:q('.owned'), payout:q('.payout'), fill:q('.fill'), chips:q('.chips'), stars:q('.stars'),
+      l:q('.bar em:first-child'), r:q('.bar em:last-child'), ms:q('.ms'), buy:q('.buy'), mgr:q('.mgr'), cache:{}};
+    ref.icon.onclick = () => work(i);
+    ref.buy.onclick = () => buy(i);
+    ref.mgr.onclick = () => hireManager(i);
+    cards.push(ref);
+  });
+}
+function set(ref, key, prop, val){
+  if (ref.cache[key + prop] !== val){ ref.cache[key + prop] = val; ref[key][prop] = val; }
+}
+const uiCache = {cache:{}};
+function setId(id, prop, val){ if (uiCache.cache[id + prop] !== val){ uiCache.cache[id + prop] = val; $(id)[prop] = val; } }
+function chipText(e){
+  const left = fmtTime((e.until - Date.now()) / 1000);
+  return e.pause ? `🔥 Pause ${left}` : `${e.icon} ×${fmt(e.mult)} ${left}`;
+}
+
+function render(){
+  const now = Date.now();
+  setId('money', 'textContent', eur(state.money));
+  setId('rate', 'textContent', '+' + eur(totalPerSec()) + '/s');
+  setId('gems', 'textContent', fmt(state.gems));
+  document.body.classList.toggle('fever', feverOn());
+
+  const active = state.effects.filter(e => e.until > now);
+  const globalHtml = active.filter(e => e.biz === -1)
+    .map(e => `<span class="chip${e.mult < 1 ? ' bad' : ''}">${chipText(e)} alle</span>`).join('');
+  setId('effects', 'innerHTML', globalHtml);
+
+  // Aktionsleiste
+  const wheelLeft = (state.wheelAt - now) / 1000;
+  setId('tWheelS', 'textContent', wheelLeft <= 0 ? '✨ Gratis-Dreh bereit!' : 'Gratis in ' + fmtTime(wheelLeft));
+  $('tWheel').classList.toggle('ready', wheelLeft <= 0);
+  if (feverOn()){
+    setId('tFeverS', 'textContent', `🔥 FIEBER! noch ${fmtTime((fever.until - now) / 1000)}`);
+    $('tFeverB').style.width = (fever.until - now) / 100 + '%';
+  } else {
+    setId('tFeverS', 'textContent', fever.meter > 0 ? `Weiter klicken! ${Math.floor(fever.meter)} %` : 'Ganz schnell klicken!');
+    $('tFeverB').style.width = fever.meter + '%';
+  }
+  $('tFever').classList.toggle('ready', feverOn());
+  const nChest = state.chests.wood + state.chests.gold + state.chests.dia;
+  setId('tChestS', 'textContent', nChest ? `${nChest} zum Öffnen!` : 'Keine Truhen');
+  $('tChest').classList.toggle('ready', nChest > 0);
+
+  // nur bis zum nächsten noch gesperrten Geschäft (+1) anzeigen
+  const firstLocked = firstLockedIdx();
+  const showUntil = firstLocked === -1 ? BIZ.length : firstLocked + 1;
+
+  BIZ.forEach((b, i) => {
+    const s = state.biz[i], c = cards[i];
+    c.el.classList.toggle('hidden', i > showUntil);
+    if (i > showUntil) return;
+    const t = bizTime(i);
+    const locked = s.owned === 0, paused = isPaused(i);
+    const mysterious = i === showUntil && locked && firstLocked !== i;
+    c.el.classList.toggle('locked', locked);
+    c.el.classList.toggle('paused', paused);
+    c.el.classList.toggle('hot', effMult(i) > 1);
+    c.icon.classList.toggle('idle', !locked && !s.running && !s.manager && !paused);
+    set(c, 'owned', 'textContent', locked ? '🔒' : fmt(s.owned));
+    const ms = milestonesReached(i);
+    set(c, 'stars', 'textContent', ms ? '★'.repeat(ms) : '');
+
+    const chips = active.filter(e => e.biz === i).map(e => `<span class="chip${e.pause || e.mult < 1 ? ' bad' : ''}">${chipText(e)}</span>`).join('');
+    set(c, 'chips', 'innerHTML', chips);
+
+    const turbo = s.manager && t < 0.25 && !paused;
+    c.fill.classList.toggle('turbo', turbo);
+    if (!turbo) c.fill.style.width = (s.running ? Math.min(1, s.progress) * 100 : 0) + '%';
+
+    set(c, 'payout', 'textContent', locked ? '' : (turbo ? eur(perSec(i)) + '/s' : eur(payout(i))));
+    let left, right;
+    if (locked){ left = mysterious ? '❓ Geheimes Geschäft' : 'Noch nicht eröffnet'; right = ''; }
+    else if (paused){ left = '🔥 Stillstand!'; right = ''; }
+    else if (turbo){ left = '🚀 Turbo-Produktion'; right = ''; }
+    else if (s.running){ left = s.manager ? '👔 Automatisch' : 'Arbeitet… (klick = schneller)'; right = fmtTime((1 - Math.min(1, s.progress)) * t); }
+    else { left = '👆 Klick auf das Symbol!'; right = fmtTime(t); }
+    set(c, 'l', 'textContent', left);
+    set(c, 'r', 'textContent', right);
+
+    const next = MILESTONES.find(m => s.owned < m);
+    const prev = [...MILESTONES].reverse().find(m => s.owned >= m) || 0;
+    const msHtml = locked ? (mysterious ? '' : `Karte: ${CARDS[i].name} ${lvlOf('c' + i) ? '(Stufe ' + lvlOf('c' + i) + ')' : ''}`) : next
+      ? `Ziel: ${fmt(s.owned)}/${next} <progress value="${s.owned - prev}" max="${next - prev}"></progress> ⚡ Tempo ×2${lvlOf('c' + i) ? ` · 🃏 ×${fmt(Math.pow(2, lvlOf('c' + i)))}` : ''}`
+      : 'Alle Meilensteine erreicht! 🏆';
+    set(c, 'ms', 'innerHTML', msHtml);
+
+    const {n, cost} = buyInfo(i);
+    c.buy.classList.toggle('ok', state.money >= cost);
+    set(c, 'buy', 'innerHTML', `${locked ? 'Eröffnen' : 'Kaufen ×' + fmt(n)}<b>${eur(cost)}</b>`);
+
+    if (s.manager){
+      set(c, 'mgr', 'className', 'btn mgr done');
+      set(c, 'mgr', 'innerHTML', '✔ Manager aktiv');
+    } else {
+      set(c, 'mgr', 'className', 'btn mgr' + (!locked && state.money >= mgrCost(i) ? ' ok' : ''));
+      set(c, 'mgr', 'innerHTML', `👔 Manager<b>${eur(mgrCost(i))}</b>`);
+    }
+  });
+
+  upRefs.forEach(r => r.btn.classList.toggle('ok', state.money >= r.u.cost));
+  $('dot-upgrades').classList.toggle('on', upRefs.some(r => state.money >= r.u.cost));
+}
+
+// ---------- Upgrades ----------
+let upRefs = [];
+function buildUpgrades(){
+  const box = $('uplist');
+  const open = UPGRADES.filter(u => !state.upgrades[u.id]).slice(0, 15);
+  if (!open.length){ box.innerHTML = '<p class="muted">Alle Upgrades gekauft! 🎉</p>'; upRefs = []; return; }
+  box.innerHTML = open.map(u => `
+    <div class="up"><div class="ic">${u.icon}</div>
+      <div class="t"><div>${u.name}</div><div>${u.desc}</div></div>
+      <button class="btn" data-id="${u.id}"><b>${eur(u.cost)}</b></button></div>`).join('');
+  upRefs = open.map(u => ({u, btn: box.querySelector(`[data-id="${u.id}"]`)}));
+  upRefs.forEach(r => r.btn.onclick = () => buyUpgrade(r.u.id));
+}
+
+// =====================================================================
+//  MISSIONEN
+// =====================================================================
+const MTYPES = {
+  own:{ make(){
+      const i = pick(ownedList()), cur = state.biz[i].owned;
+      const ms = MILESTONES.find(m => m > cur);
+      const target = ms && ms - cur <= Math.max(10, cur) ? ms : cur + Math.max(5, Math.ceil(cur * 0.3));
+      return {biz:i, target, text:`Besitze ${target}× ${BIZ[i].icon} ${BIZ[i].name}`};
+    }, prog: m => state.biz[m.biz].owned },
+  open:{ ok(){ const f = firstLockedIdx(); return f > 0 && costFor(f, 1) < Math.max(state.money, income(600)) * 3; },
+    make(){ const f = firstLockedIdx(); return {biz:f, target:1, text:`Eröffne ${BIZ[f].icon} ${BIZ[f].name}`}; }, prog: m => state.biz[m.biz].owned },
+  earn:{ make(){ const t = niceNum(income(rnd(90, 240))); return {base:state.lifetime, target:t, text:`Verdiene ${eur(t)}`}; }, prog: m => state.lifetime - m.base },
+  clicks:{ make(){ const t = pick([30, 50, 80, 120]); return {base:state.clicks, target:t, text:`Klicke ${t}× auf Geschäfte`}; }, prog: m => state.clicks - m.base },
+  upg:{ ok: () => UPGRADES.some(u => !state.upgrades[u.id] && u.cost < Math.max(state.money, income(900)) * 2),
+    make(){ return {base:upCount(), target:1, text:'Kaufe ein Upgrade ⬆️'}; }, prog: m => upCount() - m.base },
+  mgr:{ ok: () => ownedList().some(i => !state.biz[i].manager && mgrCost(i) < Math.max(state.money, income(900)) * 3),
+    make(){ return {base:mgrCount(), target:1, text:'Stelle einen Manager ein 👔'}; }, prog: m => mgrCount() - m.base },
+  fever:{ make(){ return {base:state.fevers, target:1, text:'Starte den Fieber-Modus 🔥 (ganz schnell klicken!)'}; }, prog: m => state.fevers - m.base },
+  coin:{ make(){ return {base:state.coins, target:1, text:'Fange eine goldene Münze 🪙'}; }, prog: m => state.coins - m.base },
+  trade:{ ok: () => state.lifetime > 2e4, make(){ return {base:state.goodTrades, target:1, text:'Verkaufe Aktien mit Gewinn 📈'}; }, prog: m => state.goodTrades - m.base },
+  spin:{ ok: () => Date.now() >= state.wheelAt - 300000, make(){ return {base:state.spins, target:1, text:'Dreh am Glücksrad 🎡'}; }, prog: m => state.spins - m.base },
+  event:{ ok: () => state.lifetime > 300, make(){ return {base:state.eventsSeen, target:2, text:'Erlebe 2 Ereignisse 📰'}; }, prog: m => state.eventsSeen - m.base },
+  chest:{ ok: () => state.chests.wood + state.chests.gold + state.chests.dia > 0,
+    make(){ return {base:state.chestsOpened, target:1, text:'Öffne eine Truhe 🎁'}; }, prog: m => state.chestsOpened - m.base },
+};
+function newMission(){
+  const used = state.missions.map(m => m.type);
+  const types = Object.keys(MTYPES).filter(t => !used.includes(t) && (!MTYPES[t].ok || MTYPES[t].ok()));
+  const t = pick(types) || 'earn';
+  return Object.assign({type:t, gems:2 + Math.floor(Math.random() * 3), chest:Math.random() < 0.3}, MTYPES[t].make());
+}
+function fillMissions(){ while (state.missions.length < 3) state.missions.push(newMission()); }
+const mProg = m => Math.max(0, MTYPES[m.type] ? MTYPES[m.type].prog(m) : 0);
+function claimMission(k){
+  const m = state.missions[k];
+  if (!m || mProg(m) < m.target) return;
+  const g = income(rnd(60, 150));
+  earn(g); addGems(m.gems);
+  if (m.chest) state.chests.wood++;
+  state.missionsDone++;
+  let msg = `✅ Mission erledigt! +${eur(g)} · +${m.gems} 💎${m.chest ? ' · +📦' : ''}`;
+  if (state.missionsDone % 10 === 0){ state.chests.gold++; msg += ' · 🎁 BONUS-Goldtruhe!'; }
+  toast(msg, 'good', 4500); SFX.fanfare(); confetti(40);
+  state.missions.splice(k, 1, newMission());
+  buildMissions(); buildChests();
+}
+function rerollMission(k){
+  if (!spendGems(1)) return;
+  state.missions.splice(k, 1);
+  state.missions.splice(k, 0, newMission());
+  buildMissions();
+}
+let missRefs = [];
+function buildMissions(){
+  fillMissions();
+  const box = $('missions');
+  box.innerHTML = state.missions.map((m, k) => `
+    <div class="mission" data-k="${k}">
+      <div class="mt">${m.text}</div>
+      <div class="mr">Belohnung: 💰 Geld-Bonus · ${m.gems} 💎${m.chest ? ' · 📦 Holztruhe' : ''}</div>
+      <div class="prog g"><div></div></div>
+      <div class="mp"></div>
+      <div class="mbtns"><button class="btn" data-claim="${k}">Abholen</button><button class="btn gray" data-rr="${k}" title="Neue Mission für 1 Diamant" style="flex:0 0 auto">🔄 1 💎</button></div>
+    </div>`).join('');
+  missRefs = state.missions.map((m, k) => {
+    const el = box.querySelector(`[data-k="${k}"]`);
+    return {el, bar:el.querySelector('.prog div'), txt:el.querySelector('.mp'), btn:el.querySelector('[data-claim]')};
+  });
+  box.querySelectorAll('[data-claim]').forEach(b => b.onclick = () => claimMission(+b.dataset.claim));
+  box.querySelectorAll('[data-rr]').forEach(b => b.onclick = () => rerollMission(+b.dataset.rr));
+  renderMissions();
+}
+function renderMissions(){
+  let any = false;
+  state.missions.forEach((m, k) => {
+    const r = missRefs[k]; if (!r) return;
+    const p = Math.min(m.target, mProg(m)), done = p >= m.target;
+    any = any || done;
+    r.bar.style.width = p / m.target * 100 + '%';
+    const isMoney = m.type === 'earn';
+    r.txt.textContent = isMoney ? `${eur(p)} / ${eur(m.target)}` : `${fmt(Math.floor(p))} / ${fmt(m.target)}`;
+    r.el.classList.toggle('done', done);
+    r.btn.className = 'btn' + (done ? ' green' : '');
+    r.btn.disabled = !done;
+    r.btn.textContent = done ? '🎉 Abholen!' : 'Noch nicht fertig';
+  });
+  $('dot-missions').classList.toggle('on', any);
+  $('missHead').innerHTML = `Erledigt: <b>${fmt(state.missionsDone)}</b> · Alle 10 Missionen gibt es eine <b>🎁 Goldtruhe</b> (${state.missionsDone % 10}/10)`;
+  $('missProg').style.width = (state.missionsDone % 10) * 10 + '%';
+}
+
+// =====================================================================
+//  KARTEN, TRUHEN & DIAMANTEN-SHOP
+// =====================================================================
+function rollCard(type, minR){
+  const ch = CHESTS[type];
+  let r = Math.random() * 100, k = 0;
+  for (; k < 3; k++){ if ((r -= ch.w[k]) < 0) break; }
+  if (minR) k = Math.max(k, RORDER.indexOf(minR));
+  return pick(CARDS.filter(c => c.rarity === RORDER[k]));
+}
+function addCard(c){
+  const old = cardCount(c.id);
+  state.cards[c.id] = old + 1;
+  return {card:c, isNew: old === 0, lvlUp: old > 0 && cardLvl(old + 1) > cardLvl(old), lvl: cardLvl(old + 1)};
+}
+function cardHtml(c, info, k){
+  const badge = info ? (info.isNew ? '<span class="badge">NEU!</span>' : info.lvlUp ? `<span class="badge">STUFE ${info.lvl}!</span>` : '') : '';
+  return `<div class="pcard r-${c.rarity}" style="animation-delay:${(k || 0) * .3}s" title="${cardEffect(c, info ? info.lvl : 1)}">
+    <div class="pi">${c.icon}</div><div class="pn">${c.name}</div><div class="pr">${RNAME[c.rarity]}</div>${badge}</div>`;
+}
+function openChest(type){
+  if (state.chests[type] < 1) return;
+  state.chests[type]--;
+  state.chestsOpened++;
+  const ch = CHESTS[type], res = [];
+  for (let k = 0; k < ch.n; k++) res.push(addCard(rollCard(type, k === ch.n - 1 ? ch.min : null)));
+  // seltenste Karten zuletzt aufdecken – mehr Spannung
+  res.sort((a, b) => RORDER.indexOf(a.card.rarity) - RORDER.indexOf(b.card.rarity));
+  showModal({icon:ch.icon, title:`${ch.name} geöffnet!`, wide:true,
+    text:`<div class="cardgrid">${res.map((r, k) => cardHtml(r.card, r, k)).join('')}</div>
+      <p class="muted" style="margin-top:14px">${res.map(r => r.isNew ? `🆕 ${r.card.name}: ${cardEffect(r.card, r.lvl)}` : r.lvlUp ? `⬆️ ${r.card.name} → Stufe ${r.lvl}: ${cardEffect(r.card, r.lvl)}` : '').filter(Boolean).join('<br>') || 'Gesammelt! Doppelte Karten bringen dich der nächsten Stufe näher.'}</p>`,
+    buttons:[{label:'Super!', cls:'ok'}]});
+  res.forEach((r, k) => setTimeout(() => {
+    const q = RORDER.indexOf(r.card.rarity);
+    beep(420 + q * 220, .14, 'triangle', .05);
+    if (q >= 2) beep(880 + q * 220, .2, 'sine', .04, .08);
+    if (q === 3){ confetti(90); SFX.fanfare(); }
+  }, 250 + k * 300));
+  buildChests(); buildCollection();
+}
+const GEMSHOP = [
+  {icon:'⏩', name:'Zeitsprung 1 Std',  desc:'Sofort 1 Stunde Einnahmen', cost:15, buy(){ const g = income(3600); earn(g); toast(`⏩ +${eur(g)}`, 'gold'); }},
+  {icon:'⏭️', name:'Zeitsprung 8 Std',  desc:'Sofort 8 Stunden Einnahmen', cost:90, buy(){ const g = income(8 * 3600); earn(g); toast(`⏭️ +${eur(g)}`, 'gold'); confetti(80); }},
+  {icon:'⚡', name:'Mega-Boost',        desc:'Alle Gewinne ×10 für 5 Minuten', cost:25, buy(){ addEffect(-1, 10, 300, '⚡'); toast('⚡ Mega-Boost aktiv!', 'gold'); }},
+  {icon:'🎡', name:'Glücksrad-Dreh',    desc:'Sofort am Glücksrad drehen', cost:WHEEL_COST, buy(){ openWheel(true); }, noCharge:true},
+];
+function buildChests(){
+  $('chests').innerHTML = Object.entries(CHESTS).map(([k, c]) => `
+    <div class="chest"><div class="ci">${c.icon}</div><div class="cn">${c.name}</div><div class="cc">${c.n} Karten · Du hast: <b>${state.chests[k]}</b></div>
+      <button class="btn ${state.chests[k] ? 'green' : 'gray'}" data-open="${k}" ${state.chests[k] ? '' : 'disabled'}>Öffnen</button>
+      <button class="btn blue" data-bchest="${k}">Kaufen ${c.cost} 💎</button></div>`).join('');
+  $('chests').querySelectorAll('[data-open]').forEach(b => b.onclick = () => openChest(b.dataset.open));
+  $('chests').querySelectorAll('[data-bchest]').forEach(b => b.onclick = () => {
+    const k = b.dataset.bchest;
+    if (!spendGems(CHESTS[k].cost)) return;
+    state.chests[k]++; SFX.buy(); openChest(k);
+  });
+  $('dot-cards').classList.toggle('on', state.chests.wood + state.chests.gold + state.chests.dia > 0);
+}
+function buildGemShop(){
+  $('gemshop').innerHTML = GEMSHOP.map((g, k) => `
+    <div class="up"><div class="ic">${g.icon}</div><div class="t"><div>${g.name}</div><div>${g.desc}</div></div>
+      <button class="btn blue" data-gs="${k}"><b>${g.cost} 💎</b></button></div>`).join('');
+  $('gemshop').querySelectorAll('[data-gs]').forEach(b => b.onclick = () => {
+    const g = GEMSHOP[+b.dataset.gs];
+    if (g.noCharge){ g.buy(); return; }
+    if (!spendGems(g.cost)) return;
+    SFX.buy(); g.buy();
+  });
+}
+function buildCollection(){
+  $('colCount').textContent = `(${Object.keys(state.cards).length}/${CARDS.length})`;
+  $('collection').innerHTML = [...CARDS].sort((a, b) => RORDER.indexOf(a.rarity) - RORDER.indexOf(b.rarity)).map(c => {
+    const n = cardCount(c.id), L = cardLvl(n);
+    if (!n) return `<div class="pcard r-${c.rarity} unk" title="Noch nicht gefunden (${RNAME[c.rarity]})"><div class="pi">❔</div><div class="pr">${RNAME[c.rarity]}</div></div>`;
+    const need = Math.pow(2, L), prev = Math.pow(2, L - 1);
+    return `<div class="pcard r-${c.rarity}" title="${c.name} – Stufe ${L}: ${cardEffect(c, L)}">
+      <div class="pi">${c.icon}</div><div class="pn">${c.name}</div><div class="pr">Stufe ${L}</div>
+      <div class="lvlbar"><div style="width:${L >= 10 ? 100 : (n - prev) / (need - prev) * 100}%"></div></div></div>`;
+  }).join('');
+}
+
+// =====================================================================
+//  GLÜCKSRAD
+// =====================================================================
+const WHEEL = [
+  {icon:'💰', label:'5 Min',   color:'#f5b942', give(){ const g = income(300); earn(g); return `+${eur(g)}`; }},
+  {icon:'💎', label:'3',       color:'#3b74e6', give(){ addGems(3); return '+3 Diamanten'; }},
+  {icon:'🔥', label:'×5',      color:'#ff6b4a', give(){ addEffect(-1, 5, 60, '🎡'); return 'Alle Gewinne ×5 für 60 s'; }},
+  {icon:'💰', label:'15 Min',  color:'#2fbf71', give(){ const g = income(900); earn(g); return `+${eur(g)}`; }},
+  {icon:'📦', label:'Truhe',   color:'#a0703c', give(){ state.chests.wood++; buildChests(); return '+1 Holztruhe'; }},
+  {icon:'💎', label:'5',       color:'#5b8def', give(){ addGems(5); return '+5 Diamanten'; }},
+  {icon:'💰', label:'5 Min',   color:'#f5b942', give(){ const g = income(300); earn(g); return `+${eur(g)}`; }},
+  {icon:'🃏', label:'Karte',   color:'#9b5de5', give(){ const r = addCard(rollCard('gold')); buildCollection(); return `Karte: ${r.card.icon} ${r.card.name} (${RNAME[r.card.rarity]})`; }},
+  {icon:'💰', label:'30 Min',  color:'#24a862', give(){ const g = income(1800); earn(g); return `+${eur(g)}`; }},
+  {icon:'🎁', label:'Gold',    color:'#e0a800', give(){ state.chests.gold++; buildChests(); return '+1 Goldtruhe!'; }},
+  {icon:'⚡', label:'×10',     color:'#d63af9', give(){ addEffect(-1, 10, 45, '⚡'); return 'Alle Gewinne ×10 für 45 s'; }},
+  {icon:'💎', label:'25!',     color:'#00b8d4', give(){ addGems(25); confetti(150); return '💎 JACKPOT: +25 Diamanten!'; }},
+];
+let wheelRot = 0, wheelSpinning = false;
+function openWheel(){
+  const free = Date.now() >= state.wheelAt;
+  showModal({title:'🎡 Glücksrad',
+    text:`<div class="wheelwrap"><canvas id="wheelCv" width="600" height="600"></canvas><div class="pointer">▼</div></div>
+      <div id="wheelRes" class="wheelres">${free ? '✨ Gratis-Dreh bereit!' : 'Nächster Gratis-Dreh in ' + fmtTime((state.wheelAt - Date.now()) / 1000)}</div>`,
+    buttons:[
+      {id:'spinBtn', label: free ? '🎡 Gratis drehen!' : `🎡 Drehen für ${WHEEL_COST} 💎`, cls:'purple', keep:true, fn: spinWheel},
+      {id:'wheelClose', label:'Schließen', cls:'gray'},
+    ], onOpen: drawWheel});
+}
+function drawWheel(){
+  const cv = $('wheelCv'); if (!cv) return;
+  const c = cv.getContext('2d'), R = 290, cx = 300, cy = 300, seg = Math.PI * 2 / WHEEL.length;
+  c.clearRect(0, 0, 600, 600);
+  WHEEL.forEach((w, k) => {
+    const a0 = wheelRot + k * seg;
+    c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a0 + seg); c.closePath();
+    c.fillStyle = w.color; c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 3; c.stroke();
+    c.save(); c.translate(cx, cy); c.rotate(a0 + seg / 2);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '44px serif'; c.fillText(w.icon, R * .72, 0);
+    c.font = 'bold 26px system-ui'; c.fillStyle = '#fff'; c.fillText(w.label, R * .45, 0);
+    c.restore();
+  });
+  c.beginPath(); c.arc(cx, cy, 44, 0, Math.PI * 2); c.fillStyle = '#1f2440'; c.fill();
+  c.lineWidth = 6; c.strokeStyle = '#ffc940'; c.stroke();
+  c.font = '40px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🎡', cx, cy + 2);
+}
+function spinWheel(btn){
+  if (wheelSpinning) return;
+  const free = Date.now() >= state.wheelAt;
+  if (free) state.wheelAt = Date.now() + WHEEL_CD * 1000;
+  else if (!spendGems(WHEEL_COST)) return;
+  wheelSpinning = true; btn.disabled = true; $('wheelClose').disabled = true;
+  state.spins++;
+  $('wheelRes').textContent = 'Dreht sich…';
+  const k = Math.floor(Math.random() * WHEEL.length), seg = Math.PI * 2 / WHEEL.length;
+  let target = -Math.PI / 2 - (k + 0.5) * seg + rnd(-0.38, 0.38) * seg;
+  while (target < wheelRot + 6 * Math.PI * 2) target += Math.PI * 2;
+  const start = wheelRot, dur = 4500, t0 = performance.now();
+  let lastSeg = Math.floor(wheelRot / seg);
+  function step(now){
+    const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 4);
+    wheelRot = start + (target - start) * e;
+    drawWheel();
+    const cs = Math.floor(wheelRot / seg);
+    if (cs !== lastSeg){ lastSeg = cs; beep(900, .02, 'square', .02); }
+    if (p < 1) requestAnimationFrame(step); else done();
+  }
+  function done(){
+    wheelRot %= Math.PI * 2;
+    wheelSpinning = false;
+    const res = WHEEL[k].give();
+    $('wheelRes').innerHTML = `<b style="color:var(--gold);font-size:20px">${WHEEL[k].icon} ${res}</b>`;
+    SFX.fanfare(); confetti(70);
+    $('wheelClose').disabled = false;
+    btn.innerHTML = `🎡 Nochmal für ${WHEEL_COST} 💎`;
+    btn.disabled = false;
+  }
+  requestAnimationFrame(step);
+}
+
+// =====================================================================
+//  RIVALEN
+// =====================================================================
+function nextRival(){ return RIVALS.findIndex((r, k) => !state.beaten[k]); }
+function checkRivals(silent){
+  RIVALS.forEach((r, k) => {
+    if (state.beaten[k] || state.lifetime < r.w) return;
+    state.beaten[k] = true;
+    if (silent) return;
+    const g = 5 + k * 3;
+    addGems(g);
+    showModal({icon:r.icon, title:`Du hast ${r.name} überholt!`,
+      text:`<i style="font-size:16px">„${r.quote}“</i><br><br>Belohnung: <b style="color:#8fd3ff">+${g} 💎</b>`,
+      buttons:[{label:'😎 Weiter so!', cls:'ok'}]});
+    confetti(100); SFX.fanfare();
+  });
+}
+function renderRivals(){
+  const k = nextRival();
+  if (k === -1){
+    setId('tRivalI', 'textContent', '👑'); setId('tRivalN', 'textContent', 'Reichste Person!'); setId('tRivalS', 'textContent', 'Alle überholt');
+    $('tRivalB').style.width = '100%';
+  } else {
+    const r = RIVALS[k], prev = k ? RIVALS[k - 1].w : 0;
+    setId('tRivalI', 'textContent', r.icon);
+    setId('tRivalN', 'textContent', r.name);
+    setId('tRivalS', 'textContent', `Noch ${eur(Math.max(0, r.w - state.lifetime))}`);
+    const p = (Math.log10(Math.max(1, state.lifetime)) - Math.log10(Math.max(1, prev))) / (Math.log10(r.w) - Math.log10(Math.max(1, prev)));
+    $('tRivalB').style.width = Math.max(0, Math.min(1, p)) * 100 + '%';
+  }
+  if (!$('tab-rivals').classList.contains('on')) return;
+  const rows = RIVALS.map((r, k) => ({...r, k})).concat([{me:true, name:'Du', icon:'😎', w:state.lifetime}]).sort((a, b) => b.w - a.w);
+  setId('rivals', 'innerHTML', rows.map((r, n) => `
+    <div class="riv ${r.me ? 'me' : state.beaten[r.k] ? 'beaten' : ''}"><div class="rn">#${n + 1}</div><div class="ri">${r.icon}</div>
+      <div class="rt"><div>${r.name}${!r.me && state.beaten[r.k] ? ' ✔' : ''}</div><div>${eur(r.w)}</div></div>
+      ${r.me ? '' : state.beaten[r.k] ? '' : `<div class="chip">+${5 + r.k * 3} 💎</div>`}</div>`).join(''));
+}
+
+// =====================================================================
+//  TÄGLICHER BONUS
+// =====================================================================
+const dayStr = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+function checkDaily(){
+  const today = dayStr(new Date()), yest = dayStr(new Date(Date.now() - 864e5));
+  if (state.daily.last === today) return;
+  state.daily.streak = state.daily.last === yest ? state.daily.streak + 1 : 1;
+  state.daily.last = today;
+  const d = (state.daily.streak - 1) % 7, R = DAILY[d];
+  const grid = DAILY.map((x, k) => `<div class="day ${k < d ? 'past' : k === d ? 'now' : ''}">Tag ${k + 1}<br>💎${x.gems}${x.wood ? '<br>📦' : ''}${x.gold ? '<br>🎁' : ''}</div>`).join('');
+  showModal({icon:'📅', title:`Täglicher Bonus – Tag ${state.daily.streak}`,
+    text:`${state.daily.streak > 1 ? `🔥 ${state.daily.streak} Tage in Folge!` : 'Willkommen! Komm jeden Tag wieder für größere Belohnungen.'}
+      <div class="daygrid">${grid}</div>Heute: <b>+${R.gems} 💎</b>${R.wood ? ' + 📦 Holztruhe' : ''}${R.gold ? ' + 🎁 Goldtruhe' : ''} + 💰 Geld-Bonus`,
+    buttons:[{label:'🎁 Abholen!', cls:'ok', fn(){
+      addGems(R.gems);
+      if (R.wood) state.chests.wood++;
+      if (R.gold) state.chests.gold++;
+      const g = income(600); earn(g);
+      buildChests(); confetti(80); SFX.fanfare();
+      toast(`📅 Tagesbonus: +${R.gems} 💎 · +${eur(g)}`, 'gold');
+    }}]});
+}
+
+// =====================================================================
+//  INVESTOREN-TAB, ERFOLGE, RANG, STATISTIK
+// =====================================================================
+function buildShop(){
+  $('shop').innerHTML = PERKS.map(p => `
+    <div class="up ${state.perks[p.id] ? 'owned' : ''}"><div class="ic">${p.icon}</div>
+      <div class="t"><div>${p.name}</div><div>${p.desc}</div></div>
+      ${state.perks[p.id] ? '<span class="chip">✔ Aktiv</span>'
+        : `<button class="btn" data-perk="${p.id}"><b>${fmt(p.cost)} 💼</b></button>`}</div>`).join('');
+  $('shop').querySelectorAll('[data-perk]').forEach(b => b.onclick = () => buyPerk(b.dataset.perk));
+}
+function renderInvestors(){
+  const cl = claimable(), tot = totalInvestors();
+  $('invCount').textContent = fmt(state.investors);
+  $('invBonus').textContent = '+' + fmt(state.investors * INVESTOR_BONUS * 100) + ' %';
+  $('invClaim').textContent = '+' + fmt(cl);
+  const a = lifetimeFor(tot), b = lifetimeFor(tot + 1);
+  $('invProg').style.width = Math.min(100, (state.lifetime - a) / (b - a) * 100) + '%';
+  $('invNext').textContent = `Nächster Investor bei ${eur(b)} Gesamtverdienst (jetzt: ${eur(state.lifetime)})`;
+  const pb = $('prestige');
+  pb.disabled = cl < 1;
+  pb.className = 'btn wide' + (cl >= 1 ? ' purple' : '');
+  const tip = $('invTip');
+  let msg = '';
+  if (cl >= 1 && state.investors === 0) msg = '💡 Dein erster Neustart! Mit Investoren verdienst du danach viel schneller.';
+  else if (cl >= 1 && cl >= state.investors) msg = '🔥 Lohnt sich sehr: Du würdest deine Investoren mehr als verdoppeln!';
+  tip.textContent = msg; tip.classList.toggle('on', !!msg);
+  $('dot-investors').classList.toggle('on', cl >= Math.max(1, state.investors));
+  $('shop').querySelectorAll('[data-perk]').forEach(btn => {
+    const p = PERKS.find(x => x.id === btn.dataset.perk);
+    btn.className = 'btn' + (state.investors >= p.cost ? ' purple' : '');
+  });
+}
+function buildAch(){
+  const got = Object.keys(state.ach).length;
+  $('achHead').innerHTML = `<b style="color:var(--gold)">${got} / ${ACH.length}</b> Erfolge · Bonus <b style="color:var(--green)">+${fmt(got * ACH_BONUS * 100)} %</b> auf alle Gewinne. Jeder Erfolg gibt +2 % und ${ACH_GEMS} 💎. Fahr mit der Maus drüber für Details.`;
+  $('achgrid').innerHTML = ACH.map(a => `<div class="ach ${state.ach[a.id] ? 'got' : ''}" title="${a.name}: ${a.desc}">${a.icon}${a.lvl ? `<small>${a.lvl}</small>` : ''}</div>`).join('');
+}
+function checkAch(silent){
+  let got = 0;
+  for (const a of ACH){
+    if (!state.ach[a.id] && a.test()){
+      state.ach[a.id] = true; got++;
+      state.gems += ACH_GEMS;
+      if (!silent) toast(`🏆 Erfolg: ${a.name} (+2 % Gewinn, +${ACH_GEMS} 💎)`, 'gold', 4000);
+    }
+  }
+  if (got){ if (!silent) SFX.fanfare(); buildAch(); }
+}
+function rankIndex(){ let r = 0; RANKS.forEach((x, k) => { if (state.lifetime >= x[0]) r = k; }); return r; }
+function renderRank(){
+  const r = rankIndex();
+  if (r > state.rankIdx){
+    state.rankIdx = r;
+    addGems(5);
+    confetti(100); SFX.fanfare();
+    toast(`🎉 Neuer Rang: ${RANKS[r][1]}! (+5 💎)`, 'gold', 5000);
+  }
+  setId('rankName', 'textContent', RANKS[r][1]);
+  setId('rankTitle', 'textContent', RANKS[r][1]);
+  if (r < RANKS.length - 1){
+    const a = Math.log10(Math.max(1, RANKS[r][0])), b = Math.log10(RANKS[r + 1][0]);
+    const p = (Math.log10(Math.max(1, state.lifetime)) - a) / (b - a);
+    $('rankFill').style.width = Math.max(0, Math.min(1, p)) * 100 + '%';
+    setId('rankNext', 'textContent', `Nächster Rang „${RANKS[r + 1][1]}“ bei ${eur(RANKS[r + 1][0])}`);
+  } else { $('rankFill').style.width = '100%'; setId('rankNext', 'textContent', 'Höchster Rang erreicht!'); }
+}
+function renderStats(){
+  if (!$('tab-stats').classList.contains('on')) return;
+  const rows = [
+    ['Geld jetzt', eur(state.money)],
+    ['Verdient (diese Runde)', eur(state.runEarned)],
+    ['Verdient (insgesamt)', eur(state.lifetime)],
+    ['Einkommen pro Sekunde', eur(totalPerSec())],
+    ['Geschäfte gesamt', fmt(state.biz.reduce((a, s) => a + s.owned, 0))],
+    ['Manager', mgrCount() + ' / ' + BIZ.length],
+    ['Upgrades', upCount() + ' / ' + UPGRADES.length],
+    ['Investoren', fmt(state.investors)],
+    ['Diamanten', fmt(state.gems)],
+    ['Karten gesammelt', Object.keys(state.cards).length + ' / ' + CARDS.length],
+    ['Missionen erledigt', fmt(state.missionsDone)],
+    ['Rivalen überholt', Object.keys(state.beaten).length + ' / ' + RIVALS.length],
+    ['Erfolge', Object.keys(state.ach).length + ' / ' + ACH.length],
+    ['Gewinn-Multiplikator (dauerhaft)', '×' + fmt(investorMult() * achMult() * perkMult() * (1 + 0.5 * lvlOf('cs_gold')))],
+    ['Aktiengewinne', eur(state.stockProfit)],
+    ['Goldene Münzen', fmt(state.coins)],
+    ['Fieber-Modus gestartet', fmt(state.fevers)],
+    ['Glücksrad-Drehs', fmt(state.spins)],
+    ['Ereignisse erlebt', fmt(state.eventsSeen)],
+    ['Neustarts', state.resets],
+    ['Klicks', fmt(state.clicks)],
+    ['Tage in Folge', state.daily.streak],
+    ['Spielzeit', fmtTime(state.playTime)],
+  ];
+  $('stats').innerHTML = rows.map(r => `<div class="stat"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('');
+}
+
+// =====================================================================
+//  BÖRSE
+// =====================================================================
+let stockRefs = [];
+function buildStocks(){
+  $('stocks').innerHTML = STOCKS.map((s, k) => `
+    <div class="stock">
+      <div class="sh"><b>${s.icon} ${s.name}</b><span class="sp" data-p="${k}"></span></div>
+      <canvas class="spark" data-c="${k}"></canvas>
+      <div class="sinfo" data-i="${k}"></div>
+      <div class="sbtns">
+        <button class="btn green" data-buy="${k}" data-f="0.1">Kaufen 10 %</button>
+        <button class="btn green" data-buy="${k}" data-f="0.5">Kaufen 50 %</button>
+        <button class="btn red" data-sell="${k}">Verkaufen</button>
+      </div>
+    </div>`).join('');
+  const box = $('stocks');
+  stockRefs = STOCKS.map((_, k) => ({p:box.querySelector(`[data-p="${k}"]`), c:box.querySelector(`[data-c="${k}"]`),
+    i:box.querySelector(`[data-i="${k}"]`), sell:box.querySelector(`[data-sell="${k}"]`)}));
+  box.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => buyStock(+b.dataset.buy, +b.dataset.f));
+  box.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => sellStock(+b.dataset.sell));
+  renderStocks();
+}
+function buyStock(k, f){
+  const amt = state.money * f;
+  if (amt < 1) return;
+  const m = state.market[k], h = state.hold[k];
+  state.money -= amt;
+  h.shares += amt / m.p;
+  h.cost += amt;
+  SFX.buy();
+  renderStocks();
+}
+function sellStock(k){
+  const m = state.market[k], h = state.hold[k];
+  if (h.shares <= 0) return;
+  let val = h.shares * m.p, profit = val - h.cost;
+  if (profit > 0){
+    const bonus = profit * 0.25 * lvlOf('cs_wolf');
+    val += bonus; profit += bonus;
+    state.runEarned += profit; state.lifetime += profit; state.stockProfit += profit; state.goodTrades++;
+  }
+  state.money += val;
+  if (h.cost > 0) state.bestTrade = Math.max(state.bestTrade, profit / h.cost);
+  toast(profit >= 0 ? `📈 Verkauft mit ${eur(profit)} Gewinn!` : `📉 Verkauft mit ${eur(-profit)} Verlust`, profit >= 0 ? 'good' : 'bad');
+  profit >= 0 ? SFX.fanfare() : SFX.bad();
+  h.shares = 0; h.cost = 0;
+  renderStocks();
+}
+function marketTick(){
+  STOCKS.forEach((s, k) => {
+    const m = state.market[k];
+    let lp = Math.log(m.p);
+    lp += 0.02 * (Math.log(s.p) - lp) + s.vol * randn();
+    if (Math.random() < 0.006){
+      const shock = (Math.random() < 0.5 ? -1 : 1) * rnd(0.15, 0.35);
+      lp += shock;
+      if (state.hold[k].shares > 0) toast(`📰 ${s.name} ${shock > 0 ? '📈 +' : '📉 −'}${Math.round(Math.abs(shock) * 100)} %!`, shock > 0 ? 'good' : 'bad');
+    }
+    m.p = Math.max(0.5, Math.exp(lp));
+    m.hist.push(m.p);
+    if (m.hist.length > 80) m.hist.shift();
+  });
+  renderStocks();
+}
+function shockMarket(f){ state.market.forEach(m => { m.p = Math.max(0.5, m.p * (1 + f)); m.hist.push(m.p); }); renderStocks(); }
+function renderStocks(){
+  if (!stockRefs.length || !$('tab-market').classList.contains('on')) return;
+  STOCKS.forEach((s, k) => {
+    const m = state.market[k], h = state.hold[k], r = stockRefs[k];
+    const first = m.hist[0] || m.p, ch = (m.p / first - 1) * 100;
+    r.p.innerHTML = `${m.p.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})} € <span class="${ch >= 0 ? 'up-c' : 'dn-c'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)} %</span>`;
+    if (h.shares > 0){
+      const val = h.shares * m.p, pr = val - h.cost, pct = pr / h.cost * 100;
+      r.i.innerHTML = `Dein Anteil: <b>${eur(val)}</b> · <span class="${pr >= 0 ? 'up-c' : 'dn-c'}">${pr >= 0 ? '+' : ''}${fmt(pr)} € (${pct >= 0 ? '+' : ''}${pct.toFixed(1)} %)</span>`;
+    } else r.i.textContent = 'Du besitzt keine Aktien davon.';
+    r.sell.disabled = h.shares <= 0;
+    drawSpark(r.c, m.hist);
+  });
+}
+function drawSpark(cv, hist){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w) return;
+  const dpr = devicePixelRatio || 1;
+  if (cv.width !== w * dpr){ cv.width = w * dpr; cv.height = h * dpr; }
+  const c = cv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  if (hist.length < 2) return;
+  const lo = Math.min(...hist), hi = Math.max(...hist), span = hi - lo || 1;
+  const up = hist[hist.length - 1] >= hist[0];
+  c.beginPath();
+  hist.forEach((v, j) => {
+    const x = j / (hist.length - 1) * w, y = h - 3 - (v - lo) / span * (h - 6);
+    j ? c.lineTo(x, y) : c.moveTo(x, y);
+  });
+  c.strokeStyle = up ? '#3ddc84' : '#ff5c6c';
+  c.lineWidth = 2; c.stroke();
+  c.lineTo(w, h); c.lineTo(0, h); c.closePath();
+  c.fillStyle = up ? 'rgba(61,220,132,.12)' : 'rgba(255,92,108,.12)';
+  c.fill();
+}
+
+// =====================================================================
+//  ZUFALLS-EREIGNISSE
+// =====================================================================
+const randOwned = () => pick(ownedList());
+const goodDur = d => d * (hasPerk('events') ? 2 : 1);
+function news(icon, title, text, kind){
+  toast(`${icon} ${title} ${text}`, kind, 6000);
+  if (kind === 'bad'){ SFX.bad(); shake(); } else SFX.event();
+}
+const EVENTS = [
+  {w:3, run(){ const d = goodDur(60); addEffect(-1, 3, d, '📈'); news('📈','Wirtschaftsboom!',`Alle Gewinne ×3 für ${d} s!`,'good'); }},
+  {w:3, run(){ const i = randOwned(), d = goodDur(45); addEffect(i, 10, d, '📱'); news('📱','Influencer-Hype!',`${BIZ[i].name} ×10 Gewinn für ${d} s!`,'good'); }},
+  {w:2, run(){ const g = income(180); earn(g); news('🎟️','Lottogewinn!',`+${eur(g)}`,'good'); confetti(40); }},
+  {w:2, run(){ const d = goodDur(20); addEffect(-1, 5, d, '⭐'); news('⭐','Promi-Besuch!',`Alle Gewinne ×5 für ${d} s!`,'good'); }},
+  {w:1, run(){ addGems(3); news('💎','Diamantfund!','Bauarbeiter haben 3 Diamanten gefunden!','good'); }},
+  {w:1, run(){ shockMarket(-0.3); news('📉','Börsencrash!','Alle Aktien −30 %. Jetzt billig kaufen?','bad'); }},
+  {w:1, run(){ shockMarket(0.25); news('🚀','Börsenrally!','Alle Aktien +25 %!','good'); }},
+  {w:2, choice:true, run(){
+    const i = randOwned(), c = income(60);
+    showModal({icon:'🔥', title:`Feuer in deiner ${BIZ[i].name}!`,
+      text:`Die Feuerwehr kann sofort löschen – das kostet <b>${eur(c)}</b>.<br>Sonst steht das Geschäft <b>45 Sekunden</b> still.`,
+      buttons:[
+        {label:`🚒 Feuerwehr rufen (${eur(c)})`, cls:'ok', disabled: state.money < c, fn(){ if (spend(c)) toast('🚒 Feuer gelöscht!', 'good'); else pause(i, 45); }},
+        {label:'⏳ Abwarten', cls:'gray', fn(){ pause(i, 45); toast(`🔥 ${BIZ[i].name} steht 45 s still`, 'bad'); }},
+      ]});
+  }},
+  {w:2, choice:true, run(){
+    showModal({icon:'🧾', title:'Steuerprüfung!',
+      text:'Das Finanzamt will <b>10 %</b> deines Geldes.<br>Oder du nimmst einen Anwalt: 50 % Chance, dass du <b>nichts</b> zahlst – sonst sind es <b>30 %</b>!',
+      buttons:[
+        {label:'💸 10 % zahlen', cls:'ok', fn(){ const c = state.money * 0.1; state.money -= c; toast(`🧾 ${eur(c)} Steuern gezahlt`, 'bad'); }},
+        {label:'⚖️ Anwalt nehmen (50/50)', cls:'purple', fn(){
+          if (Math.random() < 0.5){ toast('⚖️ Gewonnen! Du zahlst gar nichts!', 'good'); SFX.fanfare(); confetti(40); }
+          else { const c = state.money * 0.3; state.money -= c; toast(`⚖️ Verloren! ${eur(c)} weg…`, 'bad'); SFX.bad(); shake(); }
+        }},
+      ]});
+  }},
+  {w:2, choice:true, run(){
+    showModal({icon:'🤝', title:'Geheimer Deal',
+      text:'Ein zwielichtiger Geschäftsmann bietet dir einen Deal: Setz <b>30 % deines Geldes</b>.<br>55 % Chance auf das <b>Dreifache</b> – sonst ist alles weg!',
+      buttons:[
+        {label:'🎲 Riskieren!', cls:'purple', fn(){
+          const st = state.money * 0.3; state.money -= st;
+          if (Math.random() < 0.55){ earn(st * 3); toast(`🤑 Deal geklappt! +${eur(st * 3)}`, 'good'); SFX.fanfare(); confetti(80); }
+          else { toast(`😱 Betrogen! ${eur(st)} verloren`, 'bad'); SFX.bad(); shake(); }
+        }},
+        {label:'🙅 Ablehnen', cls:'gray'},
+      ]});
+  }},
+  {w:2, choice:true, run(){
+    const i = randOwned(), c = income(90);
+    showModal({icon:'✊', title:`Streik bei ${BIZ[i].name}!`,
+      text:`Deine Mitarbeiter wollen mehr Geld. Zahlst du <b>${eur(c)}</b>, arbeiten sie extra motiviert (<b>×2 für 60 s</b>).<br>Sonst arbeiten sie <b>90 s</b> nur mit 25 %.`,
+      buttons:[
+        {label:`💶 Bonus zahlen (${eur(c)})`, cls:'ok', disabled: state.money < c, fn(){
+          if (spend(c)){ addEffect(i, 2, goodDur(60), '😊'); toast('😊 Mitarbeiter glücklich!', 'good'); } else addEffect(i, 0.25, 90, '✊');
+        }},
+        {label:'😤 Aussitzen', cls:'gray', fn(){ addEffect(i, 0.25, 90, '✊'); }},
+      ]});
+  }},
+  {w:2, choice:true, run(){
+    showModal({icon:'📦', title:'Mysteriöses Paket',
+      text:'Vor deinem Büro steht ein Paket ohne Absender.<br>70 % Chance auf <b>viel Geld oder eine Truhe</b> – 30 % Chance, dass es eine <b>Falle</b> ist (−10 % Geld).',
+      buttons:[
+        {label:'📦 Öffnen!', cls:'purple', fn(){
+          const r = Math.random();
+          if (r < 0.45){ const g = income(300); earn(g); toast(`💰 Volltreffer! +${eur(g)}`, 'good'); SFX.fanfare(); confetti(60); }
+          else if (r < 0.7){ state.chests.wood++; buildChests(); toast('📦 Eine Holztruhe! Öffne sie im Karten-Tab.', 'good'); SFX.fanfare(); }
+          else { const c = state.money * 0.1; state.money -= c; toast(`💥 Falle! −${eur(c)}`, 'bad'); SFX.bad(); shake(); }
+        }},
+        {label:'🚮 Wegwerfen', cls:'gray'},
+      ]});
+  }},
+  {w:2, choice:true, run(){
+    const i = randOwned(), c = income(60);
+    showModal({icon:'😈', title:'Konkurrenz!',
+      text:`Direkt neben deiner ${BIZ[i].name} eröffnet ein Konkurrent!<br>Werbekampagne für <b>${eur(c)}</b> (<b>×5 für 60 s</b>)? Sonst verlierst du Kunden (×0,5 für 60 s).`,
+      buttons:[
+        {label:`📣 Werbung (${eur(c)})`, cls:'ok', disabled: state.money < c, fn(){
+          if (spend(c)){ addEffect(i, 5, goodDur(60), '📣'); toast('📣 Kampagne läuft!', 'good'); } else addEffect(i, 0.5, 60, '😈');
+        }},
+        {label:'🤷 Ignorieren', cls:'gray', fn(){ addEffect(i, 0.5, 60, '😈'); }},
+      ]});
+  }},
+];
+function triggerEvent(){
+  setTimeout(triggerEvent, rnd(60, 130) * 1000);
+  if (state.lifetime < 300 || document.hidden) return;
+  const pool = EVENTS.filter(e => !(e.choice && modalOpen));
+  let r = Math.random() * pool.reduce((a, e) => a + e.w, 0);
+  const ev = pool.find(e => (r -= e.w) < 0) || pool[0];
+  state.eventsSeen++;
+  if (ev.choice) SFX.event();
+  ev.run();
+}
+
+// =====================================================================
+//  GOLDENE MÜNZE
+// =====================================================================
+let coinTimer = null;
+function scheduleCoin(){ setTimeout(showCoin, rnd(35, 100) * 1000 / (hasPerk('luck') ? 2 : 1) / (1 + 0.2 * lvlOf('cs_luck'))); }
+function showCoin(){
+  const c = $('coin');
+  c.style.left = (40 + Math.random() * (innerWidth - 120)) + 'px';
+  c.style.top = (120 + Math.random() * (innerHeight - 220)) + 'px';
+  c.style.display = 'block';
+  coinTimer = setTimeout(() => { c.style.display = 'none'; scheduleCoin(); }, 12000);
+}
+$('coin').onclick = () => {
+  $('coin').style.display = 'none';
+  clearTimeout(coinTimer);
+  state.coins++;
+  confetti(40); SFX.fanfare();
+  const r = Math.random();
+  if (r < 0.4){ addEffect(-1, 7, 30, '🪙'); toast('🔥 Goldrausch! 30 Sekunden lang ×7 Gewinn!', 'gold', 4000); }
+  else if (r < 0.78){ const b = Math.max(income(120), state.money * 0.15); earn(b); toast(`🪙 Glückstreffer! +${eur(b)}`, 'gold', 4000); }
+  else if (r < 0.92){ const g = 2 + Math.floor(Math.random() * 4); addGems(g); toast(`💎 Die Münze war ein Diamant! +${g} 💎`, 'gold', 4000); }
+  else { const b = Math.max(income(900), state.money * 0.5); earn(b); addGems(5); toast(`💎 JACKPOT! +${eur(b)} und +5 💎`, 'gold', 5000); confetti(120); shake(); }
+  scheduleCoin();
+};
+
+// =====================================================================
+//  SKYLINE
+// =====================================================================
+const sky = $('sky'), sctx = sky.getContext('2d');
+const stars = Array.from({length:70}, () => ({x:Math.random(), y:Math.random() * 0.7, s:Math.random() * 1.5 + .3}));
+const clouds = Array.from({length:5}, () => ({x:Math.random(), y:rnd(.08, .35), s:rnd(.6, 1.3), v:rnd(.004, .012)}));
+let cars = [], fireworks = [];
+function lerpColor(a, b, t){
+  const pa = a.match(/\w\w/g).map(h => parseInt(h, 16)), pb = b.match(/\w\w/g).map(h => parseInt(h, 16));
+  return `rgb(${pa.map((v, k) => Math.round(v + (pb[k] - v) * t)).join(',')})`;
+}
+function drawSky(ms, dt){
+  const w = sky.clientWidth, h = sky.clientHeight, dpr = devicePixelRatio || 1;
+  if (!w) return;
+  if (sky.width !== Math.round(w * dpr) || sky.height !== Math.round(h * dpr)){ sky.width = Math.round(w * dpr); sky.height = Math.round(h * dpr); }
+  const c = sctx;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cycle = (ms / 1000 / 180) % 1;
+  const day = Math.max(0, Math.min(1, Math.sin(cycle * Math.PI * 2) * 0.8 + 0.5));
+  const g = c.createLinearGradient(0, 0, 0, h);
+  const fv = feverOn();
+  g.addColorStop(0, fv ? '#5a0f10' : lerpColor('0a0e2a', '4a9be8', day));
+  g.addColorStop(1, fv ? '#ff7a1a' : lerpColor('2a2050', 'ffd9a8', day));
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+  if (day < 0.5 && !fv){
+    c.fillStyle = `rgba(255,255,255,${(0.5 - day) * 2})`;
+    stars.forEach(s => c.fillRect(s.x * w, s.y * h, s.s, s.s));
+  }
+  const ang = cycle * Math.PI * 2, cx = w * (0.5 - Math.cos(ang) * 0.42), cy = h * (0.85 - Math.sin(ang) * 0.7);
+  c.beginPath(); c.arc(cx, cy, 16, 0, Math.PI * 2); c.fillStyle = '#ffe066'; c.fill();
+  const mx = w * (0.5 + Math.cos(ang) * 0.42), my = h * (0.85 + Math.sin(ang) * 0.7);
+  c.beginPath(); c.arc(mx, my, 12, 0, Math.PI * 2); c.fillStyle = '#e8ecff'; c.fill();
+
+  if (day > 0.2){
+    c.fillStyle = `rgba(255,255,255,${Math.min(.85, day)})`;
+    clouds.forEach(cl => {
+      cl.x += cl.v * dt; if (cl.x > 1.15) cl.x = -0.15;
+      const x = cl.x * w, y = cl.y * h, s = cl.s * 14;
+      c.beginPath(); c.arc(x, y, s, 0, 7); c.arc(x + s, y + 3, s * .8, 0, 7); c.arc(x - s, y + 4, s * .7, 0, 7); c.fill();
+    });
+  }
+
+  // Feuerwerk bei aktiven Boni
+  if ((fv || state.effects.some(e => e.biz === -1 && e.mult > 1 && e.until > Date.now())) && Math.random() < 0.08)
+    fireworks.push({x:rnd(.1, .9) * w, y:rnd(.1, .45) * h, t:0, col:`hsl(${Math.random() * 360},90%,65%)`});
+  fireworks = fireworks.filter(f => (f.t += dt) < 1);
+  fireworks.forEach(f => {
+    c.fillStyle = f.col; c.globalAlpha = 1 - f.t;
+    for (let k = 0; k < 14; k++){
+      const a = k / 14 * Math.PI * 2, r = f.t * 30;
+      c.fillRect(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r + f.t * f.t * 10, 2.5, 2.5);
+    }
+    c.globalAlpha = 1;
+  });
+
+  const road = 22, base = h - road, slot = w / BIZ.length, maxH = h - road - 26;
+  BIZ.forEach((b, i) => {
+    const owned = state.biz[i].owned;
+    const x = i * slot + slot * 0.12, bw = slot * 0.76;
+    if (!owned){
+      c.strokeStyle = 'rgba(255,255,255,.12)'; c.setLineDash([3, 3]);
+      c.strokeRect(x, base - 14, bw, 14); c.setLineDash([]);
+      return;
+    }
+    const bh = Math.min(maxH, 16 + (maxH - 16) * Math.log(owned + 1) / Math.log(1001));
+    const top = base - bh;
+    c.fillStyle = lerpColor('1c2040', b.color.replace('#', ''), 0.25 + day * 0.45);
+    c.fillRect(x, top, bw, bh);
+    c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(x + bw * 0.75, top, bw * 0.25, bh);
+    for (let yy = top + 5, r = 0; yy < base - 6; yy += 8, r++){
+      for (let xx = x + 4, col = 0; xx < x + bw - 5; xx += 7, col++){
+        const lit = ((r * 31 + col * 17 + i * 7) % 10) < 5;
+        c.fillStyle = day > 0.5 ? 'rgba(180,220,255,.55)' : (lit ? '#ffd86b' : 'rgba(0,0,0,.35)');
+        c.fillRect(xx, yy, 3, 4);
+      }
+    }
+    if (state.biz[i].manager){ c.fillStyle = '#ff5c6c'; c.fillRect(x + bw / 2 - 1, top - 8, 2, 8); }
+    c.font = `${Math.max(12, Math.min(20, slot * 0.5))}px serif`;
+    c.textAlign = 'center'; c.textBaseline = 'bottom';
+    c.fillText(b.icon, x + bw / 2, top - (state.biz[i].manager ? 8 : 1));
+  });
+
+  c.fillStyle = '#23263a'; c.fillRect(0, base, w, road);
+  c.fillStyle = '#f5d742';
+  for (let xx = ((ms / 40) % 24) - 24; xx < w; xx += 24) c.fillRect(xx, base + road / 2 - 1, 12, 2);
+  const unlocked = ownedList().length;
+  const want = Math.min(14, unlocked * 2);
+  while (cars.length < want) cars.push({x:Math.random() * w, lane:Math.random() < .5 ? 0 : 1, v:rnd(30, 70),
+    col:`hsl(${Math.random() * 360},70%,60%)`});
+  if (cars.length > want) cars.length = want;
+  cars.forEach(car => {
+    const dir = car.lane ? -1 : 1;
+    car.x += dir * car.v * dt * (fv ? 3 : 1);
+    if (car.x > w + 20) car.x = -20; if (car.x < -20) car.x = w + 20;
+    const y = base + (car.lane ? road - 8 : 3);
+    c.fillStyle = car.col; c.fillRect(car.x - 7, y, 14, 5);
+    c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(car.x - 3, y - 2, 6, 2);
+    if (day < 0.5){ c.fillStyle = '#fff6b0'; c.fillRect(car.x + dir * 7, y + 1, 2, 2); }
+  });
+}
+
+// =====================================================================
+//  KLEINE UI-HELFER
+// =====================================================================
+function floatAt(i, amount, text){
+  const r = cards[i].icon.getBoundingClientRect();
+  if (!r.width || r.bottom < 0 || r.top > innerHeight) return;
+  const f = document.createElement('div');
+  f.className = 'float' + (text ? ' click' : '');
+  f.textContent = text || '+' + eur(amount);
+  f.style.left = (r.left + r.width / 2 - 30 + Math.random() * 30) + 'px';
+  f.style.top = r.top + 'px';
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 1000);
+}
+let particles = 0;
+function coinBurst(i, n){
+  const r = cards[i].icon.getBoundingClientRect();
+  if (!r.width || r.bottom < 0 || r.top > innerHeight) return;
+  const m = $('money').getBoundingClientRect();
+  for (let k = 0; k < n && particles < 30; k++){
+    particles++;
+    const p = document.createElement('div');
+    p.className = 'pcoin'; p.textContent = '🪙';
+    const x = r.left + r.width / 2 + rnd(-22, 22) - 10, y = r.top + r.height / 2 + rnd(-22, 22) - 10;
+    p.style.left = x + 'px'; p.style.top = y + 'px';
+    p.style.transitionDelay = k * 50 + 'ms';
+    document.body.appendChild(p);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      p.style.transform = `translate(${m.left + m.width / 2 - x - 10}px,${m.top + m.height / 2 - y - 10}px) scale(.5)`;
+      p.style.opacity = '.4';
+    }));
+    setTimeout(() => { p.remove(); particles--; bump(); }, 700 + k * 50);
+  }
+}
+function bump(){ const el = $('money'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+function shake(){ const m = $('main'); m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); }
+function toast(msg, kind = '', ms = 3500){
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.textContent = msg;
+  $('toasts').appendChild(t);
+  setTimeout(() => t.remove(), ms);
+  while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+}
+function confetti(n = 60){
+  for (let k = 0; k < n; k++){
+    const d = document.createElement('div');
+    d.className = 'conf';
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.background = `hsl(${Math.random() * 360},90%,60%)`;
+    d.style.animationDuration = rnd(1.5, 3) + 's';
+    d.style.animationDelay = rnd(0, .3) + 's';
+    d.style.setProperty('--dx', rnd(-120, 120) + 'px');
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 3500);
+  }
+}
+const modalQueue = [];
+let modalOpen = false;
+function showModal(o){
+  if (modalOpen){ modalQueue.push(o); return; }
+  modalOpen = true;
+  $('mBox').classList.toggle('wide', !!o.wide);
+  $('mIcon').textContent = o.icon || '';
+  $('mIcon').style.display = o.icon ? '' : 'none';
+  $('mTitle').textContent = o.title;
+  $('mText').innerHTML = o.text || '';
+  const bx = $('mBtns');
+  bx.innerHTML = '';
+  (o.buttons || [{label:'OK', cls:'ok'}]).forEach(b => {
+    const el = document.createElement('button');
+    el.className = 'btn wide ' + (b.cls || 'ok');
+    el.innerHTML = b.label;
+    el.disabled = !!b.disabled;
+    if (b.id) el.id = b.id;
+    el.onclick = () => { if (!b.keep) closeModal(); b.fn && b.fn(el); };
+    bx.appendChild(el);
+  });
+  $('modal').classList.add('on');
+  o.onOpen && o.onOpen();
+}
+function closeModal(){
+  $('modal').classList.remove('on');
+  modalOpen = false;
+  if (modalQueue.length) setTimeout(() => showModal(modalQueue.shift()), 250);
+}
+
+const HINTS = [
+  {id:'h1', test:() => true, msg:'👋 Klick auf die Zitrone 🍋, um Limonade zu verkaufen!'},
+  {id:'h2', test:() => state.money >= costFor(0, 1) && state.biz[0].owned < 3, msg:'🛒 Kauf mehr Limonadenstände – mehr Stände = mehr Geld pro Verkauf!'},
+  {id:'h3', test:() => state.clicks >= 6, msg:'🔥 Klick GANZ schnell hintereinander – dann startet der Fieber-Modus!'},
+  {id:'h7', test:() => state.clicks >= 15 && state.chests.wood > 0, msg:'🎁 Du hast eine Truhe! Öffne sie im 🃏 Karten-Tab.'},
+  {id:'h4', test:() => state.money >= mgrCost(0) && !mgrCount(), msg:'👔 Stell einen Manager ein – dann läuft das Geschäft von selbst!'},
+  {id:'h8', test:() => state.lifetime > 500, msg:'🎯 Schau in den Missionen-Tab: Aufträge erledigen = Diamanten!'},
+  {id:'h5', test:() => claimable() >= 1, msg:'💼 Du kannst jetzt Investoren holen! Schau in den Investoren-Tab.'},
+  {id:'h6', test:() => state.lifetime >= 5e4, msg:'📈 Schon die Börse entdeckt? Kauf billig, verkauf teuer!'},
+];
+function checkHints(){
+  if (modalOpen) return;
+  for (const h of HINTS){
+    if (!state.hints[h.id] && h.test()){ state.hints[h.id] = true; toast(h.msg, 'purple', 6000); break; }
+  }
+}
+
+// =====================================================================
+//  STEUERUNG
+// =====================================================================
+$('buymode').onclick = e => {
+  const m = e.target.dataset.m; if (!m) return;
+  state.buyMode = m === 'max' ? 'max' : +m;
+  syncBuyMode();
+};
+function syncBuyMode(){ [...$('buymode').children].forEach(b => b.classList.toggle('on', b.dataset.m === String(state.buyMode))); }
+function openTab(t){
+  [...$('tabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.id === 'tab-' + t));
+  if (t === 'market') renderStocks();
+  if (t === 'rivals'){ uiCache.cache.rivalsinnerHTML = null; renderRivals(); }
+  if (t === 'stats') renderStats();
+  if (t === 'cards'){ buildChests(); buildCollection(); }
+  if (innerWidth < 1020) $('tabs').scrollIntoView({behavior:'smooth'});
+}
+$('tabs').onclick = e => { const btn = e.target.closest('button'); if (btn) openTab(btn.dataset.t); };
+$('tWheel').onclick = () => openWheel();
+$('tChest').onclick = () => openTab('cards');
+$('tRival').onclick = () => openTab('rivals');
+$('tFever').onclick = () => toast('🔥 Klick ganz schnell auf deine Geschäfte, um den Balken zu füllen!', 'purple');
+$('gemsBtn').onclick = () => openTab('cards');
+$('buyAllUp').onclick = buyAllUpgrades;
+function syncAudioBtns(){
+  $('mute').textContent = state.muted ? '🔇' : '🔊';
+  $('music').classList.toggle('off', !state.music);
+}
+$('mute').onclick = () => { state.muted = !state.muted; syncAudioBtns(); };
+$('music').onclick = () => { state.music = !state.music; if (state.music){ state.muted = false; beep(1, .01, 'sine', .0001); } syncAudioBtns(); };
+$('prestige').onclick = prestige;
+$('reset').onclick = () => showModal({icon:'🗑️', title:'Alles löschen?',
+  text:'Wirklich den <b>kompletten</b> Spielstand löschen? Auch Investoren, Diamanten, Karten und Erfolge sind dann weg!',
+  buttons:[
+    {label:'Ja, alles löschen', cls:'red', fn(){ resetting = true; try { localStorage.removeItem(SAVE_KEY); } catch(e){} location.reload(); }},
+    {label:'Abbrechen', cls:'gray'},
+  ]});
+
+// =====================================================================
+//  SPEICHERN / LADEN
+// =====================================================================
+let resetting = false;
+function save(){
+  if (resetting) return;
+  state.lastSeen = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e){}
+  hubSync();
+}
+// Fortschritt an die Spielhalle melden (Rekord + Erfolge)
+function hubSync(){
+  if (!window.Hub) return;
+  const gg = Hub.game('tycoon'), v = Math.floor(state.lifetime);
+  if (!(gg.best >= v)){ gg.best = v; Hub.save(); }
+  if (v >= 1e6) Hub.achieve('tycoon', 'mio', 'Millionär', 'Verdiene in Tycoon Imperium 1 Million');
+  if (v >= 1e9) Hub.achieve('tycoon', 'mrd', 'Milliardär', 'Verdiene in Tycoon Imperium 1 Milliarde');
+  if (v >= 1e12) Hub.achieve('tycoon', 'bio', 'Billionär', 'Verdiene in Tycoon Imperium 1 Billion');
+  if (state.resets > 0) Hub.achieve('tycoon', 'inv', 'Neustart mit Investoren', 'Verkaufe dein Imperium an Investoren');
+}
+function load(){
+  let data;
+  try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){}
+  if (!data) return false;
+  const d = defaults();
+  Object.assign(state, d, data);
+  ['perks','ach','hints','upgrades','cards','beaten'].forEach(k => state[k] = data[k] || {});
+  state.chests = Object.assign({wood:0, gold:0, dia:0}, data.chests || {wood:1});
+  state.daily = Object.assign({last:'', streak:0}, data.daily || {});
+  state.missions = (data.missions || []).filter(m => MTYPES[m.type]);
+  state.biz = BIZ.map((_, i) => Object.assign({}, d.biz[i], (data.biz || [])[i] || {}));
+  state.hold = STOCKS.map((_, i) => Object.assign({shares:0, cost:0}, (data.hold || [])[i] || {}));
+  state.market = STOCKS.map((s, i) => Object.assign({p:s.p, hist:[]}, (data.market || [])[i] || {}));
+  state.effects = (data.effects || []).filter(e => e.until > Date.now());
+  if (data.invClaimed === undefined) state.invClaimed = state.investors || 0;
+  delete state.boostUntil;
+  state.rankIdx = rankIndex();
+
+  const cap = (hasPerk('offline') ? 24 : 8) * 3600;
+  const away = Math.min((Date.now() - (data.lastSeen || Date.now())) / 1000, cap);
+  const eff = state.effects; state.effects = [];
+  const inc = totalPerSec() * away;
+  state.effects = eff;
+  if (away > 30 && inc > 0){
+    earn(inc);
+    showModal({icon:'👋', title:'Willkommen zurück!', text:`Deine Manager haben in <b>${fmtTime(away)}</b> insgesamt <b>${eur(inc)}</b> verdient.`,
+      buttons:[{label:'💰 Einsammeln', cls:'ok', fn(){ SFX.fanfare(); confetti(50); }}]});
+  }
+  return true;
+}
+addEventListener('beforeunload', save);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+setInterval(save, 5000);
+
+// =====================================================================
+//  START
+// =====================================================================
+buildCards();
+load();
+if (window.Hub) Hub.init('tycoon');
+checkRivals(true);
+checkAch(true);
+syncAudioBtns();
+syncBuyMode();
+buildUpgrades(); buildShop(); buildAch(); buildStocks(); buildChests(); buildGemShop(); buildCollection(); buildMissions();
+checkDaily();
+if (!state.market[0].hist.length) for (let k = 0; k < 40; k++) marketTick();
+scheduleCoin();
+setTimeout(triggerEvent, rnd(45, 90) * 1000);
+setInterval(marketTick, 2000);
+setInterval(() => {
+  state.effects = state.effects.filter(e => e.until > Date.now());
+  renderInvestors(); renderRank(); checkAch(); checkHints(); renderStats(); renderMissions(); renderRivals(); checkRivals();
+}, 500);
+renderInvestors(); renderRank(); renderStats(); renderRivals();
+
+let last = performance.now(), skyFrame = 0;
+function loop(now){
+  const dt = Math.max(0, (now - last) / 1000);
+  last = now;
+  tick(dt);
+  render();
+  if (++skyFrame % 2 === 0) drawSky(now, Math.min(dt * 2, 0.1));
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Spielstände übernehmen</title>
+<style>
+  html,body{margin:0;height:100%}
+  body{display:grid;place-items:center;background:#12141b;color:#fff;font:15px "Segoe UI",system-ui,sans-serif;text-align:center}
+  .big{font-size:46px;margin-bottom:6px}
+  h2{margin:0 0 6px;font-size:20px}
+  p{margin:0;color:#aab}
+</style>
+</head>
+<body>
+<div><div class="big">📦</div><h2 id="t">Spielstände werden übernommen …</h2><p id="s">Einen Moment.</p></div>
+<script>
+// Wird einmalig von Spielhalle.exe geöffnet: liest die Spielstände der alten
+// Datei-Version (Punkte, Chips, Partyrunde …) und gibt sie an die App weiter.
+const data = {};
+try { for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch(e){}
+const n = Object.keys(data).length;
+fetch('http://localhost:8777/__import', {method:'POST', body:JSON.stringify(data)})
+  .then(() => { t.textContent = n ? '✓ Spielstände übernommen' : 'Keine alten Spielstände gefunden'; s.textContent = n ? n + ' Einträge sind jetzt in der App.' : 'Die App startet frisch.'; })
+  .catch(() => { t.textContent = 'Übernahme nicht möglich'; s.textContent = 'Die App startet frisch.'; })
+  .finally(() => setTimeout(() => window.close(), 1500));
+</script>
+</body>
+</html>

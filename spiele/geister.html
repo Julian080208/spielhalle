@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geisterjagd</title>
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+html,body{height:100%;overflow:hidden;background:#04040c}
+body{display:flex;flex-direction:column}
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px}
+#cv{max-width:100%;max-height:100%;aspect-ratio:672/780;border-radius:14px;box-shadow:0 0 0 1px rgba(255,255,255,.07),0 30px 80px rgba(0,0,0,.7);touch-action:none;background:#05050f}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:rgba(4,4,12,.72);backdrop-filter:blur(4px)}
+.ov.hide{display:none}
+.ov h1{margin:0;font-family:var(--font-display);font-size:64px;letter-spacing:4px;background:linear-gradient(90deg,#ffd23f,#ff7a3d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 22px rgba(255,200,60,.35))}
+.ov p{color:var(--text-2);margin:0}
+.ghostrow{display:flex;gap:18px;margin:4px 0 6px}
+.ghostrow div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--text-2)}
+.ghostrow canvas{width:44px;height:44px}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="672" height="780"></canvas>
+  <div class="ov" id="ov"><h1>GEISTERJAGD</h1><p id="ovText">Friss alle Punkte – und lass dich nicht erwischen.</p>
+    <div class="ghostrow" id="ghostrow"></div>
+    <p style="font-size:13px"><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> oder <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · Wischen auf Touch · <kbd>P</kbd> Pause</p>
+    <button class="h-btn primary lg" id="go">Spiel starten</button></div>
+</div>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script>
+Hub.init('geister');
+const bar = Hub.bar({id:'geister', title:'Geisterjagd', stats:[['score', 'Punkte'], ['best', 'Rekord'], ['lvl', 'Level'], ['lives', 'Leben']], actions:['help', 'pause', 'sound', 'full']});
+bar.on('help', () => Hub.dialog({title:'Geisterjagd', html:'<p>Steuere den gelben Schlucker durch das Labyrinth und friss <b>alle Punkte</b>. Die großen, blinkenden Kraftpillen machen die Geister für kurze Zeit <b>blau und essbar</b> – jeder weitere gefressene Geist zählt doppelt (200 → 1600).</p><p>Jeder Geist hat seine eigene Taktik: <b style="color:#ff4b5c">Feuer</b> jagt dich direkt, <b style="color:#ff9ad6">Flirt</b> versucht dir den Weg abzuschneiden, <b style="color:#3fe6ff">Frost</b> ist unberechenbar und <b style="color:#ffb547">Funke</b> ist eher schüchtern.</p><p>Die Tunnel links und rechts führen auf die andere Seite. Bei 10 000 Punkten gibt es ein Extraleben.</p>'}));
+bar.on('pause', () => togglePause());
+
+const $ = id => document.getElementById(id), cv = $('cv'), ctx = cv.getContext('2d');
+const T = 24, COLS = 28, ROWS = 31, OY = 18, W = 672, H = 780;
+const MAZES = [
+ ["############################","#............##............#","#.####.#####.##.#####.####.#","#o####.#####.##.#####.####o#","#.####.#####.##.#####.####.#","#..........................#","#.####.##.########.##.####.#","#.####.##.########.##.####.#","#......##....##....##......#","######.##### ## #####.######","     #.##### ## #####.#     ","     #.##          ##.#     ","     #.## ###--### ##.#     ","######.## #      # ##.######","      .   #      #   .      ","######.## #      # ##.######","     #.## ######## ##.#     ","     #.##          ##.#     ","     #.## ######## ##.#     ","######.## ######## ##.######","#............##............#","#.####.#####.##.#####.####.#","#.####.#####.##.#####.####.#","#o..##.......  .......##..o#","###.##.##.########.##.##.###","###.##.##.########.##.##.###","#......##....##....##......#","#.##########.##.##########.#","#.##########.##.##########.#","#..........................#","############################"],
+ ["############################","#o...........##...........o#","#.####.#####.##.#####.####.#","#.####.#####.##.#####.####.#","#......##..........##......#","###.##.##.########.##.##.###","###.##....########....##.###","#...#####.##....##.#####...#","#.#.#####.##.##.##.#####.#.#","#.#......... ## .........#.#","#.####.##### ## #####.####.#","#.####.##          ##.####.#","#......## ###--### ##......#","######.## #      # ##.######","      .   #      #   .      ","######.## #      # ##.######","#......## ######## ##......#","#.####.##          ##.####.#","#.####.## ######## ##.####.#","#...##.## ######## ##.##...#","###.##.......##.......##.###","###.##.#####.##.#####.##.###","#.....o#####.##.#####o.....#","#.####.......  .......####.#","#.####.##.########.##.####.#","#......##.########.##......#","#.####.##....##....##.####.#","#.####.#####.##.#####.####.#","#.####.#####.##.#####.####.#","#..........................#","############################"],
+];
+const THEMES = [
+  {wall:'#2f6bff', fill:'#0a1640', glow:'rgba(60,120,255,.8)', dot:'#ffd9b0'},
+  {wall:'#ff3dbb', fill:'#2a0a2a', glow:'rgba(255,60,190,.8)', dot:'#ffe0f4'},
+  {wall:'#2fe08a', fill:'#06281a', glow:'rgba(50,230,140,.8)', dot:'#e6ffe8'},
+  {wall:'#ffb02e', fill:'#2c1a04', glow:'rgba(255,170,40,.8)', dot:'#fff2d0'},
+];
+const GHOSTS = [
+  {name:'Feuer', col:'#ff4b5c', scatter:[25, -3], home:[13.5, 11], delay:0},
+  {name:'Flirt', col:'#ff9ad6', scatter:[2, -3], home:[13.5, 14], delay:1.5},
+  {name:'Frost', col:'#3fe6ff', scatter:[27, 33], home:[11.5, 14], delay:5},
+  {name:'Funke', col:'#ffb547', scatter:[0, 33], home:[15.5, 14], delay:9},
+];
+const FRUITS = [['🍒', 100], ['🍓', 300], ['🍊', 500], ['🍎', 700], ['🍈', 1000], ['🔔', 2000], ['🔑', 5000]];
+const DIRS = [[0, -1], [-1, 0], [0, 1], [1, 0]];
+
+let grid, pellets, total, level = 1, score = 0, lives = 3, best = Hub.best('geister') || 0, extraGiven = false;
+let pac, ghosts = [], state = 'menu', stateT = 0, modeIdx = 0, modeT = 0, frightT = 0, frightMax = 6, eatChain = 0;
+let fruit = null, fruitsEaten = [], pops = [], parts = [], paused = false, wakaFlip = false, mazeCanvas = null, flashT = 0, lastT = 0;
+let eatenThisLevel = 0, ghostsEatenTotal = 0, deathsThisLevel = 0, want = null;
+
+const theme = () => THEMES[Math.floor((level - 1) / 2) % THEMES.length];
+const mazeIdx = () => Math.floor((level - 1) / 2) % 2;
+const cell = (x, y) => (y < 0 || y >= ROWS) ? '#' : grid[y][((x % COLS) + COLS) % COLS];
+const open = (x, y) => { const c = cell(x, y); return c !== '#' && c !== '-'; };
+const sched = () => level === 1 ? [7, 20, 7, 20, 5, 20, 5, 1e9] : level < 5 ? [7, 20, 7, 20, 5, 1033, 0.1, 1e9] : [5, 20, 5, 20, 5, 1037, 0.1, 1e9];
+const speedBase = () => Math.min(1.12, .82 + level * .035);
+
+function loadMaze(){
+  grid = MAZES[mazeIdx()].map(r => r.split(''));
+  total = 0; grid.forEach(r => r.forEach(c => { if (c === '.' || c === 'o') total++; }));
+  pellets = total; eatenThisLevel = 0;
+  buildMazeCanvas();
+}
+function buildMazeCanvas(){
+  const th = theme();
+  mazeCanvas = document.createElement('canvas'); mazeCanvas.width = W; mazeCanvas.height = ROWS * T;
+  const m = mazeCanvas.getContext('2d');
+  const isW = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS && grid[y][x] === '#';
+  // Füllung
+  m.fillStyle = th.fill;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (isW(x, y)){
+    const l = isW(x - 1, y) ? 0 : 5, r = isW(x + 1, y) ? 0 : 5, u = isW(x, y - 1) ? 0 : 5, d = isW(x, y + 1) ? 0 : 5;
+    m.fillRect(x * T + l, y * T + u, T - l - r, T - u - d);
+  }
+  // Leuchtende Kanten
+  m.strokeStyle = th.wall; m.lineWidth = 2.5; m.lineCap = 'round'; m.shadowColor = th.glow; m.shadowBlur = 10;
+  m.beginPath();
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (isW(x, y)){
+    const X = x * T, Y = y * T, i = 5;
+    if (!isW(x, y - 1) && y > 0) { m.moveTo(X + (isW(x - 1, y) ? 0 : i), Y + i); m.lineTo(X + T - (isW(x + 1, y) ? 0 : i), Y + i); }
+    if (!isW(x, y + 1) && y < ROWS - 1) { m.moveTo(X + (isW(x - 1, y) ? 0 : i), Y + T - i); m.lineTo(X + T - (isW(x + 1, y) ? 0 : i), Y + T - i); }
+    if (!isW(x - 1, y) && x > 0) { m.moveTo(X + i, Y + (isW(x, y - 1) ? 0 : i)); m.lineTo(X + i, Y + T - (isW(x, y + 1) ? 0 : i)); }
+    if (!isW(x + 1, y) && x < COLS - 1) { m.moveTo(X + T - i, Y + (isW(x, y - 1) ? 0 : i)); m.lineTo(X + T - i, Y + T - (isW(x, y + 1) ? 0 : i)); }
+  }
+  m.stroke(); m.stroke();
+  // Geistertür
+  m.shadowBlur = 0; m.fillStyle = '#ffb3d9';
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (grid[y][x] === '-') m.fillRect(x * T, y * T + T / 2 - 2, T, 4);
+}
+
+function resetActors(){
+  pac = {x:13, y:23, tx:13, ty:23, dir:[-1, 0], moving:false, mouth:0, dead:0};
+  want = [-1, 0];
+  ghosts = GHOSTS.map((g, i) => ({i, ...g, x:g.home[0], y:g.home[1], tx:0, ty:0, dir:[-1, 0], moving:false,
+    st:i === 0 ? 'grid' : 'house', path:[], fright:false, eyes:false, release:g.delay * Math.max(.35, 1 - (level - 1) * .15), bob:i * 1.3}));
+  const b = ghosts[0]; b.x = 13; b.y = 11; b.tx = 12; b.ty = 11; b.moving = true;
+  modeIdx = 0; modeT = 0; frightT = 0; eatChain = 0;
+}
+function newGame(){
+  level = 1; score = 0; lives = 3; extraGiven = false; fruitsEaten = []; ghostsEatenTotal = 0;
+  startLevel(true);
+}
+function startLevel(first){
+  loadMaze(); resetActors(); fruit = null; deathsThisLevel = 0;
+  frightMax = Math.max(1.2, 7 - level * .7);
+  state = 'ready'; stateT = first ? 2.2 : 1.6;
+  if (first) jingle();
+  updBar();
+}
+function updBar(){ bar.set('score', Hub.fmt(score)); bar.set('best', Hub.fmt(Math.max(best, score))); bar.set('lvl', level); bar.set('lives', '●'.repeat(Math.max(0, lives))); }
+
+// ---------- Bewegung ----------
+function step(e, dist, onCenter){
+  let guard = 0;
+  while (dist > 1e-6 && guard++ < 12){
+    if (!e.moving){ onCenter(e); if (!e.moving) return; }
+    const rx = e.tx - e.x, ry = e.ty - e.y, d = Math.abs(rx) + Math.abs(ry);
+    if (d <= dist){
+      e.x = e.tx; e.y = e.ty; dist -= d;
+      if (e.x < 0) e.x += COLS; else if (e.x >= COLS) e.x -= COLS;
+      e.moving = false; onCenter(e);
+      if (!e.moving) return;
+    } else { e.x += Math.sign(rx) * dist; e.y += Math.sign(ry) * dist; dist = 0; }
+  }
+}
+function setTarget(e, d){ e.dir = d; e.tx = e.x + d[0]; e.ty = e.y + d[1]; e.moving = true; }
+function pacCenter(p){
+  eatAt(p.x, p.y);
+  if (want && open(p.x + want[0], p.y + want[1])) p.dir = want;
+  if (open(p.x + p.dir[0], p.y + p.dir[1])) setTarget(p, p.dir);
+}
+function eatAt(x, y){
+  const c = grid[y][x];
+  if (c === '.' || c === 'o'){
+    grid[y][x] = ' '; pellets--; eatenThisLevel++;
+    if (c === '.'){ addScore(10); wakaFlip = !wakaFlip; Hub.tone(wakaFlip ? 520 : 390, .05, 'triangle', .022); }
+    else { addScore(50); powerUp(); }
+    if (eatenThisLevel === 70 || eatenThisLevel === 170) spawnFruit();
+    if (pellets <= 0){ state = 'clear'; stateT = 2.4; Hub.sfx('ach'); }
+  }
+}
+function powerUp(){
+  frightT = frightMax; eatChain = 0;
+  Hub.tone(200, .4, 'sawtooth', .03, 0, 800);
+  ghosts.forEach(g => { if (g.eyes) return; g.fright = frightMax > 0; if (g.st === 'grid' && g.moving) reverse(g); });
+}
+function reverse(g){
+  const d = [-g.dir[0], -g.dir[1]];
+  if (g.moving){ g.tx = g.tx + d[0]; g.ty = g.ty + d[1]; }
+  g.dir = d;
+}
+function ghostTarget(g){
+  if (g.eyes) return [13, 11];
+  const ph = modeIdx % 2 === 0;
+  const px = Math.round(pac.x), py = Math.round(pac.y), pd = pac.dir;
+  if (ph) return g.scatter;
+  if (g.i === 0) return [px, py];
+  if (g.i === 1) return [px + pd[0] * 4, py + pd[1] * 4];
+  if (g.i === 2){ const b = ghosts[0], ax = px + pd[0] * 2, ay = py + pd[1] * 2; return [ax * 2 - Math.round(b.x), ay * 2 - Math.round(b.y)]; }
+  const dx = px - g.x, dy = py - g.y;
+  return dx * dx + dy * dy > 64 ? [px, py] : g.scatter;
+}
+function ghostCenter(g){
+  if (g.eyes && g.x === 13 && g.y === 11){
+    g.st = 'enter'; g.path = [[13.5, 11], [13.5, 14]]; g.moving = false; return;
+  }
+  const back = [-g.dir[0], -g.dir[1]];
+  let opts = DIRS.filter(d => !(d[0] === back[0] && d[1] === back[1]) && open(g.x + d[0], g.y + d[1]));
+  if (!opts.length) opts = [back];
+  let pick;
+  if (g.fright && !g.eyes) pick = opts[Math.floor(Math.random() * opts.length)];
+  else {
+    const [tx, ty] = ghostTarget(g);
+    let bestD = 1e9;
+    opts.forEach(d => { const nx = g.x + d[0], ny = g.y + d[1], dd = (nx - tx) ** 2 + (ny - ty) ** 2; if (dd < bestD - 1e-9){ bestD = dd; pick = d; } });
+  }
+  setTarget(g, pick);
+}
+function moveFree(g, dist){
+  while (dist > 0 && g.path.length){
+    const [wx, wy] = g.path[0], dx = wx - g.x, dy = wy - g.y, d = Math.hypot(dx, dy);
+    if (d > 0) g.dir = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
+    if (d <= dist){ g.x = wx; g.y = wy; dist -= d; g.path.shift(); }
+    else { g.x += dx / d * dist; g.y += dy / d * dist; dist = 0; }
+  }
+  if (!g.path.length){
+    if (g.st === 'enter'){ g.eyes = false; g.fright = false; g.st = 'exit'; g.path = [[13.5, 11], [13, 11]]; }
+    else if (g.st === 'exit'){ g.st = 'grid'; g.x = 13; g.y = 11; g.dir = [-1, 0]; setTarget(g, [-1, 0]); }
+  }
+}
+function ghostSpeed(g){
+  const sb = speedBase() * 7.4;
+  if (g.eyes) return 16;
+  if (g.st !== 'grid') return 4;
+  if (g.y === 14 && (g.x < 6 || g.x > 21)) return sb * .5;
+  if (g.fright) return sb * .55;
+  if (g.i === 0 && pellets < 20) return sb * 1.06;
+  return sb;
+}
+
+function update(dt){
+  if (state === 'ready'){ stateT -= dt; if (stateT <= 0) state = 'play'; return; }
+  if (state === 'clear'){
+    stateT -= dt; flashT += dt;
+    if (stateT <= 0){
+      Hub.achieve('geister', 'lvl1', 'Labyrinth geleert', 'Schaffe das erste Level in Geisterjagd');
+      if (deathsThisLevel === 0) Hub.achieve('geister', 'clean', 'Unberührbar', 'Schaffe ein Level ohne ein Leben zu verlieren');
+      level++;
+      if (level >= 5) Hub.achieve('geister', 'lvl5', 'Labyrinth-Profi', 'Erreiche Level 5 in Geisterjagd');
+      if (level >= 9) Hub.achieve('geister', 'lvl9', 'Geisterkönig', 'Erreiche Level 9 in Geisterjagd');
+      startLevel(false);
+    }
+    return;
+  }
+  if (state === 'dying'){
+    stateT -= dt; pac.dead = Math.min(1, pac.dead + dt / 1.4);
+    if (stateT <= 0){
+      lives--;
+      if (lives < 0){ gameOver(); return; }
+      resetActors(); state = 'ready'; stateT = 1.4; updBar();
+    }
+    return;
+  }
+  if (state !== 'play') return;
+
+  // Modus-Wechsel
+  if (frightT > 0){
+    frightT -= dt;
+    if (frightT <= 0){ ghosts.forEach(g => g.fright = false); }
+  } else {
+    modeT += dt;
+    const s = sched();
+    if (modeT >= s[modeIdx] && modeIdx < s.length - 1){ modeT = 0; modeIdx++; ghosts.forEach(g => { if (g.st === 'grid' && !g.eyes) reverse(g); }); }
+  }
+  // Pac
+  const ps = speedBase() * 7.8 * (frightT > 0 ? 1.08 : 1);
+  if (want && pac.moving && want[0] === -pac.dir[0] && want[1] === -pac.dir[1]){
+    pac.tx -= pac.dir[0]; pac.ty -= pac.dir[1]; pac.dir = want;
+  }
+  step(pac, ps * dt, pacCenter);
+  if (pac.moving) pac.mouth += dt * 14;
+  // Geister
+  ghosts.forEach(g => {
+    if (g.st === 'house'){
+      g.release -= dt; g.bob += dt * 5; g.y = g.home[1] + Math.sin(g.bob) * .3;
+      if (g.release <= 0){ g.st = 'exit'; g.path = [[13.5, 14], [13.5, 11], [13, 11]]; }
+      return;
+    }
+    if (g.st === 'exit' || g.st === 'enter'){ moveFree(g, ghostSpeed(g) * dt); return; }
+    step(g, ghostSpeed(g) * dt, ghostCenter);
+  });
+  // Frucht
+  if (fruit){
+    fruit.t -= dt;
+    if (fruit.t <= 0) fruit = null;
+    else if (Math.abs(pac.x - 13.5) < .8 && pac.y === 17){
+      addScore(fruit.v); pops.push({x:13.5, y:17, t:1.4, txt:fruit.v}); fruitsEaten.push(fruit.e);
+      Hub.tone(880, .1, 'triangle', .05); Hub.tone(1320, .14, 'triangle', .05, .08); fruit = null;
+      Hub.achieve('geister', 'fruit', 'Vitamine', 'Friss eine Bonusfrucht');
+    }
+  }
+  // Kollisionen
+  for (const g of ghosts){
+    if (g.eyes || g.st === 'house') continue;
+    const dx = Math.abs(g.x - pac.x), dy = Math.abs(g.y - pac.y);
+    if (Math.min(dx, COLS - dx) < .65 && dy < .65){
+      if (g.fright){
+        g.fright = false; g.eyes = true; eatChain++;
+        const v = 200 * 2 ** (eatChain - 1); addScore(v); ghostsEatenTotal++;
+        pops.push({x:g.x, y:g.y, t:1.2, txt:v}); burst(g.x, g.y, g.col);
+        Hub.tone(300, .25, 'square', .04, 0, 1200);
+        if (g.st !== 'grid'){ g.st = 'enter'; g.path = [[13.5, 11], [13.5, 14]]; }
+        if (eatChain === 4) Hub.achieve('geister', 'four', 'Geisterjäger', 'Friss alle vier Geister mit einer Kraftpille');
+        if (ghostsEatenTotal >= 25) Hub.achieve('geister', 'g25', 'Exorzist', 'Friss 25 Geister in einem Spiel');
+      } else {
+        state = 'dying'; stateT = 2; pac.dead = 0; deathsThisLevel++;
+        [0, .15, .3, .45, .6, .75].forEach((d, k) => Hub.tone(700 - k * 90, .16, 'sawtooth', .035, d, 500 - k * 80));
+        return;
+      }
+    }
+  }
+}
+function addScore(v){
+  score += v;
+  if (!extraGiven && score >= 10000){ extraGiven = true; lives++; Hub.toast('Extraleben!', '10 000 Punkte erreicht', 'heart'); Hub.sfx('ok'); }
+  if (score >= 10000) Hub.achieve('geister', 's10k', 'Fünfstellig', 'Erreiche 10 000 Punkte in Geisterjagd');
+  if (score >= 50000) Hub.achieve('geister', 's50k', 'Punktemonster', 'Erreiche 50 000 Punkte in Geisterjagd');
+  updBar();
+}
+function spawnFruit(){ const f = FRUITS[Math.min(FRUITS.length - 1, level - 1)]; fruit = {e:f[0], v:f[1], t:9.5}; }
+function burst(x, y, col){ for (let k = 0; k < 18; k++){ const a = Math.random() * 6.283, s = 2 + Math.random() * 6; parts.push({x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s, t:.6, col}); } }
+function gameOver(){
+  state = 'over';
+  const rec = Hub.score('geister', score, {label:'Punkte'});
+  if (score > best) best = score;
+  updBar();
+  $('ovText').innerHTML = `Spiel vorbei – <b>${Hub.fmt(score)}</b> Punkte, Level ${level}.${rec.record && score > 0 ? '<br><b style="color:#ffd23f">Neuer Rekord!</b>' : ''}`;
+  $('go').textContent = 'Nochmal';
+  $('ov').classList.remove('hide');
+  Hub.sfx('bad');
+}
+function jingle(){
+  const n = [523, 1047, 784, 659, 1047, 784, 659, 0, 554, 1109, 831, 698, 1109, 831, 698];
+  n.forEach((f, k) => f && Hub.tone(f, .1, 'square', .025, k * .11));
+}
+
+// ---------- Zeichnen ----------
+function drawPac(x, y, r, dir, mouth, dead){
+  ctx.save(); ctx.translate(x, y);
+  ctx.rotate(Math.atan2(dir[1], dir[0]));
+  let m = (Math.sin(mouth) * .5 + .5) * .38 + .04;
+  if (dead > 0) m = Math.min(Math.PI, .2 + dead * Math.PI);
+  ctx.fillStyle = '#ffd93b'; ctx.shadowColor = 'rgba(255,215,60,.7)'; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, m, Math.PI * 2 - m); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawGhost(c, x, y, r, col, dir, fright, eyes, flash, t){
+  c.save(); c.translate(x, y);
+  if (!eyes){
+    c.fillStyle = fright ? (flash ? '#f4f4ff' : '#2b3cff') : col;
+    c.shadowColor = fright ? 'rgba(80,100,255,.7)' : col; c.shadowBlur = 12;
+    c.beginPath(); c.arc(0, -r * .15, r, Math.PI, 0);
+    const wv = Math.floor(t * 8) % 2;
+    c.lineTo(r, r * .85);
+    for (let k = 0; k < 4; k++){ const x0 = r - k * r / 2; c.lineTo(x0 - r / 4, r * (wv ? .6 : .85) - (k % 2 ? 0 : 0)); c.lineTo(x0 - r / 2, r * .85); }
+    c.closePath(); c.fill(); c.shadowBlur = 0;
+  }
+  if (fright && !eyes){
+    c.fillStyle = flash ? '#ff3a3a' : '#ffd0c0';
+    c.fillRect(-r * .45, -r * .35, r * .22, r * .22); c.fillRect(r * .23, -r * .35, r * .22, r * .22);
+    c.strokeStyle = c.fillStyle; c.lineWidth = 2; c.beginPath();
+    for (let k = 0; k <= 6; k++) c.lineTo(-r * .6 + k * r * .2, r * .3 + (k % 2 ? -r * .12 : 0));
+    c.stroke();
+  } else {
+    [-1, 1].forEach(s => {
+      c.fillStyle = '#fff'; c.beginPath(); c.ellipse(s * r * .38, -r * .25, r * .27, r * .33, 0, 0, 7); c.fill();
+      c.fillStyle = '#1a2cff'; c.beginPath(); c.arc(s * r * .38 + dir[0] * r * .13, -r * .25 + dir[1] * r * .15, r * .14, 0, 7); c.fill();
+    });
+  }
+  c.restore();
+}
+function draw(t){
+  ctx.fillStyle = '#05050f'; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.translate(0, OY);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, ROWS * T); ctx.clip();
+  // Labyrinth
+  if (state === 'clear' && Math.floor(flashT * 5) % 2) ctx.filter = 'brightness(2.2) saturate(.2)';
+  ctx.drawImage(mazeCanvas, 0, 0); ctx.filter = 'none';
+  // Punkte
+  const th = theme();
+  ctx.fillStyle = th.dot;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++){
+    const c = grid[y][x];
+    if (c === '.') ctx.fillRect(x * T + T / 2 - 2, y * T + T / 2 - 2, 4, 4);
+    else if (c === 'o' && (state !== 'play' || Math.floor(t * 4) % 2)){
+      ctx.save(); ctx.shadowColor = th.dot; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(x * T + T / 2, y * T + T / 2, 7.5, 0, 7); ctx.fill(); ctx.restore();
+    }
+  }
+  if (fruit){ ctx.font = '22px "Segoe UI Emoji"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(fruit.e, 13.5 * T + T / 2, 17 * T + T / 2 + Math.sin(t * 4) * 2); }
+  const P = (x) => x * T + T / 2;
+  const drawWrapped = (x, fn) => { fn(x); if (x < 1) fn(x + COLS); if (x > COLS - 2) fn(x - COLS); };
+  // Geister
+  if (state !== 'clear' && !(state === 'dying' && stateT < 1.4)){
+    ghosts.forEach(g => {
+      const flash = g.fright && frightT < 2 && Math.floor(t * 6) % 2;
+      drawWrapped(g.x, X => drawGhost(ctx, P(X), P(g.y) + 2, T * .62, g.col, g.dir, g.fright, g.eyes, flash, t + g.i));
+    });
+  }
+  // Spieler
+  if (state !== 'dying' || pac.dead < .99) drawWrapped(pac.x, X => drawPac(P(X), P(pac.y), T * .62, state === 'dying' ? [0, -1] : pac.dir, pac.mouth, state === 'dying' ? pac.dead : 0));
+  // Partikel / Punkte-Popups
+  parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.t / .6); ctx.fillStyle = p.col; ctx.fillRect(P(p.x) - 2, P(p.y) - 2, 4, 4); }); ctx.globalAlpha = 1;
+  ctx.font = '700 16px Bahnschrift, Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  pops.forEach(p => { ctx.globalAlpha = Math.min(1, p.t * 2); ctx.fillStyle = '#7cf3ff'; ctx.fillText(p.txt, P(p.x), P(p.y) - (1.2 - p.t) * 18); }); ctx.globalAlpha = 1;
+  ctx.restore();
+  // READY
+  if (state === 'ready'){
+    ctx.font = '700 22px Bahnschrift, Segoe UI'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd93b';
+    ctx.shadowColor = 'rgba(255,217,59,.7)'; ctx.shadowBlur = 14;
+    ctx.fillText(level > 1 && stateT > 1 ? 'LEVEL ' + level : 'BEREIT!', W / 2, 17 * T + T / 2 + 1); ctx.shadowBlur = 0;
+  }
+  if (paused && state === 'play'){ ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, W, ROWS * T); ctx.fillStyle = '#fff'; ctx.font = '700 34px Bahnschrift'; ctx.textAlign = 'center'; ctx.fillText('PAUSE', W / 2, ROWS * T / 2); }
+  ctx.restore();
+  // Fußzeile: Früchte
+  ctx.font = '18px "Segoe UI Emoji"'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  fruitsEaten.slice(-8).forEach((f, k, a) => ctx.fillText(f, W - 10 - (a.length - 1 - k) * 24, H - 14));
+  ctx.textAlign = 'left'; ctx.fillStyle = '#7c8294'; ctx.font = '600 12px Bahnschrift';
+  if (frightT > 0 && state === 'play'){ ctx.fillStyle = '#5b6cff'; ctx.fillRect(10, H - 20, 160 * frightT / frightMax, 8); }
+  ctx.fillStyle = '#7c8294'; ctx.fillText(`Punkte übrig: ${pellets}`, 10, 9);
+}
+function loop(now){
+  const dt = Math.min(.033, (now - lastT) / 1000 || 0); lastT = now;
+  if (!paused && state !== 'menu' && state !== 'over') update(dt);
+  pops.forEach(p => p.t -= dt); pops = pops.filter(p => p.t > 0);
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.t -= dt; }); parts = parts.filter(p => p.t > 0);
+  if (grid) draw(now / 1000);
+  requestAnimationFrame(loop);
+}
+function togglePause(){ if (state === 'menu' || state === 'over') return; paused = !paused; }
+
+// ---------- Eingabe ----------
+const KEYMAP = {ArrowUp:[0, -1], KeyW:[0, -1], ArrowLeft:[-1, 0], KeyA:[-1, 0], ArrowDown:[0, 1], KeyS:[0, 1], ArrowRight:[1, 0], KeyD:[1, 0]};
+addEventListener('keydown', e => {
+  if (KEYMAP[e.code]){ want = KEYMAP[e.code]; e.preventDefault(); }
+  if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
+  if ((e.code === 'Enter' || e.code === 'Space') && !$('ov').classList.contains('hide')) $('go').click();
+});
+let touch0 = null;
+cv.addEventListener('pointerdown', e => { touch0 = [e.clientX, e.clientY]; });
+cv.addEventListener('pointermove', e => {
+  if (!touch0) return;
+  const dx = e.clientX - touch0[0], dy = e.clientY - touch0[1];
+  if (Math.hypot(dx, dy) > 24){ want = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]; touch0 = [e.clientX, e.clientY]; }
+});
+addEventListener('pointerup', () => touch0 = null);
+$('go').onclick = () => { $('ov').classList.add('hide'); paused = false; newGame(); Hub.sfx('click'); };
+
+// Menü-Geister
+GHOSTS.forEach((g, i) => {
+  const d = document.createElement('div'), c = document.createElement('canvas'); c.width = c.height = 88;
+  const cc = c.getContext('2d'); drawGhost(cc, 44, 48, 30, g.col, [1, 0], false, false, false, i);
+  d.appendChild(c); d.append(g.name); $('ghostrow').appendChild(d);
+});
+loadMaze(); resetActors(); updBar();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
