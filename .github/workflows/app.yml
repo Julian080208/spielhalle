@@ -84,6 +84,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $v = '${{ steps.v.outputs.version }}'
-          gh release create "v$v" app\dist\Spielhalle.exe app\dist\Spielhalle.exe.sha256 --target "$env:GITHUB_SHA" --title "Spielhalle $v" --notes "Neue Version der Spielhalle-App. Herunterladen: Spielhalle.exe" --latest
+          # Für ältere Spielhallen (1.x mit Setup): die suchen nach Spielhalle-Setup.exe und version.json.
+          # Die neue exe richtet sich beim Start selbst ein und entfernt die alte Version.
+          Copy-Item app\dist\Spielhalle.exe app\dist\Spielhalle-Setup.exe
+          $sha = (Get-FileHash app\dist\Spielhalle-Setup.exe -Algorithm SHA256).Hash
+          $json = [ordered]@{ version = $v; notes = 'Die neue Spielhalle: eigenes Fenster, Spiele kommen automatisch von GitHub.'; setup = 'Spielhalle-Setup.exe'; sha256 = $sha; date = (Get-Date -Format 'yyyy-MM-dd') } | ConvertTo-Json
+          [IO.File]::WriteAllText("$pwd\app\dist\version.json", $json, (New-Object Text.UTF8Encoding $false))
+          gh release create "v$v" app\dist\Spielhalle.exe app\dist\Spielhalle.exe.sha256 app\dist\Spielhalle-Setup.exe app\dist\version.json --target "$env:GITHUB_SHA" --title "Spielhalle $v" --notes "Neue Version der Spielhalle-App. Herunterladen: Spielhalle.exe" --latest
           if ($LASTEXITCODE) { throw 'Veröffentlichen fehlgeschlagen' }
           "Veröffentlicht: Spielhalle $v"
