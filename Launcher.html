@@ -1,472 +1,115 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spielhalle</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a594ff'/%3E%3Cstop offset='1' stop-color='%236a4cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23a)'/%3E%3Cpath d='M24 18v28l22-14z' fill='white'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="spiele/shared/hub.css">
+<!--
+  Der Launcher der Spielhalle. Die App (app/Spielhalle.cs) holt diese Datei und den Ordner
+  spiele/ direkt von GitHub und liefert unter /__spiele alle Spiele (jede HTML-Datei in spiele/).
+  Cover, Text und Kategorie kommen aus spiele/shared/catalog*.js oder – bei neuen Spielen –
+  aus den <meta name="spielhalle-…">-Angaben im Spiel selbst.
+-->
 <style>
-html,body{height:100%;overflow:hidden}
-body{display:grid;grid-template-columns:264px 1fr;background:var(--bg)}
-#aurora{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-
-/* ---------- Seitenleiste ---------- */
-.side{position:relative;z-index:2;display:flex;flex-direction:column;gap:6px;padding:20px 14px 14px;background:rgba(10,11,16,.72);backdrop-filter:blur(20px) saturate(140%);border-right:1px solid var(--border);min-height:0}
-.brand{display:flex;align-items:center;gap:12px;padding:4px 8px 18px}
-.brand .mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent-2),var(--accent));display:flex;align-items:center;justify-content:center;
-  box-shadow:0 8px 24px rgba(var(--accent-rgb),.45),inset 0 1px 0 rgba(255,255,255,.35)}
-.brand .mark svg{width:20px;height:20px;color:#fff;margin-left:2px}
-.brand b{display:block;font-family:var(--font-display);font-size:19px;letter-spacing:2.5px;font-weight:700}
-.brand small{color:var(--muted);font-size:12px;letter-spacing:.3px}
-.nav{display:flex;flex-direction:column;gap:2px}
-.nav button{position:relative;display:flex;align-items:center;gap:12px;height:42px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--text-2);font-weight:600;font-size:14px;cursor:pointer;transition:.15s;text-align:left}
-.nav button:hover{background:rgba(255,255,255,.05);color:var(--text)}
-.nav button.on{background:rgba(var(--accent-rgb),.14);color:var(--text)}
-.nav button.on::before{content:'';position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--accent);box-shadow:0 0 12px var(--accent)}
-.nav button.on .ico{color:var(--accent-2)}
-.nav .cnt{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.side h4{margin:18px 10px 6px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;justify-content:space-between}
-.mini-list{display:flex;flex-direction:column;gap:1px;overflow:auto;min-height:0;flex:1;margin-right:-6px;padding-right:6px}
-.mini-list a{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:9px;text-decoration:none;color:var(--text-2);font-size:13.5px;font-weight:500;transition:.12s}
-.mini-list a:hover{background:rgba(255,255,255,.05);color:var(--text)}
-.mini-list a .lg{width:26px;height:26px;border-radius:7px;overflow:hidden;flex:none;box-shadow:0 0 0 1px var(--border-2)}
-.mini-list a .lg svg{width:100%;height:100%;display:block}
-.mini-list a .run{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
-.profile{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--border);cursor:pointer;transition:.15s;margin-top:8px}
-.profile:hover{background:rgba(255,255,255,.07)}
-.avatar{position:relative;width:44px;height:44px;flex:none}
-.avatar .ring{position:absolute;inset:0}
-.avatar .in{position:absolute;inset:5px;border-radius:50%;background:linear-gradient(135deg,var(--accent-2),var(--accent));display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:15px;color:#fff}
-.profile .pn{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.profile .pl{font-size:12px;color:var(--muted)}
-.profile .pl b{color:var(--accent-2)}
-
-/* ---------- Hauptbereich ---------- */
-main{position:relative;z-index:1;overflow:auto;min-width:0}
-.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:16px 34px;background:linear-gradient(180deg,rgba(8,9,13,.92),rgba(8,9,13,.6) 70%,transparent)}
-.search{position:relative;flex:1;max-width:520px}
-.search .ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}
-.search input{width:100%;height:44px;padding:0 70px 0 42px;border-radius:12px;border:1px solid var(--border-2);background:rgba(18,20,27,.8);color:var(--text);font:inherit;font-size:14px;outline:none;transition:.15s}
-.search input:focus{border-color:rgba(var(--accent-rgb),.7);box-shadow:0 0 0 4px rgba(var(--accent-rgb),.15);background:var(--surface)}
-.search kbd{position:absolute;right:12px;top:50%;transform:translateY(-50%)}
-.clock{margin-left:auto;text-align:right;line-height:1.15}
-.clock b{font-family:var(--font-display);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
-.clock small{display:block;color:var(--muted);font-size:12px}
-.view{display:none;padding:6px 34px 60px;animation:vin .35s var(--ease)}
-.view.on{display:block}
-@keyframes vin{from{opacity:0;transform:translateY(8px)}}
-.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:34px 0 14px}
-.sec-h h2{margin:0;font-family:var(--font-display);font-size:22px;font-weight:600;letter-spacing:.3px}
-.sec-h .sub{color:var(--muted);font-size:13px}
-.page-h{margin:10px 0 22px}
-.page-h h1{margin:0;font-family:var(--font-display);font-size:36px;font-weight:600;letter-spacing:.3px}
-.page-h p{margin:6px 0 0;color:var(--muted)}
-
-/* ---------- Hero ---------- */
-.hero{position:relative;height:440px;border-radius:26px;overflow:hidden;background:#111;box-shadow:var(--sh-2);isolation:isolate}
-.hero .art{position:absolute;inset:-20px;transition:opacity .7s ease, transform 8s linear}
-.hero .art svg{width:100%;height:100%;display:block}
-.hero .art.off{opacity:0}
-.hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,7,10,.92) 0%,rgba(6,7,10,.7) 32%,rgba(6,7,10,.05) 65%),linear-gradient(0deg,rgba(6,7,10,.75),transparent 45%)}
-.hero .content{position:absolute;left:46px;bottom:44px;max-width:520px}
-.hero .content > *{animation:hin .6s var(--ease) both}
-.hero .content > *:nth-child(2){animation-delay:.05s}.hero .content > *:nth-child(3){animation-delay:.1s}.hero .content > *:nth-child(4){animation-delay:.15s}.hero .content > *:nth-child(5){animation-delay:.2s}
-@keyframes hin{from{opacity:0;transform:translateY(14px)}}
-.hero .tag-row{display:flex;gap:8px;margin-bottom:14px}
-.hero h1{margin:0;font-family:var(--font-display);font-size:60px;line-height:1;font-weight:700;letter-spacing:.5px;text-shadow:0 6px 30px rgba(0,0,0,.5)}
-.hero .tl{margin:12px 0 18px;font-size:18px;color:#d9dce6;line-height:1.45}
-.hero .meta{display:flex;gap:22px;margin-bottom:24px}
-.hero .meta div small{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:700}
-.hero .meta div b{font-family:var(--font-display);font-size:18px;font-weight:600}
-.hero .btns{display:flex;gap:10px}
-.thumbs{position:absolute;right:26px;bottom:26px;display:flex;flex-direction:column;gap:10px;width:230px}
-.thumb{position:relative;display:flex;align-items:center;gap:12px;padding:8px;border-radius:14px;background:rgba(10,11,16,.55);backdrop-filter:blur(10px);border:1px solid var(--border);cursor:pointer;transition:.2s;overflow:hidden}
-.thumb:hover{background:rgba(20,22,30,.75)}
-.thumb.on{background:rgba(30,32,44,.85);border-color:var(--border-2)}
-.thumb .tc{width:64px;height:40px;border-radius:8px;overflow:hidden;flex:none}
-.thumb .tc svg{width:100%;height:100%;display:block}
-.thumb b{font-size:13px;font-weight:600}
-.thumb .pg{position:absolute;left:0;bottom:0;height:2px;width:0;background:var(--accent)}
-.thumb.on .pg{animation:prog 8s linear forwards}
-@keyframes prog{to{width:100%}}
-
-/* ---------- Karten ---------- */
-.row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,1fr);gap:16px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
-.wide-card{position:relative;height:150px;border-radius:18px;overflow:hidden;cursor:pointer;scroll-snap-align:start;border:1px solid var(--border);transition:transform .2s var(--ease), box-shadow .2s}
-.wide-card .art{position:absolute;inset:0}
-.wide-card .art svg{width:100%;height:100%;display:block;transition:transform .5s var(--ease)}
-.wide-card:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.5)}
-.wide-card:hover .art svg{transform:scale(1.06)}
-.wide-card .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,7,10,.9),rgba(6,7,10,.35) 70%,transparent)}
-.wide-card .ct{position:absolute;left:18px;top:16px;bottom:16px;right:18px;display:flex;flex-direction:column}
-.wide-card h3{margin:0;font-family:var(--font-display);font-size:21px;font-weight:600}
-.wide-card .info{color:var(--text-2);font-size:13px;margin-top:4px}
-.wide-card .bar{margin-top:auto;display:flex;align-items:center;gap:10px}
-.wide-card .pbtn{width:42px;height:42px;border-radius:50%;border:0;background:#fff;color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4);transition:transform .15s}
-.wide-card .pbtn:hover{transform:scale(1.08)}
-.wide-card .pbtn .ico{width:18px;height:18px;margin-left:2px}
-.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.filters select{height:30px;border-radius:999px;border:1px solid var(--border-2);background:var(--surface);color:var(--text-2);font:inherit;font-size:13px;font-weight:600;padding:0 12px;outline:none;margin-left:auto}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px}
-.gcard{position:relative;border-radius:18px;background:var(--surface);border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:transform .22s var(--ease), box-shadow .22s, border-color .22s;outline:none}
-.gcard:hover,.gcard:focus-visible{transform:translateY(-6px);box-shadow:0 22px 50px rgba(0,0,0,.55),0 0 0 1px var(--glow,rgba(255,255,255,.2)),0 0 40px -10px var(--glow,transparent);border-color:transparent}
-.gcard .cv{position:relative;aspect-ratio:16/9;overflow:hidden}
-.gcard .cv svg{width:100%;height:100%;display:block;transition:transform .6s var(--ease)}
-.gcard:hover .cv svg{transform:scale(1.07)}
-.gcard .cv .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);opacity:0;transition:opacity .2s}
-.gcard:hover .cv .play{opacity:1}
-.gcard .cv .play span{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.95);color:#000;display:flex;align-items:center;justify-content:center;transform:scale(.85);transition:transform .25s var(--ease);box-shadow:0 10px 30px rgba(0,0,0,.4)}
-.gcard:hover .cv .play span{transform:scale(1)}
-.gcard .cv .play .ico{width:24px;height:24px;margin-left:3px}
-.gcard .badges{position:absolute;left:10px;top:10px;display:flex;gap:6px}
-.gcard .fav{position:absolute;right:10px;top:10px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:.15s}
-.gcard:hover .fav,.gcard .fav.on{opacity:1}
-.gcard .fav.on{color:#ff5d8f}
-.gcard .fav.on .ico{fill:currentColor}
-.gcard .bd{padding:14px 16px 16px}
-.gcard h3{margin:0;font-family:var(--font-display);font-size:18px;font-weight:600;letter-spacing:.2px}
-.gcard .gn{color:var(--muted);font-size:12.5px;margin-top:3px}
-.gcard .st{display:flex;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-2)}
-.gcard .st span{display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gcard .st .ico{width:14px;height:14px;color:var(--muted)}
-.empty{padding:50px;text-align:center;color:var(--muted);border:1px dashed var(--border-2);border-radius:18px}
-
-/* ---------- Liste / Tabellen ---------- */
-.table{width:100%;border-collapse:separate;border-spacing:0 6px}
-.table th{text-align:left;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 14px 4px;cursor:pointer;white-space:nowrap}
-.table th:hover{color:var(--text)}
-.table td{padding:10px 14px;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:14px;white-space:nowrap}
-.table td:first-child{border-left:1px solid var(--border);border-radius:12px 0 0 12px}
-.table td:last-child{border-right:1px solid var(--border);border-radius:0 12px 12px 0;text-align:right}
-.table tr:hover td{background:var(--surface-2)}
-.table .gname{display:flex;align-items:center;gap:12px;font-weight:600}
-.table .gname .lg{width:36px;height:36px;border-radius:9px;overflow:hidden;flex:none}
-.table .gname .lg svg{width:100%;height:100%;display:block}
-.table .muted{color:var(--muted)}
-
-/* ---------- Statistik ---------- */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
-.kpi{padding:18px 20px;border-radius:18px;background:var(--surface);border:1px solid var(--border);position:relative;overflow:hidden}
-.kpi .ico{width:22px;height:22px;color:var(--accent-2)}
-.kpi b{display:block;font-family:var(--font-display);font-size:30px;font-weight:600;margin-top:10px;font-variant-numeric:tabular-nums}
-.kpi small{color:var(--muted);font-size:13px}
-.kpi::after{content:'';position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(var(--accent-rgb),.18),transparent 70%)}
-.bars{display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:18px;background:var(--surface);border:1px solid var(--border)}
-.bar-row{display:grid;grid-template-columns:200px 1fr 90px;gap:14px;align-items:center;font-size:14px}
-.bar-row .gname{display:flex;align-items:center;gap:10px;font-weight:600}
-.bar-row .lg{width:28px;height:28px;border-radius:7px;overflow:hidden;flex:none}
-.bar-row .lg svg{width:100%;height:100%;display:block}
-.bar-row .track{height:10px;border-radius:10px;background:var(--surface-3);overflow:hidden}
-.bar-row .track div{height:100%;border-radius:10px;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0;transition:width 1s var(--ease)}
-.bar-row .v{text-align:right;color:var(--text-2);font-variant-numeric:tabular-nums}
-
-/* ---------- Erfolge ---------- */
-.ach-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.ach{display:flex;gap:14px;align-items:center;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--border)}
-.ach .ai{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#ffd76a,#f0a020);color:#3a2400;display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 6px 18px rgba(240,160,32,.3)}
-.ach .ai .ico{width:22px;height:22px}
-.ach b{display:block;font-size:14.5px}
-.ach span{font-size:13px;color:var(--text-2)}
-.ach small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-
-/* ---------- Einstellungen ---------- */
-.set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px}
-.set{padding:22px;border-radius:18px;background:var(--surface);border:1px solid var(--border)}
-.set h3{margin:0 0 4px;font-family:var(--font-display);font-size:18px;font-weight:600}
-.set > p{margin:0 0 16px;color:var(--muted);font-size:13px}
-.set-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--border)}
-.set-row:first-of-type{border-top:0}
-.set-row label{flex:1;font-size:14px;font-weight:500}
-.set-row label small{display:block;color:var(--muted);font-size:12.5px;font-weight:400;margin-top:2px}
-.set-row .h-range{max-width:170px}
-.set-row .val{width:42px;text-align:right;color:var(--text-2);font-variant-numeric:tabular-nums;font-size:13px}
-.swatches{display:flex;gap:8px}
-.swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .15s;box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
-.swatch:hover{transform:scale(1.12)}
-.swatch.on{border-color:#fff}
-.set-row .upd-ver{font-variant-numeric:tabular-nums;color:var(--text-2);font-size:14px;font-weight:600}
-.set .upd-new{margin:2px 0 12px;padding:12px 14px;border-radius:12px;background:rgba(var(--accent-rgb),.12);border:1px solid rgba(var(--accent-rgb),.35);font-size:13.5px;line-height:1.5}
-.set .upd-new b{display:block;font-size:14.5px;margin-bottom:2px}
-.set .upd-new p{margin:0 0 10px;color:var(--text-2)}
-.set .upd-new .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:6px 0 2px}
-.set .upd-new .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent));transition:width .3s}
-.set .upd-hint{margin:2px 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,210,63,.08);border:1px solid rgba(255,210,63,.25);color:var(--text-2);font-size:13px;line-height:1.45}
-.set .upd-hint.err{background:rgba(255,90,90,.12);border-color:rgba(255,90,90,.35);color:#ffb3b3}
-
-/* ---------- Detail-Ansicht ---------- */
-.detail{width:min(900px,100%);max-height:92vh;overflow:auto;border-radius:26px;background:var(--surface);border:1px solid var(--border-2);box-shadow:var(--sh-2);transform:translateY(16px) scale(.98);transition:transform .3s var(--ease)}
-.h-overlay.on .detail{transform:none}
-.detail .dh{position:relative;height:320px;overflow:hidden}
-.detail .dh svg{width:100%;height:100%;display:block}
-.detail .dh .shade{position:absolute;inset:0;background:linear-gradient(0deg,var(--surface) 2%,rgba(18,20,27,.4) 45%,transparent)}
-.detail .dh .x{position:absolute;right:16px;top:16px}
-.detail .dh .dt{position:absolute;left:32px;bottom:18px;right:32px;display:flex;align-items:flex-end;gap:18px}
-.detail .dh .dt .lg{width:76px;height:76px;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 0 1px var(--border-2);flex:none}
-.detail .dh .dt .lg svg{width:100%;height:100%}
-.detail .dh h2{margin:0;font-family:var(--font-display);font-size:40px;font-weight:700;line-height:1}
-.detail .dh .gn{color:var(--text-2);margin-top:6px}
-.detail .db{display:grid;grid-template-columns:1.4fr 1fr;gap:26px;padding:10px 32px 30px}
-.detail .db p{color:var(--text-2);line-height:1.65;margin:0 0 18px}
-.detail .db h4{margin:18px 0 10px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
-.detail .ctrl{display:flex;flex-direction:column;gap:8px;font-size:14px}
-.detail .ctrl div{display:flex;justify-content:space-between;gap:10px;color:var(--text-2)}
-.detail .dstats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.detail .dstats div{padding:12px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
-.detail .dstats small{display:block;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:700}
-.detail .dstats b{font-family:var(--font-display);font-size:19px;font-weight:600}
-.detail .dbtns{display:flex;gap:10px;margin-top:6px}
-
-/* ---------- Start-Bildschirm ---------- */
-#launch{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:22px;opacity:0;pointer-events:none;transition:opacity .35s}
-#launch.on{opacity:1;pointer-events:auto}
-#launch .bg{position:absolute;inset:-40px;filter:blur(30px) brightness(.45) saturate(1.3);transform:scale(1.1)}
-#launch .bg svg{width:100%;height:100%}
-#launch .lg{position:relative;width:120px;height:120px;border-radius:30px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.15);animation:lpop .6s var(--ease)}
-#launch .lg svg{width:100%;height:100%}
-@keyframes lpop{from{transform:scale(.7);opacity:0}}
-#launch h2{position:relative;margin:0;font-family:var(--font-display);font-size:34px;font-weight:600;letter-spacing:.5px}
-#launch .lb{position:relative;width:240px;height:4px;border-radius:4px;background:rgba(255,255,255,.15);overflow:hidden}
-#launch .lb div{height:100%;width:0;background:#fff;border-radius:4px}
-#launch.on .lb div{animation:lbar .85s var(--ease) forwards}
-@keyframes lbar{to{width:100%}}
-#launch small{position:relative;color:var(--text-2)}
-
-/* ---------- Partyraum ---------- */
-html.tv body{zoom:var(--tvz,1.3)}
-.nav .partyNav{background:linear-gradient(90deg,rgba(255,93,143,.16),rgba(255,210,63,.1))}
-.nav .pe{font-size:17px;width:18px;text-align:center;font-family:'Segoe UI Emoji'}
-.pr-hero{position:relative;overflow:hidden;border-radius:24px;padding:28px 30px;margin:10px 0 18px;background:linear-gradient(120deg,#3a1a5a,#7a1a4a 55%,#c4581a);box-shadow:0 20px 60px rgba(0,0,0,.4)}
-.pr-hero h1{margin:0;font-family:var(--font-display);font-size:40px;font-weight:700;letter-spacing:.5px}
-.pr-hero p{margin:6px 0 0;color:rgba(255,255,255,.85);font-size:15px;max-width:640px}
-.pr-hero .confetti{position:absolute;inset:0;pointer-events:none;opacity:.35;font-size:26px;font-family:'Segoe UI Emoji'}
-.pr-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-.pr-p{position:relative;border-radius:18px;padding:14px 12px 12px;background:var(--surface);border:2px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:8px;transition:.2s}
-.pr-p.on{border-color:var(--pc);background:linear-gradient(180deg,color-mix(in srgb,var(--pc) 22%,var(--surface)),var(--surface));box-shadow:0 10px 30px color-mix(in srgb,var(--pc) 25%,transparent)}
-.pr-p .av{width:74px;height:74px;border-radius:50%;background:var(--pc);display:flex;align-items:center;justify-content:center;font-size:42px;font-family:'Segoe UI Emoji';cursor:pointer;box-shadow:inset 0 -5px 0 rgba(0,0,0,.25);transition:transform .15s}
-.pr-p .av:hover{transform:scale(1.06) rotate(-4deg)}
-.pr-p:not(.on) .av{filter:grayscale(.8) brightness(.7)}
-.pr-p input{width:100%;text-align:center;font-weight:800;font-size:16px}
-.pr-p .cols{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
-.pr-p .cols i{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent}
-.pr-p .cols i.on{border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
-.pr-p .tog{width:100%;height:32px;border-radius:10px;border:0;font-weight:800;cursor:pointer;background:rgba(255,255,255,.07);color:var(--text-2)}
-.pr-p.on .tog{background:var(--pc);color:#fff}
-.pr-p .del{position:absolute;top:6px;right:8px;background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px}
-.pr-add{border:2px dashed var(--border-2);border-radius:18px;display:flex;align-items:center;justify-content:center;min-height:200px;color:var(--text-2);cursor:pointer;font-weight:700;background:none;font-size:15px}
-.pr-add:hover{border-color:var(--accent);color:var(--text)}
-.pr-tv{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 18px;border-radius:18px;background:var(--surface);border:1px solid var(--border)}
-.pr-tv .big{font-size:34px;font-family:'Segoe UI Emoji'}
-.pr-tv .txt{flex:1;min-width:220px}.pr-tv .txt b{font-size:16px}.pr-tv .txt small{display:block;color:var(--text-2);margin-top:2px}
-.pr-tv .seg{display:flex;gap:3px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:12px;padding:4px}
-.pr-tv .seg button{height:32px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--text-2);font-weight:700;cursor:pointer}
-.pr-tv .seg button.on{background:var(--text);color:#111}
-.pr-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-.pr-g{position:relative;border-radius:18px;overflow:hidden;background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:transform .18s var(--ease),box-shadow .18s;display:flex;flex-direction:column}
-.pr-g:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(0,0,0,.45)}
-.pr-g .cv{height:130px;position:relative;overflow:hidden}
-.pr-g .cv svg{width:100%;height:100%;display:block}
-.pr-g .ppl{position:absolute;right:10px;top:10px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.65);font-weight:800;font-size:12px}
-.pr-g .bd{padding:12px 14px 14px}
-.pr-g .bd b{font-size:16px;display:block}
-.pr-g .bd small{color:var(--text-2);font-size:12.5px;line-height:1.4;display:block;margin-top:3px}
-.pr-g .bd .h-btn{margin-top:10px;width:100%}
-.pr-note{color:var(--text-2);font-size:13.5px;margin:-6px 0 12px}
-/* ---------- YouTube-Kino ---------- */
-#v-yt{padding-top:0}
-.yt-frame{width:100%;height:calc(100vh - 96px);border:0;border-radius:20px;background:#0b0c10;box-shadow:0 20px 60px rgba(0,0,0,.4);display:block}
-html.tv .yt-frame{height:calc(100vh / var(--tvz,1.3) - 96px)}
-.yt-off{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;min-height:60vh;padding:30px;border-radius:24px;background:linear-gradient(160deg,#2a0a0a,#12141b);border:1px solid var(--border)}
-.yt-off .big{font-size:64px}
-.yt-off p{max-width:560px;color:var(--text-2);line-height:1.6;margin:0}
-/* ---------- Browser & YouTube ---------- */
-.wb-hero{position:relative;overflow:hidden;border-radius:24px;padding:30px;margin:10px 0 18px;background:linear-gradient(120deg,#12233f,#1d3f7a 50%,#7a1a2a);box-shadow:0 20px 60px rgba(0,0,0,.4)}
-.wb-hero h1{margin:0 0 4px;font-family:var(--font-display);font-size:38px;font-weight:700}
-.wb-hero p{margin:0 0 18px;color:rgba(255,255,255,.8)}
-.wb-search{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.wb-search .inp{flex:1;min-width:260px;display:flex;align-items:center;gap:10px;height:58px;padding:0 18px;border-radius:16px;background:rgba(255,255,255,.95);color:#1b2028;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.wb-search .inp span{font-size:22px;font-family:'Segoe UI Emoji'}
-.wb-search input{flex:1;border:0;outline:0;background:none;font:inherit;font-size:18px;color:#1b2028;min-width:0}
-.wb-search .h-btn{height:58px;font-size:16px;border-radius:16px;padding:0 22px}
-.wb-search .yt{background:linear-gradient(180deg,#ff3b3b,#cc0000);color:#fff;border-color:transparent}
-.wb-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-.wb-tile{position:relative;height:118px;border-radius:18px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;color:#fff;background:var(--bg);border:0;text-align:left;font:inherit;box-shadow:0 8px 24px rgba(0,0,0,.3);transition:transform .15s var(--ease),box-shadow .15s;overflow:hidden}
-.wb-tile:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 16px 36px rgba(0,0,0,.45)}
-.wb-tile .ic{font-size:34px;font-family:'Segoe UI Emoji';line-height:1}
-.wb-tile b{font-size:17px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
-.wb-tile small{display:block;font-size:12px;opacity:.85}
-.wb-tile .x{position:absolute;top:8px;right:10px;background:rgba(0,0,0,.3);border:0;color:#fff;border-radius:8px;width:24px;height:24px;cursor:pointer;opacity:0;transition:.15s}
-.wb-tile:hover .x{opacity:1}
-.wb-chips{display:flex;flex-wrap:wrap;gap:8px}
-.wb-chips button{height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--border-2);background:var(--surface);color:var(--text);font:inherit;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px}
-.wb-chips button:hover{border-color:#ff3b3b;background:rgba(255,59,59,.12)}
-.wb-add{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.wb-add input{height:40px}
-.wb-note{display:flex;gap:14px;align-items:center;padding:14px 18px;border-radius:16px;background:var(--surface);border:1px solid var(--border);color:var(--text-2);font-size:14px;line-height:1.5;margin-top:18px}
-.wb-note span{font-size:28px;font-family:'Segoe UI Emoji'}
-/* ---------- App-Version & Online-Updates ---------- */
-.appbox{display:flex;align-items:center;gap:8px;margin:8px 4px 0;padding:8px 10px;border-radius:10px;font-size:12px;color:var(--muted)}
-.appbox .dot{width:8px;height:8px;border-radius:50%;background:#2fbf71;box-shadow:0 0 8px #2fbf71;flex:none}
-.appbox .dot.new{background:#ffd23f;box-shadow:0 0 8px #ffd23f}
-.appbox button{margin-left:auto;border:0;background:transparent;color:var(--text-2);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px}
-.appbox button:hover{background:rgba(255,255,255,.07);color:var(--text)}
-.appbox{flex-wrap:wrap}
-.appbox .login{flex-basis:100%;display:flex;flex-direction:column;gap:6px;margin-top:4px;padding:8px 10px;border-radius:8px;background:rgba(255,210,63,.08);border:1px solid rgba(255,210,63,.25);color:var(--text-2);line-height:1.4}
-.appbox .login button{margin:0;align-self:flex-start;background:rgba(255,210,63,.16);color:var(--text);font-weight:600}
-.appbox[hidden],.updbox[hidden]{display:none}
-@media (max-width:820px){ body .appbox{display:none} body .updbox{left:12px;right:12px;width:auto;bottom:80px} }
-.updbox{position:fixed;right:22px;bottom:22px;z-index:60;width:360px;padding:18px 18px 16px;border-radius:18px;background:linear-gradient(160deg,#2a2160,#151826);border:1px solid rgba(165,148,255,.35);box-shadow:0 20px 60px rgba(0,0,0,.5);color:var(--text);animation:updIn .4s ease}
-@keyframes updIn{from{transform:translateY(30px);opacity:0}}
-.updbox h3{margin:0 0 4px;font-size:17px;display:flex;align-items:center;gap:8px}
-.updbox p{margin:0 0 12px;color:var(--text-2);font-size:13.5px;line-height:1.5}
-.updbox .row{display:flex;gap:8px;justify-content:flex-end}
-.updbox .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:4px 0 10px}
-.updbox .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#a594ff,#6a4cff);transition:width .3s}
-.updbox p.err{padding:8px 10px;border-radius:8px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.35);color:#ffb3b3}
-.updbox .x{position:absolute;top:10px;right:12px;border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}
-@media (max-width:1100px){ .thumbs{display:none} .detail .db{grid-template-columns:1fr} }
-@media (max-width:820px){
-  body{grid-template-columns:1fr}
-  .side{position:fixed;bottom:0;left:0;right:0;top:auto;flex-direction:row;padding:6px;z-index:30;justify-content:space-around}
-  .brand,.side h4,.mini-list,.profile{display:none}
-  .nav{flex-direction:row;width:100%;justify-content:space-around}
-  .nav button{flex-direction:column;height:auto;padding:6px;gap:2px;font-size:11px}
-  .nav button.on::before{display:none}
-  .nav .cnt{display:none}
-  .view{padding:6px 16px 90px}
-  .topbar{padding:12px 16px}
-  .clock{display:none}
-  .hero{height:380px}.hero h1{font-size:40px}.hero .content{left:22px;right:22px;bottom:24px}
-  .bar-row{grid-template-columns:120px 1fr 70px}
-}
+  :root { --bg:#0c0d14; --panel:#151724; --line:#262a3d; --text:#f2f3fa; --muted:#9499b3; --accent:#7c6cff; --accent2:#c45cff; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:'Segoe UI', system-ui, sans-serif; }
+  body { overflow-y:auto; background:radial-gradient(1200px 600px at 10% -10%, rgba(124,108,255,.18), transparent 60%),
+         radial-gradient(900px 500px at 100% 0%, rgba(255,90,140,.10), transparent 60%), var(--bg); background-attachment:fixed; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:16px; padding:18px 32px;
+           background:linear-gradient(var(--bg) 70%, transparent); }
+  .logo { display:flex; align-items:center; gap:12px; font-size:26px; font-weight:800; letter-spacing:.5px; white-space:nowrap; }
+  .logo i { width:46px; height:46px; border-radius:14px; display:grid; place-items:center; font-style:normal; font-size:22px;
+            background:linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow:0 6px 20px rgba(124,108,255,.45); }
+  .search { flex:1; max-width:560px; display:flex; align-items:center; gap:10px; height:50px; padding:0 18px; border-radius:999px;
+            background:var(--panel); border:1px solid var(--line); }
+  .search:focus-within { border-color:var(--accent); }
+  .search input { flex:1; min-width:0; background:none; border:0; outline:0; color:var(--text); font:inherit; font-size:17px; }
+  .btn { height:50px; padding:0 20px; border-radius:999px; border:1px solid var(--line); background:var(--panel); font-weight:700; font-size:15px;
+         display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+  .btn:hover, .btn:focus-visible { border-color:var(--accent); outline:0; }
+  .btn.primary { background:linear-gradient(135deg, var(--accent), var(--accent2)); border:0; }
+  .btn.sm { height:38px; padding:0 14px; font-size:14px; }
+  .clock { margin-left:auto; text-align:right; font-weight:800; font-size:24px; white-space:nowrap; }
+  .clock small { display:block; font-size:13px; font-weight:500; color:var(--muted); }
+  main { padding:0 32px 40px; }
+  .banners { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:10; display:flex; flex-direction:column; gap:10px; width:min(860px, calc(100vw - 32px)); }
+  .banner { display:none; align-items:center; gap:14px; padding:14px 18px; border-radius:16px; font-size:16px;
+            background:#262145; border:1px solid rgba(124,108,255,.7); box-shadow:0 12px 40px rgba(0,0,0,.6); }
+  .banner.on { display:flex; }
+  .banner b { font-size:18px; white-space:nowrap; }
+  .banner .btn { margin-left:auto; }
+  h2 { margin:26px 0 12px; font-size:20px; }
+  .players { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .player { display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 16px 0 6px; border-radius:999px; border:2px solid var(--pc);
+            background:color-mix(in srgb, var(--pc) 22%, var(--panel)); font-weight:700; font-size:16px; }
+  .player span { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; background:var(--pc); font-size:18px; }
+  .player.off { border-color:var(--line); background:var(--panel); color:var(--muted); text-decoration:line-through; }
+  .player.off span { background:var(--line); filter:grayscale(1); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:22px 0 4px; }
+  .chip { height:38px; padding:0 16px; border-radius:999px; border:1px solid var(--line); background:var(--panel); font-weight:600; color:var(--muted); }
+  .chip.on { background:var(--text); color:var(--bg); border-color:var(--text); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:18px; margin-top:16px; }
+  .tile { position:relative; border-radius:18px; overflow:hidden; background:var(--panel); border:1px solid var(--line); text-align:left; padding:0;
+          transition:transform .15s, box-shadow .15s, border-color .15s; }
+  .tile:hover, .tile:focus-visible { transform:translateY(-4px) scale(1.02); border-color:var(--glow, var(--accent)); outline:0;
+          box-shadow:0 14px 34px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, var(--glow, var(--accent)) 60%, transparent); }
+  .cv { aspect-ratio:16/9; position:relative; overflow:hidden; background:#000; }
+  .cv svg { width:100%; height:100%; display:block; }
+  .cv .new { position:absolute; left:10px; top:10px; padding:3px 10px; border-radius:999px; background:#ff4f7a; font-size:12px; font-weight:800; letter-spacing:.5px; }
+  .cv .play { position:absolute; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.35); opacity:0; transition:opacity .15s; font-size:46px; }
+  .tile:hover .play, .tile:focus-visible .play { opacity:1; }
+  .bd { padding:12px 14px 14px; }
+  .bd b { display:block; font-size:18px; }
+  .bd small { display:block; color:var(--muted); font-size:14px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .empty { grid-column:1/-1; padding:40px; text-align:center; color:var(--muted); font-size:18px; }
+  footer { display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-top:34px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:14px; }
+  footer .hint { color:#ff9aa8; }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:20px; padding:24px; width:min(560px, 92vw); }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  dialog h3 { margin:0 0 16px; font-size:22px; }
+  .prow { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .prow input[type=text] { flex:1; height:44px; padding:0 14px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; font-size:16px; }
+  .prow .av { width:44px; height:44px; border-radius:50%; border:0; font-size:22px; background:var(--pc); }
+  .prow .col { width:30px; height:30px; border-radius:50%; border:2px solid #fff3; background:var(--pc); }
+  .drow { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  @media (max-width:760px) { .banner span { display:none; } header { flex-wrap:wrap; padding:14px 16px; } .clock { display:none; } main { padding:0 16px 30px; } }
 </style>
 </head>
-<body>
-<canvas id="aurora"></canvas>
-<div class="noise"></div>
-
-<aside class="side">
-  <div class="brand"><div class="mark"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M7.5 4.6v14.8a1 1 0 0 0 1.53.85l11.6-7.4a1 1 0 0 0 0-1.7L9.03 3.75A1 1 0 0 0 7.5 4.6z"/></svg></div>
-    <div><b>SPIELHALLE</b><small>Deine Spielebibliothek</small></div></div>
-  <nav class="nav" id="nav">
-    <button data-v="home" class="on"><span data-i="home"></span>Startseite</button>
-    <button data-v="party" class="partyNav"><span class="pe">🎉</span>Partyraum<span class="cnt" id="partyCnt"></span></button>
-    <button data-v="yt"><span class="pe">▶️</span>YouTube</button>
-    <button data-v="web"><span class="pe">🌐</span>Browser</button>
-    <button data-v="library"><span data-i="grid"></span>Bibliothek<span class="cnt" id="libCnt"></span></button>
-    <button data-v="stats"><span data-i="chart"></span>Statistiken</button>
-    <button data-v="ach"><span data-i="trophy"></span>Erfolge<span class="cnt" id="achCnt"></span></button>
-    <button data-v="settings"><span data-i="sliders"></span>Einstellungen</button>
-  </nav>
-  <h4><span>Meine Spiele</span></h4>
-  <div class="mini-list" id="miniList"></div>
-  <div class="profile" id="profileCard"></div>
-  <div class="appbox" id="appBox" hidden></div>
-</aside>
-<div class="updbox" id="updBox" hidden></div>
-
-<main id="main">
-  <div class="topbar">
-    <div class="search"><span data-i="search"></span><input id="q" placeholder="Spiele durchsuchen…" autocomplete="off"><kbd>Strg K</kbd></div>
-    <button class="h-btn" id="randomBtn"><span data-i="shuffle"></span>Zufallsspiel</button>
-    <button class="h-btn icon" id="fullBtn" title="Vollbild"><span data-i="max"></span></button>
-    <div class="clock"><b id="clk">--:--</b><small id="dte"></small></div>
+<body id="spielhalle-launcher">
+<header>
+  <div class="logo"><i>▶</i>Spielhalle</div>
+  <label class="search"><span>🔍</span><input id="q" type="search" placeholder="Spiel suchen …" autocomplete="off"></label>
+  <button class="btn" id="zufall" title="Ein zufälliges Spiel starten">🎲 Zufall</button>
+  <button class="btn" id="voll" title="Vollbild (F11)">⛶</button>
+  <div class="clock"><span id="uhr"></span><small id="datum"></small></div>
+</header>
+<main>
+  <div class="banners">
+  <div class="banner" id="bNeu"><b>🎉 Neue Spiele sind da!</b><span>Die Spielhalle hat gerade neue Spiele oder Verbesserungen geladen.</span><button class="btn primary sm" id="neuLaden">Anzeigen</button></div>
+  <div class="banner" id="bApp"><b>🚀 Neue App-Version</b><span id="bAppText"></span><button class="btn primary sm" id="neuStart">Jetzt neu starten</button></div>
   </div>
 
-  <section class="view on" id="v-home">
-    <div class="hero" id="hero"><div class="art" id="heroArt"></div><div class="shade"></div><div class="content" id="heroContent"></div><div class="thumbs" id="thumbs"></div></div>
-    <div id="recentWrap"><div class="sec-h"><h2>Weiterspielen</h2><span class="sub">Zuletzt gespielt</span></div><div class="row" id="recent"></div></div>
-    <div class="sec-h"><h2>Alle Spiele</h2>
-      <div class="filters" id="filters"></div></div>
-    <div class="grid" id="grid"></div>
-  </section>
+  <h2>Wer spielt mit?</h2>
+  <div class="players" id="players"></div>
 
-  <section class="view" id="v-party">
-    <div class="pr-hero"><div class="confetti" id="prConf"></div><h1>🎉 Partyraum</h1><p>Spieleabend im Keller: Lege fest, wer heute dabei ist – alle Spiele übernehmen die Runde automatisch. Am Fernseher am besten den Fernseher-Modus einschalten und mit <kbd>F11</kbd> in den Vollbildmodus gehen.</p></div>
-    <div class="sec-h" style="margin-top:6px"><h2>Wer ist heute dabei?</h2><span class="sub" id="prCount"></span></div>
-    <div class="pr-people" id="prPeople"></div>
-    <div class="sec-h"><h2>Fernseher-Modus</h2></div>
-    <div class="pr-tv" id="prTv"></div>
-    <div class="sec-h"><h2>Alle zusammen an einem Bildschirm</h2><span class="sub">Reihum am Laptop – 3 bis 6 Leute</span></div>
-    <div class="pr-games" id="prAll"></div>
-    <div class="sec-h"><h2>Reihum-Wettkampf</h2><span class="sub">Jeder spielt eine Runde – Bestwert gewinnt</span></div>
-    <p class="pr-note">Startet den Wettkampf mit allen, die heute dabei sind. Zwischen den Runden zeigt die Spielhalle, wer als Nächstes dran ist, und am Ende gibt es eine Siegerehrung.</p>
-    <div class="pr-games" id="prChal"></div>
-    <div class="sec-h"><h2>Duelle – zwei gegen einander</h2><span class="sub">Der Rest feuert an</span></div>
-    <div class="pr-games" id="prDuel"></div>
-  </section>
+  <div class="chips" id="chips"></div>
+  <div class="grid" id="grid"></div>
 
-  <section class="view" id="v-yt"><div id="ytBox"></div></section>
-
-  <section class="view" id="v-web">
-    <div class="wb-hero"><h1>🌐 Browser</h1><p>Im Web suchen und Lieblingsseiten öffnen. Videos schaust du am besten im ▶ YouTube-Kino direkt in der Spielhalle.</p>
-      <div class="wb-search"><div class="inp"><span>🔎</span><input id="wbQ" placeholder="Suchen oder Webadresse eingeben …" autocomplete="off"></div>
-        <button class="h-btn primary" id="wbGo">Im Web suchen</button><button class="h-btn yt" id="wbYt">▶ Auf YouTube suchen</button></div></div>
-    <div class="sec-h" style="margin-top:6px"><h2>Schnellzugriff</h2><span class="sub">Öffnet in einem eigenen Fenster</span></div>
-    <div class="wb-tiles" id="wbTiles"></div>
-    <div class="sec-h"><h2>YouTube-Ideen für den Spieleabend</h2><span class="sub">Läuft direkt im YouTube-Kino</span></div>
-    <div class="wb-chips" id="wbChips"></div>
-    <div class="sec-h"><h2>Meine Links</h2><span class="sub">Eigene Lieblingsseiten speichern</span></div>
-    <div class="wb-tiles" id="wbMine"></div>
-    <div class="wb-add"><input class="h-input" id="wbName" placeholder="Name (z. B. Pizzaservice)" style="width:220px"><input class="h-input" id="wbUrl" placeholder="Adresse (z. B. www.beispiel.de)" style="flex:1;min-width:220px"><button class="h-btn" id="wbAdd">+ Speichern</button></div>
-    <div class="wb-note"><span>💡</span><div>Webseiten öffnen sich in einem eigenen Fenster über der Spielhalle. Zurück geht’s mit <kbd>Alt</kbd> + <kbd>Tab</kbd> oder indem du das Fenster schließt. Am Fernseher: <kbd>F11</kbd> für Vollbild, bei YouTube-Videos einfach <kbd>F</kbd> drücken.</div></div>
-  </section>
-
-  <section class="view" id="v-library">
-    <div class="page-h"><h1>Bibliothek</h1><p id="libSub"></p></div>
-    <table class="table" id="libTable"></table>
-  </section>
-
-  <section class="view" id="v-stats">
-    <div class="page-h"><h1>Statistiken</h1><p>So spielst du – alles wird automatisch gezählt.</p></div>
-    <div class="kpis" id="kpis"></div>
-    <div class="sec-h"><h2>Spielzeit nach Spiel</h2></div>
-    <div class="bars" id="bars"></div>
-    <div class="sec-h"><h2>Rekorde</h2></div>
-    <table class="table" id="recTable"></table>
-  </section>
-
-  <section class="view" id="v-ach">
-    <div class="page-h"><h1>Erfolge</h1><p id="achSub"></p></div>
-    <div class="ach-list" id="achList"></div>
-  </section>
-
-  <section class="view" id="v-settings">
-    <div class="page-h"><h1>Einstellungen</h1><p>Gilt für die Spielhalle und alle Spiele.</p></div>
-    <div class="set-grid">
-      <div class="set"><h3>Profil</h3><p>Dein Name und deine Farbe.</p>
-        <div class="set-row"><label>Name</label><input class="h-input" id="sName" maxlength="20" style="width:200px"></div>
-        <div class="set-row"><label>Akzentfarbe<small>Färbt Knöpfe, Balken und Leuchteffekte</small></label><div class="swatches" id="swatches"></div></div>
-      </div>
-      <div class="set"><h3>Audio</h3><p>Lautstärke für alle Spiele.</p>
-        <div class="set-row"><label>Gesamtlautstärke</label><input type="range" class="h-range" min="0" max="100" id="sMaster"><span class="val" id="vMaster"></span></div>
-        <div class="set-row"><label>Effekte</label><input type="range" class="h-range" min="0" max="100" id="sSfx"><span class="val" id="vSfx"></span></div>
-        <div class="set-row"><label>Musik</label><input type="range" class="h-range" min="0" max="100" id="sMusic"><span class="val" id="vMusic"></span></div>
-      </div>
-      <div class="set"><h3>Darstellung</h3><p>Komfort und Barrierefreiheit.</p>
-        <div class="set-row"><label>Bewegungen reduzieren<small>Schaltet Animationen und Hintergrund-Effekte ab</small></label><div class="h-switch" id="sMotion"></div></div>
-        <div class="set-row"><label>Animierter Hintergrund<small>Farbverläufe hinter dem Launcher</small></label><div class="h-switch" id="sAurora"></div></div>
-      </div>
-      <div class="set"><h3>Spielstände</h3><p>Sichere alles in einer Datei oder stelle es wieder her.</p>
-        <div class="set-row"><label>Backup exportieren<small>Alle Spielstände, Rekorde und Einstellungen</small></label><button class="h-btn sm" id="expBtn"><span data-i="download"></span>Exportieren</button></div>
-        <div class="set-row"><label>Backup importieren<small>Überschreibt vorhandene Daten</small></label><button class="h-btn sm" id="impBtn"><span data-i="upload"></span>Importieren</button><input type="file" id="impFile" accept=".json" hidden></div>
-        <div class="set-row"><label>Alles zurücksetzen<small>Löscht wirklich alles – endgültig</small></label><button class="h-btn sm danger" id="resetBtn"><span data-i="trash"></span>Löschen</button></div>
-      </div>
-      <div class="set"><h3>Als App starten</h3><p>Ohne Browser-Leiste, wie ein echtes Programm.</p>
-        <div class="set-row"><label>Doppelklick auf <b>„Spielhalle starten.bat“</b> im Spielordner öffnet die Spielhalle als eigenes Fenster. Mit <b>„Desktop-Verknüpfung erstellen.bat“</b> bekommst du ein Symbol auf den Desktop.</label></div>
-        <div class="set-row"><label>Tastenkürzel<small><kbd>Strg</kbd> <kbd>K</kbd> Suche · <kbd>F11</kbd> Vollbild · <kbd>Esc</kbd> Schließen</small></label></div>
-      </div>
-      <div class="set"><h3>Updates</h3><p>Neue Spiele und Verbesserungen holen.</p>
-        <div id="setUpd"><div class="set-row"><label>Updates gibt es in der installierten App.<small>Einmal <b>„Spielhalle einrichten.cmd“</b> ausführen, dann aktualisiert sich die Spielhalle von selbst.</small></label></div></div>
-      </div>
-    </div>
-  </section>
+  <footer>
+    <span id="fVersion">Spielhalle</span>
+    <span id="fStand"></span>
+    <button class="btn sm" id="suchen">🔄 Nach neuen Spielen suchen</button>
+    <span class="hint" id="fHinweis"></span>
+  </footer>
 </main>
 
-<div class="h-overlay" id="detailOv"><div class="detail" id="detail"></div></div>
-<div id="launch"><div class="bg" id="lBg"></div><div class="lg" id="lLogo"></div><h2 id="lTitle"></h2><div class="lb"><div></div></div><small>Wird gestartet …</small></div>
+<dialog id="dlg">
+  <h3>Wer spielt mit?</h3>
+  <div id="dlgRows"></div>
+  <div class="drow"><button class="btn sm" id="dlgAdd">+ Person</button><span style="flex:1"></span><button class="btn sm primary" id="dlgOk">Fertig</button></div>
+</dialog>
 
 <script src="spiele/shared/hub.js"></script>
 <script src="spiele/shared/catalog.js"></script>
@@ -475,562 +118,174 @@ html.tv .yt-frame{height:calc(100vh / var(--tvz,1.3) - 96px)}
 <script src="spiele/shared/catalog4.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-const I = Hub.icon;
-document.querySelectorAll('[data-i]').forEach(e => e.outerHTML = I(e.dataset.i));
-const GAMES = HubCatalog;
-const covers = {};               // Cover-SVGs einmal erzeugen und wiederverwenden
-const cover = g => covers[g.id] || (covers[g.id] = g.cover());
-const logo = g => g.logo ? g.logo() : '';
-const fav = Hub.read('hub_favs', {});
+const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'})[c]);
+const APP = location.port === '8777';
+const CATALOG = window.HubCatalog || [];
+const LAST_KEY = 'spielhalle_zuletzt';
+const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch(e){ return d; } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 
-// ---------- Daten pro Spiel ----------
-const legacyHS = Hub.read('arcade_hs', {}), legacyMin = Hub.read('arcade_minen', {});
-function gstat(g){
-  const p = Hub.profile.games[g.id] || {};
-  let best = p.best, label = 'Rekord';
-  if (best == null && g.legacy) best = legacyHS[g.legacy] || null;
-  if (g.id === 'minen'){ const m = [legacyMin.easy, legacyMin.mid, legacyMin.hard].filter(Boolean); if (best == null && m.length) best = Math.min(...m); label = 'Bestzeit'; }
-  let extra = '';
-  if (g.id === 'tycoon'){ const s = Hub.read('tycoon_imperium_v1', null); if (s && s.lifetime) extra = big(s.lifetime) + ' € verdient'; }
-  if (g.id === 'oel'){ const s = Hub.read('oelrausch_v1', null); if (s){ const st = Object.values(s.stars || {}).reduce((a, b) => a + b, 0); if (st || s.years) extra = `${st} Sterne`; } }
-  return {play:p.playtime || 0, sessions:p.sessions || 0, last:p.last || 0, best, label, extra};
+// ---------------------------------------------------------------- Spiele
+const COLORS = ['#7c6cff', '#ff8a3d', '#2fbf71', '#ff4f9a', '#3d8bff', '#c45cff', '#18c5d8', '#ffb020'];
+function makeCover(title, sym, color){
+  const fs = Math.max(26, Math.min(52, Math.round(1000 / Math.max(10, title.length)))), u = 'g' + Math.random().toString(36).slice(2, 8);
+  return `<svg viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="#0d0f16"/></linearGradient>
+      <radialGradient id="${u}r"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    <rect width="640" height="360" fill="url(#${u})"/><circle cx="470" cy="150" r="170" fill="url(#${u}r)"/>
+    <text x="470" y="150" font-size="150" text-anchor="middle" dominant-baseline="central">${esc(sym)}</text>
+    <text x="40" y="318" font-size="${fs}" font-weight="800" fill="#fff" font-family="Segoe UI,system-ui,sans-serif">${esc(title)}</text></svg>`;
 }
-const UN = ['', '', ' Mio', ' Mrd', ' Bio', ' Brd', ' Trio'];
-function big(n){ if (n < 1e6) return Hub.fmt(n); const e = Math.min(6, Math.floor(Math.log10(n) / 3)); return (n / Math.pow(1000, e)).toLocaleString('de-DE', {maximumFractionDigits:1}) + UN[e]; }
-function rel(t){
-  if (!t) return 'Noch nie';
-  const s = (Date.now() - t) / 1000;
-  if (s < 90) return 'Gerade eben';
-  if (s < 3600) return `vor ${Math.round(s / 60)} Min.`;
-  if (s < 86400) return `vor ${Math.round(s / 3600)} Std.`;
-  const d = Math.round(s / 86400);
-  return d === 1 ? 'Gestern' : `vor ${d} Tagen`;
-}
-const bestTxt = (g, st) => st.best == null ? (st.extra || '–') : (g.id === 'minen' ? st.best + ' s' : Hub.fmt(st.best));
-
-// ---------- Start eines Spiels ----------
-function launch(g){
-  Hub.sfx('launch');
-  if (g.auto){ const st = Hub.game(g.id); st.sessions++; st.last = Date.now(); Hub.save(); }
-  $('lBg').innerHTML = cover(g);
-  $('lLogo').innerHTML = logo(g);
-  $('lTitle').textContent = g.title;
-  $('launch').classList.add('on');
-  try { localStorage.setItem('launcher_last', g.id); } catch(e){}
-  setTimeout(() => location.href = g.file, 900);
-}
-addEventListener('pageshow', e => { if (e.persisted) $('launch').classList.remove('on'); });
-
-// ---------- Seitenleiste ----------
-function renderSide(){
-  const last = (() => { try { return localStorage.getItem('launcher_last'); } catch(e){ return null; } })();
-  $('miniList').innerHTML = [...GAMES].sort((a, b) => a.title.localeCompare(b.title)).map(g =>
-    `<a href="${g.file}" data-id="${g.id}"><span class="lg">${logo(g)}</span>${g.title}${g.id === last ? '<span class="run" title="Zuletzt gespielt"></span>' : ''}</a>`).join('');
-  $('miniList').querySelectorAll('a').forEach(a => a.onclick = e => { e.preventDefault(); launch(GAMES.find(g => g.id === a.dataset.id)); });
-  const li = Hub.levelInfo(), name = Hub.settings.name || 'Spieler';
-  const C = 2 * Math.PI * 20;
-  $('profileCard').innerHTML = `<div class="avatar"><svg class="ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="3"/>
-      <circle cx="22" cy="22" r="20" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - li.pct)}" transform="rotate(-90 22 22)"/></svg>
-      <div class="in">${name.slice(0, 2).toUpperCase()}</div></div>
-    <div style="min-width:0"><div class="pn"></div><div class="pl">Level <b>${li.level}</b> · ${Hub.fmt(li.cur)} / ${Hub.fmt(li.need)} XP</div></div>`;
-  $('profileCard').querySelector('.pn').textContent = name;
-  $('libCnt').textContent = GAMES.length;
-  $('achCnt').textContent = Object.keys(Hub.profile.ach).length || '';
-}
-$('profileCard').onclick = () => show('stats');
-
-// ---------- Hero ----------
-const featured = GAMES.filter(g => g.featured).concat(GAMES.filter(g => !g.featured).sort((a, b) => (gstat(b).last - gstat(a).last)).slice(0, 2));
-let heroIdx = 0, heroTimer = null;
-function renderHero(i, instant){
-  heroIdx = (i + featured.length) % featured.length;
-  const g = featured[heroIdx], st = gstat(g);
-  const art = $('heroArt');
-  art.classList.add('off');
-  setTimeout(() => {
-    art.innerHTML = cover(g);
-    art.classList.remove('off');
-    art.style.transform = 'scale(1.02)';
-    requestAnimationFrame(() => requestAnimationFrame(() => art.style.transform = 'scale(1.09)'));
-  }, instant ? 0 : 250);
-  $('heroContent').innerHTML = `
-    <div class="tag-row">${g.isNew ? '<span class="h-badge new">Neu</span>' : '<span class="h-badge accent">Empfohlen</span>'}${g.genres.map(x => `<span class="h-badge">${x}</span>`).join('')}</div>
-    <h1>${g.title}</h1><div class="tl">${g.tagline}</div>
-    <div class="meta"><div><small>Spielzeit</small><b>${st.play ? Hub.fmtTime(st.play) : '–'}</b></div><div><small>${st.label}</small><b>${bestTxt(g, st)}</b></div><div><small>Zuletzt</small><b>${rel(st.last)}</b></div></div>
-    <div class="btns"><button class="h-btn primary lg" id="heroPlay">${I('play')}${st.sessions ? 'Weiterspielen' : 'Jetzt spielen'}</button><button class="h-btn lg" id="heroInfo">${I('info')}Details</button></div>`;
-  $('heroPlay').onclick = () => launch(g);
-  $('heroInfo').onclick = () => openDetail(g);
-  $('thumbs').innerHTML = featured.map((f, k) => `<div class="thumb ${k === heroIdx ? 'on' : ''}" data-k="${k}"><span class="tc">${cover(f)}</span><b>${f.title}</b><span class="pg"></span></div>`).join('');
-  $('thumbs').querySelectorAll('.thumb').forEach(t => t.onclick = () => { renderHero(+t.dataset.k); restartHero(); });
-}
-function restartHero(){ clearInterval(heroTimer); if (!Hub.settings.reduceMotion) heroTimer = setInterval(() => renderHero(heroIdx + 1), 8000); }
-$('hero').addEventListener('mousemove', e => {
-  if (Hub.settings.reduceMotion) return;
-  const r = $('hero').getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-  $('heroArt').style.translate = `${-x * 18}px ${-y * 12}px`;
-});
-
-// ---------- Weiterspielen ----------
-function renderRecent(){
-  const rec = GAMES.map(g => [g, gstat(g)]).filter(([, s]) => s.last).sort((a, b) => b[1].last - a[1].last).slice(0, 6);
-  $('recentWrap').style.display = rec.length ? '' : 'none';
-  $('recent').innerHTML = rec.map(([g, s]) => `<div class="wide-card" data-id="${g.id}"><div class="art">${cover(g)}</div><div class="shade"></div>
-    <div class="ct"><h3>${g.title}</h3><div class="info">${rel(s.last)} · ${Hub.fmtTime(s.play)} gespielt</div>
-      <div class="bar"><button class="pbtn" title="Spielen">${I('play')}</button><span class="info">${s.label}: ${bestTxt(g, s)}</span></div></div></div>`).join('');
-  $('recent').querySelectorAll('.wide-card').forEach(c => {
-    const g = GAMES.find(x => x.id === c.dataset.id);
-    c.onclick = () => openDetail(g);
-    c.querySelector('.pbtn').onclick = e => { e.stopPropagation(); launch(g); };
-  });
-}
-
-// ---------- Spiele-Raster ----------
-let filter = 'Alle', sortBy = 'featured', query = '';
-function renderFilters(){
-  const genres = ['Alle', 'Favoriten', ...new Set(GAMES.flatMap(g => g.genres))];
-  $('filters').innerHTML = genres.map(x => `<button class="h-chip ${x === filter ? 'on' : ''}" data-f="${x}">${x === 'Favoriten' ? I('heart') : ''}${x}</button>`).join('') +
-    `<select id="sort"><option value="featured">Empfohlen</option><option value="az">A – Z</option><option value="recent">Zuletzt gespielt</option><option value="time">Meiste Spielzeit</option></select>`;
-  $('sort').value = sortBy;
-  $('sort').onchange = e => { sortBy = e.target.value; renderGrid(); };
-  $('filters').querySelectorAll('.h-chip').forEach(b => b.onclick = () => { filter = b.dataset.f; renderFilters(); renderGrid(); Hub.sfx('click'); });
-}
-function visibleGames(){
-  let list = GAMES.filter(g => (filter === 'Alle' || (filter === 'Favoriten' ? fav[g.id] : g.genres.includes(filter))) &&
-    (!query || (g.title + ' ' + g.genres.join(' ') + ' ' + g.tagline).toLowerCase().includes(query)));
-  if (sortBy === 'featured') list.sort((a, b) => (!!b.featured - !!a.featured) || (!!b.isNew - !!a.isNew));
-  if (sortBy === 'az') list.sort((a, b) => a.title.localeCompare(b.title));
-  if (sortBy === 'recent') list.sort((a, b) => gstat(b).last - gstat(a).last);
-  if (sortBy === 'time') list.sort((a, b) => gstat(b).play - gstat(a).play);
-  return list;
-}
-function renderGrid(){
-  const list = visibleGames();
-  $('grid').innerHTML = list.length ? list.map(g => {
-    const s = gstat(g);
-    return `<div class="gcard" tabindex="0" data-id="${g.id}" style="--glow:${g.accent}">
-      <div class="cv">${cover(g)}<div class="badges">${g.isNew ? '<span class="h-badge new">Neu</span>' : ''}</div>
-        <button class="fav ${fav[g.id] ? 'on' : ''}" title="Favorit">${I('heart')}</button><div class="play"><span>${I('play')}</span></div></div>
-      <div class="bd"><h3>${g.title}</h3><div class="gn">${g.genres.join(' · ')}</div>
-        <div class="st"><span>${I('clock')}${s.play ? Hub.fmtTime(s.play) : 'Neu'}</span><span>${I('trophy')}${bestTxt(g, s)}</span></div></div></div>`;
-  }).join('') : `<div class="empty" style="grid-column:1/-1">Keine Spiele gefunden${query ? ` für „${query}“` : ''}.</div>`;
-  $('grid').querySelectorAll('.gcard').forEach(c => {
-    const g = GAMES.find(x => x.id === c.dataset.id);
-    c.onclick = e => { if (e.target.closest('.fav')) return; if (e.target.closest('.play')) launch(g); else openDetail(g); };
-    c.ondblclick = () => launch(g);
-    c.onkeydown = e => { if (e.key === 'Enter') launch(g); };
-    c.querySelector('.fav').onclick = () => { fav[g.id] = !fav[g.id]; Hub.write('hub_favs', fav); Hub.sfx('click'); renderGrid(); };
-  });
-}
-
-// ---------- Detail ----------
-function openDetail(g){
-  const s = gstat(g);
-  const achs = Object.entries(Hub.profile.ach).filter(([, a]) => a.game === g.id);
-  $('detail').innerHTML = `
-    <div class="dh">${cover(g)}<div class="shade"></div><button class="h-btn icon x" id="dClose">${I('x')}</button>
-      <div class="dt"><div class="lg">${logo(g)}</div><div><h2>${g.title}</h2><div class="gn">${g.genres.join(' · ')}</div></div></div></div>
-    <div class="db"><div><p>${g.desc}</p>
-        <div class="dbtns"><button class="h-btn primary lg" id="dPlay">${I('play')}Spielen</button><button class="h-btn lg" id="dFav">${I('heart')}${fav[g.id] ? 'Favorit' : 'Merken'}</button></div>
-        ${achs.length ? `<h4>Deine Erfolge (${achs.length})</h4><div class="ctrl">${achs.slice(0, 6).map(([, a]) => `<div><span>${I('trophy')} ${a.title}</span><span class="muted">${new Date(a.t).toLocaleDateString('de-DE')}</span></div>`).join('')}</div>` : ''}</div>
-      <div><h4>Deine Statistik</h4><div class="dstats"><div><small>Spielzeit</small><b>${s.play ? Hub.fmtTime(s.play) : '–'}</b></div><div><small>Sitzungen</small><b>${s.sessions}</b></div>
-          <div><small>${s.label}</small><b>${bestTxt(g, s)}</b></div><div><small>Zuletzt</small><b>${rel(s.last)}</b></div></div>
-        <h4>Steuerung</h4><div class="ctrl">${(g.controls || []).map(([k, v]) => `<div><kbd>${k}</kbd><span>${v}</span></div>`).join('')}</div></div></div>`;
-  $('dClose').onclick = closeDetail;
-  $('dPlay').onclick = () => launch(g);
-  $('dFav').onclick = () => { fav[g.id] = !fav[g.id]; Hub.write('hub_favs', fav); openDetail(g); renderGrid(); };
-  $('detailOv').classList.add('on');
-}
-function closeDetail(){ $('detailOv').classList.remove('on'); }
-$('detailOv').addEventListener('pointerdown', e => { if (e.target === $('detailOv')) closeDetail(); });
-
-// ---------- Bibliothek ----------
-let libSort = 'title', libDir = 1;
-function renderLibrary(){
-  const rows = GAMES.map(g => [g, gstat(g)]);
-  const key = {title:([g]) => g.title, genre:([g]) => g.genres[0], play:([, s]) => s.play, last:([, s]) => s.last, sess:([, s]) => s.sessions}[libSort];
-  rows.sort((a, b) => { const x = key(a), y = key(b); return (x > y ? 1 : x < y ? -1 : 0) * libDir; });
-  const total = rows.reduce((a, [, s]) => a + s.play, 0);
-  $('libSub').textContent = `${GAMES.length} Spiele · ${Hub.fmtTime(total)} Gesamtspielzeit`;
-  const th = (k, l) => `<th data-s="${k}">${l}${libSort === k ? (libDir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
-  $('libTable').innerHTML = `<tr>${th('title', 'Spiel')}${th('genre', 'Genre')}${th('play', 'Spielzeit')}${th('sess', 'Sitzungen')}${th('last', 'Zuletzt')}<th></th></tr>` +
-    rows.map(([g, s]) => `<tr data-id="${g.id}"><td><div class="gname"><span class="lg">${logo(g)}</span>${g.title}</div></td><td class="muted">${g.genres.join(', ')}</td>
-      <td>${s.play ? Hub.fmtTime(s.play) : '–'}</td><td>${s.sessions || '–'}</td><td class="muted">${rel(s.last)}</td>
-      <td><button class="h-btn sm primary" data-play="${g.id}">${I('play')}Spielen</button></td></tr>`).join('');
-  $('libTable').querySelectorAll('th[data-s]').forEach(t => t.onclick = () => { if (libSort === t.dataset.s) libDir *= -1; else { libSort = t.dataset.s; libDir = 1; } renderLibrary(); });
-  $('libTable').querySelectorAll('[data-play]').forEach(b => b.onclick = e => { e.stopPropagation(); launch(GAMES.find(g => g.id === b.dataset.play)); });
-  $('libTable').querySelectorAll('tr[data-id]').forEach(r => r.onclick = () => openDetail(GAMES.find(g => g.id === r.dataset.id)));
-}
-
-// ---------- Statistik ----------
-function renderStats(){
-  const rows = GAMES.map(g => [g, gstat(g)]);
-  const total = rows.reduce((a, [, s]) => a + s.play, 0), sess = rows.reduce((a, [, s]) => a + s.sessions, 0);
-  const top = rows.slice().sort((a, b) => b[1].play - a[1].play)[0];
-  const li = Hub.levelInfo();
-  const k = (ic, v, l) => `<div class="kpi">${I(ic)}<b>${v}</b><small>${l}</small></div>`;
-  $('kpis').innerHTML = k('clock', total ? Hub.fmtTime(total) : '0 min', 'Gesamtspielzeit') + k('gamepad', sess, 'Spielsitzungen') + k('crown', 'Level ' + li.level, Hub.fmt(Hub.profile.xp) + ' XP gesammelt')
-    + k('trophy', Object.keys(Hub.profile.ach).length, 'Erfolge') + k('heart', top && top[1].play ? top[0].title : '–', 'Lieblingsspiel');
-  const max = Math.max(1, ...rows.map(([, s]) => s.play));
-  $('bars').innerHTML = rows.sort((a, b) => b[1].play - a[1].play).map(([g, s]) => `<div class="bar-row"><div class="gname"><span class="lg">${logo(g)}</span>${g.title}</div>
-    <div class="track"><div data-w="${s.play / max * 100}"></div></div><div class="v">${s.play ? Hub.fmtTime(s.play) : '–'}</div></div>`).join('');
-  requestAnimationFrame(() => $('bars').querySelectorAll('[data-w]').forEach(d => d.style.width = Math.max(1, d.dataset.w) + '%'));
-  $('recTable').innerHTML = '<tr><th>Spiel</th><th>Bestwert</th><th>Sitzungen</th><th></th></tr>' + rows.sort((a, b) => a[0].title.localeCompare(b[0].title)).map(([g, s]) =>
-    `<tr><td><div class="gname"><span class="lg">${logo(g)}</span>${g.title}</div></td><td>${s.label}: <b>${bestTxt(g, s)}</b></td><td class="muted">${s.sessions || '–'}</td><td><button class="h-btn sm" data-play="${g.id}">${I('play')}Spielen</button></td></tr>`).join('');
-  $('recTable').querySelectorAll('[data-play]').forEach(b => b.onclick = () => launch(GAMES.find(g => g.id === b.dataset.play)));
-}
-
-// ---------- Erfolge ----------
-function renderAch(){
-  const list = Object.entries(Hub.profile.ach).sort((a, b) => b[1].t - a[1].t);
-  const tyc = Hub.read('tycoon_imperium_v1', null), tycN = tyc && tyc.ach ? Object.keys(tyc.ach).length : 0;
-  $('achSub').textContent = `${list.length} Spielhallen-Erfolge freigeschaltet${tycN ? ` · dazu ${tycN} Erfolge in Tycoon Imperium` : ''}`;
-  $('achList').innerHTML = list.length ? list.map(([, a]) => {
-    const g = GAMES.find(x => x.id === a.game);
-    return `<div class="ach"><div class="ai">${I('trophy')}</div><div><b></b><span></span><small>${g ? g.title : ''} · ${new Date(a.t).toLocaleDateString('de-DE')}</small></div></div>`;
-  }).join('') : '<div class="empty" style="grid-column:1/-1">Noch keine Erfolge – spiel ein paar Runden und sie kommen von ganz allein!</div>';
-  $('achList').querySelectorAll('.ach').forEach((el, i) => { el.querySelector('b').textContent = list[i][1].title; el.querySelector('span').textContent = list[i][1].desc || ''; });
-}
-
-// ---------- Einstellungen ----------
-function renderSettings(){
-  const S = Hub.settings;
-  $('sName').value = S.name || '';
-  $('sName').oninput = e => { S.name = e.target.value || 'Spieler'; Hub.saveSettings(); renderSide(); };
-  $('swatches').innerHTML = Object.entries(Hub.ACCENTS).map(([k, v]) => `<div class="swatch ${S.accent === k ? 'on' : ''}" data-a="${k}" style="background:${v[0]}" title="${k}"></div>`).join('');
-  $('swatches').querySelectorAll('.swatch').forEach(s => s.onclick = () => { S.accent = s.dataset.a; Hub.saveSettings(); renderSettings(); renderSide(); Hub.sfx('click'); });
-  [['sMaster', 'vMaster', 'master'], ['sSfx', 'vSfx', 'sfx'], ['sMusic', 'vMusic', 'music']].forEach(([i, v, k]) => {
-    $(i).value = Math.round(S[k] * 100); $(v).textContent = $(i).value + ' %';
-    $(i).oninput = e => { S[k] = e.target.value / 100; $(v).textContent = e.target.value + ' %'; Hub.saveSettings(); };
-    $(i).onchange = () => Hub.sfx('ok');
-  });
-  $('sMotion').classList.toggle('on', !!S.reduceMotion);
-  $('sMotion').onclick = () => { S.reduceMotion = !S.reduceMotion; Hub.saveSettings(); renderSettings(); restartHero(); };
-  $('sAurora').classList.toggle('on', S.aurora !== false);
-  $('sAurora').onclick = () => { S.aurora = S.aurora === false; Hub.saveSettings(); renderSettings(); };
-}
-$('expBtn').onclick = () => {
-  const blob = new Blob([JSON.stringify(Hub.exportAll(), null, 1)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `Spielhalle-Backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-  Hub.toast('Backup erstellt', 'Die Datei liegt in deinem Download-Ordner.', 'download');
-};
-$('impBtn').onclick = () => $('impFile').click();
-$('impFile').onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try { Hub.importAll(JSON.parse(await f.text())); Hub.toast('Backup geladen', 'Die Spielhalle wird neu geladen …', 'upload'); setTimeout(() => location.reload(), 900); }
-  catch(err){ Hub.dialog({title:'Import fehlgeschlagen', html:'<p>Das ist keine gültige Spielhallen-Backup-Datei.</p>'}); }
-};
-$('resetBtn').onclick = async () => {
-  const ok = await Hub.dialog({title:'Wirklich alles löschen?', html:'<p>Alle Spielstände, Rekorde, Erfolge und Einstellungen werden <b>endgültig</b> gelöscht. Tipp: Exportiere vorher ein Backup.</p>',
-    buttons:[{label:'Abbrechen', value:false}, {label:'Alles löschen', value:true, cls:'danger'}]});
-  if (ok){ try { localStorage.clear(); } catch(e){} location.reload(); }
-};
-
-// ---------- Partyraum ----------
-const PARTY_ALL = [['immo', '2–6', 'Kaufen, bauen, Miete kassieren – der Klassiker für lange Abende.'], ['leben', '2–6', 'Studium, Hochzeit, Kinder, Villa – wer hat das beste Leben?'],
-  ['poker', '2–6', 'Texas Hold’em mit Sichtschutz: Jeder sieht nur seine eigenen Karten.'], ['blackjack', '1–6', 'Alle gegen die Bank – jeder an seinem Platz.'],
-  ['kniffel', '2–6', 'Würfeln, halten, eintragen – mit Spielblock für alle.'], ['memory', '2–6', 'Wer merkt sich die meisten Paare?'],
-  ['golf', '2–6', '9 Bahnen Minigolf reihum – wer braucht die wenigsten Schläge?'], ['tron', '2–4', 'Lichtrenner gleichzeitig an einer Tastatur!'],
-  ['flipper', '2–4', 'Klassischer Mehrspieler-Flipper: Kugel für Kugel abwechselnd.']];
-const PARTY_DUEL = [['schach', 'Schach'], ['dame', 'Dame'], ['vier', 'Vier gewinnt'], ['reversi', 'Reversi'], ['billard', 'Billard'], ['schiffe', 'Schiffe versenken'], ['pong', 'Neon-Pong']];
-function renderParty(){
-  const P = Hub.party, d = P.data, all = P.all();
-  $('partyCnt').textContent = P.active().length;
-  $('prCount').textContent = `${P.active().length} von ${all.length} dabei`;
-  $('prPeople').innerHTML = all.map(p => `<div class="pr-p ${p.on ? 'on' : ''}" data-i="${p.idx}" style="--pc:${p.color}">
-      ${all.length > 2 ? `<button class="del" data-a="del" title="Entfernen">✕</button>` : ''}
-      <div class="av" data-a="av" title="Avatar wechseln">${p.avatar}</div>
-      <input class="h-input" data-a="name" value="${p.name.replace(/"/g, '&quot;')}" maxlength="14" placeholder="Name">
-      <div class="cols">${P.COLORS.map((c, k) => `<i data-a="col" data-c="${k}" class="${k === p.col ? 'on' : ''}" style="background:${c}"></i>`).join('')}</div>
-      <button class="tog" data-a="tog">${p.on ? '✔ Heute dabei' : 'Nicht dabei'}</button></div>`).join('') +
-    (all.length < 8 ? '<button class="pr-add" id="prAdd">+ Spieler hinzufügen</button>' : '');
-  $('prPeople').querySelectorAll('.pr-p').forEach(el => {
-    const i = +el.dataset.i, pl = d.players[i];
-    el.querySelector('[data-a=av]').onclick = () => { pl.av = (pl.av + 1) % P.AVATARS.length; P.save(); renderParty(); Hub.sfx('click'); };
-    el.querySelector('[data-a=name]').oninput = e => { pl.name = e.target.value; P.save(); $('prCount').textContent = `${P.active().length} von ${all.length} dabei`; };
-    el.querySelectorAll('[data-a=col]').forEach(c => c.onclick = () => { pl.col = +c.dataset.c; P.save(); renderParty(); });
-    el.querySelector('[data-a=tog]').onclick = () => { pl.on = !pl.on; P.save(); renderParty(); Hub.sfx('click'); };
-    const del = el.querySelector('[data-a=del]'); if (del) del.onclick = () => { d.players.splice(i, 1); P.save(); renderParty(); };
-  });
-  if ($('prAdd')) $('prAdd').onclick = () => { d.players.push({name:'Gast', col:d.players.length % 8, av:(d.players.length + 6) % P.AVATARS.length, on:true}); P.save(); renderParty(); };
-  // Fernseher
-  $('prTv').innerHTML = `<span class="big">📺</span><div class="txt"><b>Fernseher-Modus ${d.tv ? 'ist an' : 'ist aus'}</b><small>Vergrößert Schrift, Knöpfe und Dialoge, damit man vom Sofa alles lesen kann.</small></div>
-    <div class="seg" id="tvScale">${[[1.15, 'Etwas größer'], [1.3, 'Groß'], [1.5, 'Riesig']].map(([v, l]) => `<button data-v="${v}" class="${d.tvScale == v ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="h-switch ${d.tv ? 'on' : ''}" id="tvSw"></div><button class="h-btn" id="tvFull">⛶ Vollbild</button>`;
-  $('tvSw').onclick = () => { d.tv = !d.tv; P.save(); renderParty(); };
-  $('tvScale').onclick = e => { const v = +e.target.dataset.v; if (!v) return; d.tvScale = v; d.tv = true; P.save(); renderParty(); };
-  $('tvFull').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
-  // Spiele
-  const card = (g, ppl, txt, btn) => `<div class="pr-g" data-id="${g.id}"><div class="cv">${cover(g)}<span class="ppl">👥 ${ppl}</span></div><div class="bd"><b>${g.title}</b><small>${txt}</small>${btn ? `<button class="h-btn primary sm" data-ch="${g.id}">${btn}</button>` : ''}</div></div>`;
-  const G = id => GAMES.find(g => g.id === id);
-  $('prAll').innerHTML = PARTY_ALL.filter(([id]) => G(id)).map(([id, ppl, txt]) => card(G(id), ppl, txt)).join('');
-  $('prChal').innerHTML = Object.keys(Hub.challenge.GAMES).filter(G).map(id => card(G(id), 'reihum', G(id).tagline, '🏁 Wettkampf starten')).join('');
-  $('prDuel').innerHTML = PARTY_DUEL.filter(([id]) => G(id)).map(([id]) => card(G(id), '2', G(id).tagline)).join('');
-  document.querySelectorAll('#v-party .pr-g').forEach(el => el.onclick = e => {
-    const id = el.dataset.id, g = G(id);
-    if (e.target.dataset.ch){
-      const order = Hub.party.active().map(p => p.idx);
-      if (order.length < 2) return Hub.toast('Zu wenig Leute', 'Mindestens zwei müssen heute dabei sein.', 'user');
-      Hub.challenge.start(id, order, 1);
-    } else Hub.party.flagLaunch(id);
-    launch(g);
-  });
-  const cf = $('prConf'); if (!cf.innerHTML){ let h = ''; for (let k = 0; k < 18; k++) h += `<span style="position:absolute;left:${(k * 53) % 100}%;top:${(k * 37) % 90}%;transform:rotate(${k * 40}deg)">${['🎉', '🎲', '🃏', '🍕', '🎮', '🏆'][k % 6]}</span>`; cf.innerHTML = h; }
-}
-
-// ---------- YouTube-Kino (läuft über den lokalen Spielhallen-Server) ----------
-const KINO = 'http://localhost:8777/spiele/kino.html';
-let ytLoaded = false;
-async function kinoOnline(){ try { const c = new AbortController(); setTimeout(() => c.abort(), 1500); const r = await fetch('http://localhost:8777/__ping', {signal:c.signal, cache:'no-store'}); return r.ok; } catch(e){ return false; } }
-async function renderYT(q){
-  const box = $('ytBox');
-  if (await kinoOnline()){
-    const src = KINO + '?tv=' + (Hub.party.tv ? 1 : 0) + (q ? '&q=' + encodeURIComponent(q) : '');
-    if (!ytLoaded || q){ box.innerHTML = `<iframe class="yt-frame" src="${src}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>`; ytLoaded = true; }
-    return;
-  }
-  ytLoaded = false;
-  box.innerHTML = `<div class="yt-off"><div class="big">📺</div><h2 style="margin:0;font-family:var(--font-display)">YouTube-Kino ist noch nicht bereit</h2>
-    <p>Damit YouTube direkt in der Spielhalle läuft, muss die Spielhalle über <b>„Spielhalle starten“</b> (bzw. die Desktop-Verknüpfung) geöffnet werden – dabei startet automatisch ein kleiner Helfer im Hintergrund.</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button class="h-btn primary" id="ytRetry">🔄 Nochmal prüfen</button><button class="h-btn" id="ytWin">YouTube im eigenen Fenster öffnen</button></div></div>`;
-  $('ytRetry').onclick = () => renderYT(q); $('ytWin').onclick = () => openWeb(q ? 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q) : 'https://www.youtube.com');
-}
-function openKino(q){ show('yt'); renderYT(q); }
-
-// ---------- Browser & YouTube ----------
-const WEB_LINKS = [
-  ['YouTube', 'Videos, Musik, Clips', 'https://www.youtube.com', '▶️', 'linear-gradient(135deg,#ff3b3b,#b30000)'],
-  ['YouTube Music', 'Musik für den Abend', 'https://music.youtube.com', '🎵', 'linear-gradient(135deg,#ff5a5a,#5a0a1a)'],
-  ['Google', 'Suchen', 'https://www.google.de', '🔎', 'linear-gradient(135deg,#4285f4,#1a4fb0)'],
-  ['Twitch', 'Livestreams', 'https://www.twitch.tv', '🎮', 'linear-gradient(135deg,#9146ff,#4a1a9a)'],
-  ['Spotify', 'Musik & Playlists', 'https://open.spotify.com', '🎧', 'linear-gradient(135deg,#1ed760,#0a6a2e)'],
-  ['Netflix', 'Filme & Serien', 'https://www.netflix.com', '🎬', 'linear-gradient(135deg,#e50914,#3a0003)'],
-  ['Disney+', 'Filme & Serien', 'https://www.disneyplus.com', '🏰', 'linear-gradient(135deg,#1a3a8a,#0a1a3a)'],
-  ['Google Maps', 'Karten & Routen', 'https://maps.google.de', '🗺️', 'linear-gradient(135deg,#34a853,#1a6a3a)'],
-  ['Wikipedia', 'Nachschlagen', 'https://de.wikipedia.org', '📚', 'linear-gradient(135deg,#5a6270,#2a3040)'],
-  ['Wetter', 'Wie wird das Wetter?', 'https://www.wetteronline.de', '🌦️', 'linear-gradient(135deg,#2fa0e8,#1a5a9a)'],
-];
-const YT_IDEAS = [['🎉', 'Partymusik'], ['😂', 'Lustige Videos'], ['🎤', 'Karaoke Songs'], ['🧠', 'Quiz für Gruppen'], ['🎮', 'Gaming Highlights'], ['🎧', 'Lofi zum Zocken'], ['🕺', 'Just Dance'], ['⚽', 'Fußball Highlights'], ['🍕', 'Pizza Rezept'], ['👻', 'Gruselgeschichten']];
-function openWeb(url){
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  Hub.sfx('launch');
-  const w = window.open(url, '_blank', `popup,width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`);
-  if (!w) window.open(url, '_blank');
-}
-const ytSearch = q => openKino(q);
-function webSearch(q){
-  q = q.trim(); if (!q) return;
-  if (/^[^\s]+\.[a-z]{2,}(\/\S*)?$/i.test(q) || /^https?:\/\//i.test(q)) return openWeb(q);
-  openWeb('https://www.google.de/search?q=' + encodeURIComponent(q));
-}
-function renderWeb(){
-  const tile = (n, sub, url, ic, bg, k) => `<button class="wb-tile" data-u="${url}" style="--bg:${bg}">${k != null ? `<span class="x" data-del="${k}" title="Entfernen">✕</span>` : ''}<span class="ic">${ic}</span><div><b>${n.replace(/</g, '&lt;')}</b><small>${sub.replace(/</g, '&lt;')}</small></div></button>`;
-  $('wbTiles').innerHTML = WEB_LINKS.map(l => tile(...l)).join('');
-  const mine = Hub.read('hub_links_v1', []);
-  const cols = ['#7c6cff', '#ff8a3d', '#2fbf71', '#ff4f9a', '#3d8bff', '#c45cff'];
-  $('wbMine').innerHTML = mine.length ? mine.map((l, k) => tile(l.n, l.u.replace(/^https?:\/\//, ''), l.u, '⭐', `linear-gradient(135deg,${cols[k % cols.length]},#1b2028)`, k)).join('') : '<p style="color:var(--muted);margin:0">Noch keine eigenen Links – unten hinzufügen.</p>';
-  $('wbChips').innerHTML = YT_IDEAS.map(([e, q]) => `<button data-q="${q}"><span>${e}</span>${q}</button>`).join('');
-  document.querySelectorAll('#v-web .wb-tile').forEach(b => b.onclick = e => {
-    if (e.target.dataset.del != null){ const m = Hub.read('hub_links_v1', []); m.splice(+e.target.dataset.del, 1); Hub.write('hub_links_v1', m); renderWeb(); return; }
-    if (b.dataset.u === 'https://www.youtube.com') return openKino();
-    openWeb(b.dataset.u);
-  });
-  document.querySelectorAll('#wbChips button').forEach(b => b.onclick = () => ytSearch(b.dataset.q));
-}
-$('wbGo').onclick = () => webSearch($('wbQ').value);
-$('wbYt').onclick = () => openKino($('wbQ').value.trim());
-$('wbQ').onkeydown = e => { if (e.key === 'Enter') webSearch(e.target.value); };
-$('wbAdd').onclick = () => {
-  const n = $('wbName').value.trim(), u = $('wbUrl').value.trim();
-  if (!u) return Hub.toast('Adresse fehlt', 'Gib eine Webadresse ein.', 'info');
-  const m = Hub.read('hub_links_v1', []); m.push({n:n || u.replace(/^https?:\/\//, '').split('/')[0], u:/^https?:\/\//i.test(u) ? u : 'https://' + u}); Hub.write('hub_links_v1', m);
-  $('wbName').value = $('wbUrl').value = ''; renderWeb(); Hub.sfx('ok');
-};
-
-// ---------- Ansichten ----------
-function show(v){
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
-  if (v === 'library') renderLibrary();
-  if (v === 'stats') renderStats();
-  if (v === 'ach') renderAch();
-  if (v === 'settings') renderSettings();
-  if (v === 'party') renderParty();
-  if (v === 'web'){ renderWeb(); setTimeout(() => $('wbQ').focus(), 100); }
-  if (v === 'yt' && !ytLoaded) renderYT();
-  $('main').scrollTop = 0;
-}
-$('nav').onclick = e => { const b = e.target.closest('button'); if (b){ show(b.dataset.v); Hub.sfx('click'); } };
-$('q').oninput = e => { query = e.target.value.trim().toLowerCase(); if (!$('v-home').classList.contains('on')) show('home'); renderGrid(); if (query) $('grid').scrollIntoView({behavior:'smooth', block:'start'}); };
-$('q').onkeydown = e => { if (e.key === 'Enter'){ const g = visibleGames()[0]; if (g) launch(g); } if (e.key === 'Escape'){ e.target.value = ''; query = ''; renderGrid(); e.target.blur(); } };
-$('randomBtn').onclick = () => launch(GAMES[Math.floor(Math.random() * GAMES.length)]);
-$('fullBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
-addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); $('q').focus(); $('q').select(); }
-  if (e.key === 'Escape') closeDetail();
-});
-function tickClock(){
-  const d = new Date();
-  $('clk').textContent = d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-  $('dte').textContent = d.toLocaleDateString('de-DE', {weekday:'long', day:'numeric', month:'long'});
-}
-setInterval(tickClock, 15000); tickClock();
-
-// ---------- Animierter Hintergrund ----------
-(function aurora(){
-  const c = $('aurora'), x = c.getContext('2d');
-  const blobs = [[.15, .2, '124,108,255'], [.85, .1, '255,110,80'], [.6, .9, '40,190,255'], [.3, .7, '255,70,160']];
-  function frame(t){
-    const W = Math.round(innerWidth * .5), H = Math.round(innerHeight * .5);
-    if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
-    x.clearRect(0, 0, W, H);
-    if (Hub.settings.aurora !== false){
-      const acc = Hub.ACCENTS[Hub.settings.accent] || Hub.ACCENTS.violet;
-      blobs.forEach(([bx, by, col], k) => {
-        const s = Hub.settings.reduceMotion ? 0 : t / 1000;
-        const px = (bx + Math.sin(s * .07 + k * 2) * .12) * W, py = (by + Math.cos(s * .05 + k) * .12) * H;
-        const g = x.createRadialGradient(px, py, 0, px, py, Math.max(W, H) * .55);
-        g.addColorStop(0, `rgba(${k === 0 ? acc[2] : col},.16)`); g.addColorStop(1, 'rgba(0,0,0,0)');
-        x.fillStyle = g; x.fillRect(0, 0, W, H);
-      });
-    }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-})();
-
-$('partyCnt').textContent = Hub.party.active().length;
-renderSide(); renderHero(0, true); restartHero(); renderRecent(); renderFilters(); renderGrid();
-
-// ---------- Neue Spiele: jede HTML-Datei in spiele/ erscheint automatisch ----------
-// Die App liefert unter /__spiele alle Spieldateien. Was (noch) nicht im Katalog steht,
-// bekommt hier einen Eintrag mit erzeugtem Cover – Angaben aus <meta name="spielhalle-…">.
-const AUTO_COLORS = ['#7c6cff', '#ff8a3d', '#2fbf71', '#ff4f9a', '#3d8bff', '#c45cff', '#18c5d8', '#ffb020'];
-function autoGame(s){
-  const m = s.meta || {}, A = HubArt;
-  const x = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'})[c]);
+// Ein Spiel aus der Dateiliste der App; Angaben aus dem Katalog haben Vorrang
+function toGame(s){
+  const m = s.meta || {}, cat = CATALOG.find(c => c.file === s.file);
   const name = s.file.replace(/^spiele\//, '').replace(/\.html$/i, '');
   const hash = [...name].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-  const accent = /^#[0-9a-f]{3,8}$/i.test(m.farbe || '') ? m.farbe : AUTO_COLORS[hash % AUTO_COLORS.length];
-  const sym = [...(m.symbol || '🎮')].slice(0, 4).join('');
-  const title = (m.titel || s.title || name).replace(/\s+[–|-]\s+Spielhalle$/i, '').replace(/[<>"]/g, '');
-  const genres = (m.genre || '').split(',').map(t => x(t.trim())).filter(Boolean);
-  const controls = (m.steuerung || '').split(';').map(t => t.split('=').map(v => v.trim())).filter(([k, v]) => k && v);
-  const id = 'datei_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  const played = (Hub.profile.games[id] || {}).sessions;
-  return {id, file:s.file, title, auto:true, isNew:!played, accent,
-    tagline:x(m.beschreibung || 'Neu in der Spielhalle.'), genres:genres.length ? genres : ['Neu'],
-    desc:x(m.text || m.beschreibung || 'Ein neues Spiel in der Spielhalle. Viel Spaß!'), controls:controls.map(r => r.map(x)),
-    cover(){
-      const u = A.uid(), fs = Math.max(26, Math.min(52, Math.round(1000 / Math.max(10, title.length))));
-      return A.wrap(u, A.lg(u + 'a', [[0, accent], [1, '#0d0f16']], 1, 1) + A.rg(u + 'r', [[0, '#fff', .22], [1, '#fff', 0]]),
-        `<rect width="640" height="360" fill="url(#${u}a)"/><circle cx="470" cy="150" r="170" fill="url(#${u}r)"/>
-         <text x="470" y="150" font-size="150" text-anchor="middle" dominant-baseline="central">${x(sym)}</text>
-         <text x="40" y="318" font-size="${fs}" font-weight="800" fill="#fff" font-family="Segoe UI,system-ui,sans-serif">${x(title)}</text>`);
-    },
-    logo:() => A.logoWrap([[0, accent], [1, '#151822']], `<text x="32" y="34" font-size="34" text-anchor="middle" dominant-baseline="central">${x(sym)}</text>`),
-  };
+  const color = /^#[0-9a-f]{3,8}$/i.test(m.farbe || '') ? m.farbe : (cat && cat.accent) || COLORS[hash % COLORS.length];
+  const title = (cat && cat.title) || m.titel || (s.title || name).replace(/\s+[–|-]\s+Spielhalle$/i, '');
+  const genres = cat ? cat.genres : (m.genre || '').split(',').map(t => t.trim()).filter(Boolean);
+  return {file:s.file, id:cat ? cat.id : 'datei_' + name, title, color,
+    tagline:(cat && cat.tagline) || m.beschreibung || '', desc:(cat && cat.desc) || m.text || m.beschreibung || '',
+    genres:genres.length ? genres : ['Neu'], catNew:!!(cat && cat.isNew), noCat:!cat,
+    cover:() => { try { if (cat && cat.cover) return cat.cover(); } catch(e){} return makeCover(title, [...(m.symbol || '🎮')].slice(0, 4).join(''), color); }};
 }
-if (location.port === '8777') fetch('/__spiele', {cache:'no-store'}).then(r => r.json()).then(list => {
-  const known = new Set(GAMES.map(g => g.file));
-  const neu = list.filter(s => s && s.file && !known.has(s.file)).map(autoGame).sort((a, b) => a.title.localeCompare(b.title));
-  if (!neu.length) return;
-  GAMES.push(...neu);
-  renderSide(); renderRecent(); renderFilters(); renderGrid();
-}).catch(() => {});
+let GAMES = [];
+const coverCache = {};
+const cover = g => coverCache[g.file] || (coverCache[g.file] = g.cover());
+function lastPlayed(g){
+  const own = read(LAST_KEY, {})[g.file] || 0;
+  const hub = window.Hub && Hub.profile.games[g.id] ? Hub.profile.games[g.id].last || 0 : 0;
+  return Math.max(own, hub);
+}
+const isNew = g => (g.catNew || g.noCat) && !lastPlayed(g);
 
-// ---------- App: Version, Online-Updates, Hinweise ----------
-if (location.port === '8777'){
-  const esc = s => String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
-  let updHidden = false, updTimer = 0;
-  const info = () => fetch('/__info', {cache:'no-store'}).then(r => r.json());
-  function renderApp(i, checking){
-    const box = $('appBox'); box.hidden = false;
-    const needLogin = ['nogh', 'nologin', 'noaccess'].includes(i.login);
-    box.innerHTML = `<span class="dot ${i.update || needLogin ? 'new' : ''}"></span><span>Version ${esc(i.version)}${i.update ? ' · Update da' : ''}</span>
-      <button id="updCheck" title="Jetzt nach Updates suchen">${checking ? 'Suche …' : '🔄 Prüfen'}</button>` +
-      (needLogin ? `<div class="login"><span>${esc(i.loginText)}</span><button id="ghLogin">🔑 Bei GitHub anmelden</button></div>` : '');
-    if (needLogin) $('ghLogin').onclick = () => {
-      fetch('/__login', {method:'POST'}).catch(() => {});
-      Hub.toast('Anmeldung geöffnet', 'Im schwarzen Fenster (evtl. unten in der Taskleiste) den Schritten folgen.', 'sparkles');
-      // danach regelmäßig prüfen, bis die Anmeldung klappt
-      let n = 0; const t = setInterval(() => {
-        if (++n > 36) return clearInterval(t);
-        fetch('/__check', {cache:'no-store'}).then(r => r.json()).then(j => {
-          if (!['nogh', 'nologin', 'noaccess'].includes(j.login)){ clearInterval(t); renderApp(j); updHidden = false; renderUpd(j); Hub.toast('Mit GitHub verbunden', 'Updates kommen jetzt automatisch.', 'sparkles'); }
-        }).catch(() => {});
-      }, 5000);
-    };
-    $('updCheck').onclick = () => check(i);
-    renderSetUpd(i, checking);
-  }
-  function check(i){
-    renderApp(i, true);
-    fetch('/__check', {cache:'no-store'}).then(r => r.json()).then(n => {
-      renderApp(n); updHidden = false; renderUpd(n);
-      if (!n.update){
-        const fail = n.note && n.note !== 'Aktuell';
-        Hub.toast(fail ? 'Update-Prüfung' : 'Alles aktuell', fail ? n.note : 'Du hast die neueste Version ' + n.version + '.', 'sparkles');
-      }
-    }).catch(() => renderApp(i));
-  }
-  function install(){
-    fetch('/__update', {method:'POST'}).then(r => r.json()).then(n => { n.progress = Math.max(0, n.progress); updHidden = false; renderUpd(n); renderSetUpd(n); });
-  }
-  // Karte „Updates“ in den Einstellungen
-  function renderSetUpd(i, checking){
-    const box = $('setUpd');
-    const needLogin = ['nogh', 'nologin', 'noaccess'].includes(i.login);
-    const fail = (i.note || '').startsWith('Update fehlgeschlagen');
-    let html = `<div class="set-row"><label>Installierte Version</label><span class="upd-ver">${esc(i.version)}</span></div>`;
-    if (i.update){
-      const busy = i.progress >= 0;
-      html += `<div class="upd-new"><b>🚀 Neue Version ${esc(i.update.version)}</b><p>${esc(i.update.notes || 'Neue Spiele und Verbesserungen.')}</p>` +
-        (busy ? `<div>${i.progress >= 100 ? 'Wird installiert – die Spielhalle startet gleich neu …' : 'Wird geladen … ' + Math.max(0, i.progress) + ' %'}</div><div class="bar"><i style="width:${Math.max(3, i.progress)}%"></i></div>`
-              : `<button class="h-btn sm primary" id="setUpdNow">${I('download')}Jetzt installieren</button>`) + `</div>`;
-    } else if (!needLogin && i.online){
-      html += `<div class="set-row"><label>Status<small>${checking ? 'Suche nach Updates …' : i.note && i.note !== 'Aktuell' ? esc(i.note) : 'Du hast die neueste Version.'}</small></label></div>`;
-    }
-    if (fail) html += `<div class="upd-hint err">${esc(i.note)}</div>`;
-    if (needLogin) html += `<div class="upd-hint">${esc(i.loginText)}<div style="margin-top:8px"><button class="h-btn sm" id="setUpdLogin">🔑 Bei GitHub anmelden</button></div></div>`;
-    html += `<div class="set-row"><label>Nach Updates suchen<small>Passiert sonst auch beim Start und alle 20 Minuten</small></label><button class="h-btn sm" id="setUpdCheck" ${checking ? 'disabled' : ''}>${I('refresh')}${checking ? 'Suche …' : 'Suchen'}</button></div>
-      <div class="set-row"><label>Automatisch aktualisieren<small>Neue Versionen gleich beim Start installieren</small></label><div class="h-switch ${i.auto ? 'on' : ''}" id="setUpdAuto"></div></div>`;
-    box.innerHTML = html;
-    if ($('setUpdNow')) $('setUpdNow').onclick = install;
-    if ($('setUpdLogin')) $('setUpdLogin').onclick = () => $('ghLogin') && $('ghLogin').click();
-    $('setUpdCheck').onclick = () => check(i);
-    $('setUpdAuto').onclick = () => fetch('/__auto?an=' + (i.auto ? 0 : 1), {cache:'no-store'}).then(r => r.json()).then(n => renderSetUpd(n)).catch(() => {});
-  }
-  function renderUpd(i){
-    const box = $('updBox');
-    if (!i.update || updHidden){ box.hidden = true; return; }
-    box.hidden = false;
-    if (i.progress >= 0){
-      box.innerHTML = `<h3>⬇️ Update auf ${esc(i.update.version)}</h3>
-        <p>${i.progress >= 100 ? 'Wird installiert – die Spielhalle startet gleich neu …' : 'Wird geladen …'}</p><div class="bar"><i style="width:${Math.max(3, i.progress)}%"></i></div>`;
-      clearTimeout(updTimer); updTimer = setTimeout(() => info().then(n => { renderUpd(n); renderSetUpd(n); }).catch(() => {}), 500);
-      return;
-    }
-    box.innerHTML = `<button class="x" title="Später">×</button><h3>🚀 Neue Version ${esc(i.update.version)}</h3>
-      <p>${esc(i.update.notes || 'Neue Spiele und Verbesserungen.')}</p>
-      ${(i.note || '').startsWith('Update fehlgeschlagen') ? `<p class="err">${esc(i.note)}</p>` : ''}
-      <div class="row"><button class="h-btn" id="updLater">Später</button><button class="h-btn primary" id="updNow">Jetzt aktualisieren</button></div>`;
-    box.querySelector('.x').onclick = $('updLater').onclick = () => { updHidden = true; box.hidden = true; };
-    $('updNow').onclick = install;
-  }
-  info().then(i => {
-    if (!i.app) return;
-    renderApp(i); renderUpd(i);
-    // Nach einem Update: was ist neu?
-    const last = localStorage.getItem('hub_app_version');
-    if (last && last !== i.version) Hub.toast('Aktualisiert auf ' + i.version, i.notes || 'Die neueste Version ist jetzt drauf.', 'sparkles');
-    localStorage.setItem('hub_app_version', i.version);
-    const n = +localStorage.getItem('hub_umzug_v1');
-    if (n > 0 && !localStorage.getItem('hub_umzug_info')){ localStorage.setItem('hub_umzug_info', '1'); Hub.toast('Spielstände übernommen', 'Punkte, Chips und Partyrunde sind mit umgezogen.', 'trophy'); }
-    // regelmäßig nachsehen, ob die App ein Update gefunden hat
-    setInterval(() => info().then(j => { renderApp(j); if (!$('updBox').innerHTML || j.update) renderUpd(j); }).catch(() => {}), 60000);
-  }).catch(() => {});
+async function loadGames(){
+  let list = null;
+  if (APP) try { list = await (await fetch('/__spiele', {cache:'no-store'})).json(); } catch(e){}
+  if (!list) list = CATALOG.map(c => ({file:c.file, title:c.title, meta:{}}));   // ohne App: nur der Katalog
+  GAMES = list.filter(s => s && s.file).map(toGame).sort((a, b) => a.title.localeCompare(b.title, 'de'));
+  renderChips(); renderGrid();
 }
+
+function launch(g){
+  const l = read(LAST_KEY, {}); l[g.file] = Date.now(); write(LAST_KEY, l);
+  location.href = g.file;
+}
+
+// ---------------------------------------------------------------- Raster, Filter, Suche
+let filter = 'Alle', query = '';
+function renderChips(){
+  const genres = [...new Set(GAMES.flatMap(g => g.genres))].sort((a, b) => a.localeCompare(b, 'de'));
+  const all = ['Alle', 'Zuletzt gespielt', ...genres];
+  if (!all.includes(filter)) filter = 'Alle';
+  $('chips').innerHTML = all.map(x => `<button class="chip ${x === filter ? 'on' : ''}" data-f="${esc(x)}">${esc(x)}</button>`).join('');
+  $('chips').querySelectorAll('.chip').forEach(b => b.onclick = () => { filter = b.dataset.f; renderChips(); renderGrid(); });
+}
+function visible(){
+  let l = GAMES.filter(g => !query || (g.title + ' ' + g.genres.join(' ') + ' ' + g.tagline).toLowerCase().includes(query));
+  if (filter === 'Zuletzt gespielt') l = l.filter(lastPlayed).sort((a, b) => lastPlayed(b) - lastPlayed(a));
+  else if (filter !== 'Alle') l = l.filter(g => g.genres.includes(filter));
+  else l = l.slice().sort((a, b) => (isNew(b) - isNew(a)) || a.title.localeCompare(b.title, 'de'));
+  return l;
+}
+function renderGrid(){
+  const l = visible();
+  $('grid').innerHTML = l.length ? l.map((g, i) => `<button class="tile" data-i="${GAMES.indexOf(g)}" style="--glow:${esc(g.color)}" title="${esc(g.desc)}">
+      <div class="cv">${cover(g)}${isNew(g) ? '<span class="new">NEU</span>' : ''}<div class="play">▶</div></div>
+      <div class="bd"><b>${esc(g.title)}</b><small>${esc(g.tagline || g.genres.join(' · '))}</small></div></button>`).join('')
+    : `<div class="empty">${GAMES.length ? `Kein Spiel gefunden${query ? ` für „${esc(query)}“` : ''}.` : 'Spiele werden geladen …'}</div>`;
+  $('grid').querySelectorAll('.tile').forEach(t => t.onclick = () => launch(GAMES[+t.dataset.i]));
+}
+$('q').oninput = e => { query = e.target.value.trim().toLowerCase(); renderGrid(); };
+$('q').onkeydown = e => {
+  if (e.key === 'Enter'){ const g = visible()[0]; if (g) launch(g); }
+  if (e.key === 'Escape'){ e.target.value = ''; query = ''; renderGrid(); e.target.blur(); }
+};
+$('zufall').onclick = () => { const l = visible().length ? visible() : GAMES; if (l.length) launch(l[Math.floor(Math.random() * l.length)]); };
+$('voll').onclick = () => window.spielhalleVollbild ? spielhalleVollbild()
+  : (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}));
+
+// Pfeiltasten wandern durch die Spiele, Enter startet
+addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== $('q')){ e.preventDefault(); $('q').focus(); return; }
+  const t = document.activeElement;
+  if (!t || !t.classList.contains('tile') || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+  const tiles = [...$('grid').querySelectorAll('.tile')], i = tiles.indexOf(t);
+  const cols = getComputedStyle($('grid')).gridTemplateColumns.split(' ').length;
+  const j = {ArrowLeft:i - 1, ArrowRight:i + 1, ArrowUp:i - cols, ArrowDown:i + cols}[e.key];
+  if (tiles[j]){ e.preventDefault(); tiles[j].focus(); tiles[j].scrollIntoView({block:'nearest'}); }
+});
+
+// ---------------------------------------------------------------- Mitspieler (gelten für alle Partyspiele)
+function renderPlayers(){
+  if (!window.Hub){ $('players').textContent = ''; return; }
+  const P = Hub.party;
+  $('players').innerHTML = P.all().map(p => `<button class="player ${p.on && p.name.trim() ? '' : 'off'}" data-i="${p.idx}" style="--pc:${p.color}" title="Antippen: mitspielen an/aus">
+      <span>${p.avatar}</span>${esc(p.name || '–')}</button>`).join('') + `<button class="btn sm" id="pEdit">✏️ Bearbeiten</button>`;
+  $('players').querySelectorAll('.player').forEach(b => b.onclick = () => { const p = P.data.players[+b.dataset.i]; p.on = !p.on; P.save(); renderPlayers(); });
+  $('pEdit').onclick = openPlayers;
+}
+function openPlayers(){
+  const P = Hub.party;
+  const rows = () => {
+    $('dlgRows').innerHTML = P.all().map(p => `<div class="prow" style="--pc:${p.color}" data-i="${p.idx}">
+        <button class="av" data-a="av" title="Anderes Tier">${p.avatar}</button><button class="col" data-a="col" title="Andere Farbe"></button>
+        <input type="text" value="${esc(p.name)}" maxlength="16" placeholder="Name"><button class="btn sm" data-a="del" title="Entfernen">✕</button></div>`).join('');
+    $('dlgRows').querySelectorAll('.prow').forEach(r => {
+      const p = P.data.players[+r.dataset.i];
+      r.querySelector('input').oninput = e => { p.name = e.target.value; P.save(); };
+      r.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+        if (b.dataset.a === 'av') p.av = (p.av + 1) % P.AVATARS.length;
+        if (b.dataset.a === 'col') p.col = (p.col + 1) % P.COLORS.length;
+        if (b.dataset.a === 'del') P.data.players.splice(+r.dataset.i, 1);
+        P.save(); rows();
+      });
+    });
+    $('dlgAdd').disabled = P.data.players.length >= 8;
+  };
+  $('dlgAdd').onclick = () => { const n = P.data.players.length; P.data.players.push({name:'', col:n % P.COLORS.length, av:n % P.AVATARS.length, on:true}); P.save(); rows();
+    const ins = $('dlgRows').querySelectorAll('input'); ins[ins.length - 1].focus(); };
+  $('dlgOk').onclick = () => $('dlg').close();
+  $('dlg').onclose = renderPlayers;
+  rows(); $('dlg').showModal();
+}
+
+// ---------------------------------------------------------------- Uhr
+function tick(){
+  const d = new Date();
+  $('uhr').textContent = d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  $('datum').textContent = d.toLocaleDateString('de-DE', {weekday:'long', day:'numeric', month:'long'});
+}
+setInterval(tick, 15000); tick();
+
+// ---------------------------------------------------------------- App: Stand, neue Spiele, Updates
+function renderStatus(s){
+  $('fVersion').textContent = 'Spielhalle ' + s.version;
+  $('fStand').textContent = s.datum ? 'Spiele vom ' + s.datum : '';
+  $('fHinweis').textContent = s.hinweis || '';
+  $('suchen').disabled = !!s.suche;
+  $('suchen').textContent = s.suche ? '⏳ Suche …' : '🔄 Nach neuen Spielen suchen';
+  $('bNeu').classList.toggle('on', !!s.neu);
+  $('bApp').classList.toggle('on', !!s.appUpdate);
+  $('bAppText').textContent = s.appUpdate ? `Version ${s.appUpdate} ist da und wird beim Neustart eingesetzt.` : '';
+}
+const status = () => fetch('/__status', {cache:'no-store'}).then(r => r.json()).then(s => { renderStatus(s); return s; });
+if (APP){
+  status().catch(() => {});
+  setInterval(() => status().catch(() => {}), 20000);
+  $('suchen').onclick = async () => {
+    renderStatus(await (await fetch('/__suchen', {method:'POST'})).json());
+    for (let i = 0; i < 60; i++){ await new Promise(r => setTimeout(r, 1000)); const s = await status(); if (!s.suche) break; }
+  };
+  $('neuLaden').onclick = () => fetch('/__gesehen', {cache:'no-store'}).finally(() => location.reload());
+  $('neuStart').onclick = () => { $('neuStart').disabled = true; $('neuStart').textContent = 'Startet neu …'; fetch('/__neustart', {method:'POST'}).catch(() => {}); };
+} else {
+  $('suchen').hidden = true;
+  $('fHinweis').textContent = 'Tipp: Mit Spielhalle.exe startest du die Spielhalle als App – mit automatisch neuen Spielen.';
+}
+
+renderPlayers();
+loadGames();
 </script>
 </body>
 </html>

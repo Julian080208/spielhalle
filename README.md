@@ -1,48 +1,41 @@
 # 🎮 Spielhalle
 
-Über 40 Spiele für einen allein oder die ganze Runde am Fernseher: Partyraum für 3–6 Leute, Immobilienkönig, Lebensweg, Poker, Blackjack, Slots, Minigolf, Flipper, YouTube-Kino und vieles mehr. Alles läuft mit Spielgeld, ohne echtes Geld.
+Über 40 Spiele für einen allein oder die ganze Runde am Fernseher: Partyspiele, Immobilienkönig, Lebensweg, Poker, Blackjack, Minigolf, Flipper, YouTube-Kino und vieles mehr. Alles mit Spielgeld, ohne echtes Geld.
 
-## Installieren
+## Installieren (Windows)
 
-Am einfachsten mit **`Spielhalle einrichten.cmd`** (hier im Projekt): herunterladen und doppelklicken. Die Datei
+1. **[Spielhalle.exe herunterladen](https://github.com/Julian080208/spielhalle/releases/latest/download/Spielhalle.exe)**
+2. Doppelklicken. Fertig.
 
-1. installiert die GitHub CLI, falls sie fehlt (Windows fragt nach Erlaubnis → **Ja**),
-2. meldet einmal bei GitHub an (das Projekt ist privat; Code im Browser eingeben),
-3. lädt die neueste Spielhalle und prüft sie,
-4. installiert bzw. aktualisiert sie und startet sie.
+Die Spielhalle richtet sich selbst ein, mit Symbol auf dem Desktop und im Startmenü, und öffnet sich in einem eigenen Fenster.
+Ab dann geht alles von selbst: Neue Spiele und Verbesserungen holt sie sich direkt von GitHub, beim Start und alle 10 Minuten. Die App selbst aktualisiert sich auch.
 
-Danach aktualisiert sich die Spielhalle von selbst, beim Start und während des Spielens. Die Datei kann man jederzeit nochmal starten, z. B. auf einem neuen PC.
-
-> Windows meldet vielleicht „Der Computer wurde durch Windows geschützt“, weil das Setup nicht signiert ist.
+> Windows meldet vielleicht „Der Computer wurde durch Windows geschützt“, weil die Datei nicht signiert ist.
 > Dann auf **Weitere Informationen → Trotzdem ausführen** klicken.
 
-Deinstallieren geht über *Einstellungen → Apps → Spielhalle*.
+- **F11**: Vollbild an/aus
+- Entfernen: *Einstellungen → Apps → Spielhalle → Deinstallieren*
 
 ## Neues Spiel hinzufügen
 
 1. Eine HTML-Datei in den Ordner `spiele/` legen, z. B. `spiele/reaktion.html`.
-   Als Vorlage: [`vorlagen/neues-spiel.html`](vorlagen/neues-spiel.html), ein fertiges kleines Spiel zum Abschauen.
+   Als Vorlage dient [`vorlagen/neues-spiel.html`](vorlagen/neues-spiel.html), ein fertiges kleines Spiel zum Abschauen.
 2. Auf `main` bringen. Mehr nicht.
 
-GitHub baut dann automatisch eine neue Version, alle installierten Spielhallen holen sie sich selbst, und das Spiel steht in der Liste: mit Cover, „Neu“-Abzeichen und einem Knopf „← Spielhalle“ zum Zurückgehen.
-Name, Beschreibung, Kategorie, Emoji und Farbe fürs Cover kommen aus ein paar `<meta name="spielhalle-…">`-Zeilen im Spiel (siehe Vorlage), ohne sie aus dem `<title>`.
+Spätestens nach 10 Minuten (oder beim nächsten Start) steht das Spiel in jeder Spielhalle, mit Cover und „Neu“-Abzeichen.
+Name, Beschreibung, Kategorie, Emoji und Farbe fürs Cover kommen aus ein paar `<meta name="spielhalle-…">`-Zeilen im Spiel.
 
 Am einfachsten sagt man Claude einfach: *„Mach für die Spielhalle ein Spiel, bei dem …“*
 
-## Für Entwickler
+## Aufbau
 
 | Ordner / Datei | Inhalt |
 |---|---|
-| `Launcher.html`, `spiele/` | die Spielhalle selbst (HTML/JS) |
-| `spiele/shared/catalog*.js` | Spiele mit selbst gezeichnetem Cover (freiwillig, sonst erzeugt die App eins) |
-| `vorlagen/neues-spiel.html` | Vorlage für neue Spiele |
-| `installer/Spielhalle.cs` | App: eigenes Fenster, lokaler Server (Port 8777), Online-Updates |
-| `installer/Setup.cs` | Installations-Assistent und Deinstaller |
-| `installer/build.ps1` | baut App und Setup mit Windows-Bordmitteln |
-| `installer/veroeffentlichen.ps1` | neue Version als GitHub-Release veröffentlichen |
+| `Launcher.html` | die Startseite mit allen Spielen |
+| `spiele/` | die Spiele (jede HTML-Datei ist ein Spiel) |
+| `spiele/shared/` | gemeinsame Bibliothek (`hub.js`) und gezeichnete Cover (`catalog*.js`) |
+| `app/` | die Windows-App `Spielhalle.exe` (C#) und ihr Build-Skript |
+| `vorlagen/` | Vorlage für neue Spiele |
 
-Neue Version veröffentlichen: passiert automatisch. Jede Änderung an `Launcher.html`, `spiele/` oder `installer/`, die in `main` landet, baut GitHub Actions auf Windows und veröffentlicht sie als neue Version (letzte Version + 1). Die installierten Spielhallen holen sich das Update dann selbst.
-
-- Neuigkeiten fürs Update: in `installer/neu.txt` schreiben, sonst werden die Commit-Titel genommen.
-- Größerer Versionssprung (z. B. 1.1.0): Nummer in `installer/version.txt` eintragen.
-- Von Hand vom eigenen PC geht weiterhin: `.\installer\veroeffentlichen.ps1 -Notiz "Neu: ..."`
+`Launcher.html` und `spiele/` holt die App direkt aus `main`, dafür braucht es keine neue Version.
+Nur Änderungen an `app/` werden zu einer neuen `Spielhalle.exe`: GitHub Actions baut sie, testet sie auf Windows und veröffentlicht sie als Release. Die installierten Apps aktualisieren sich dann selbst.

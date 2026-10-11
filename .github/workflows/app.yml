@@ -1,0 +1,89 @@
+# Baut Spielhalle.exe, testet sie auf Windows (einrichten, Spiele von GitHub laden,
+# eigenes Fenster) und veröffentlicht sie als neues Release, wenn sich die App geändert hat.
+# Spiele und Launcher brauchen kein Release: die App holt sie direkt aus main.
+#
+# Versionsnummer: letzte Version + 1 (z. B. 2.0.3 -> 2.0.4); für einen größeren
+# Sprung die Nummer in app/version.txt eintragen.
+# Auf anderen Branches wird nur gebaut und getestet, nichts veröffentlicht.
+name: App
+on:
+  push:
+    branches: [main, 'claude/**']   # auf anderen Branches wird nur gebaut und getestet
+    paths: ['app/**', 'Launcher.html', 'spiele/**', '.github/workflows/app.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: app
+jobs:
+  app:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Version
+        id: v
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'   # gh/git schreiben Hinweise nach stderr
+          $tag = gh release view --json tagName --jq .tagName 2>$null
+          if ($LASTEXITCODE -or -not $tag) { $tag = '' }
+          $datei = [version]((Get-Content app\version.txt -Raw).Trim())
+          $neu = $datei
+          if ($tag) {
+            $letzte = [version]$tag.TrimStart('v')
+            if ($datei -le $letzte) { $neu = New-Object Version $letzte.Major, $letzte.Minor, ([Math]::Max(0, $letzte.Build) + 1) }
+          }
+          $geaendert = (-not $tag) -or [bool](git diff --name-only $tag HEAD -- app .github/workflows/app.yml)
+          "Version $neu (vorher: $(if ($tag) { $tag } else { 'keine' })), App geändert: $geaendert"
+          Add-Content $env:GITHUB_OUTPUT "version=$neu"
+          Add-Content $env:GITHUB_OUTPUT "release=$(if ($geaendert) { 1 } else { 0 })"
+      - name: Bauen
+        shell: powershell
+        run: .\app\build.ps1 -Version ${{ steps.v.outputs.version }}
+      - name: Testen (einrichten, Spiele laden, eigenes Fenster)
+        shell: powershell
+        env:
+          SPIELHALLE_TEST: '1'
+          SPIELHALLE_GITHUB_TOKEN: ${{ github.token }}
+          SPIELHALLE_ZWEIG: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $d = "$env:RUNNER_TEMP\spielhalle"
+          $env:SPIELHALLE_ORDNER = $d
+          Start-Process app\dist\Spielhalle.exe
+          $log = "$d\protokoll.txt"
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep 2
+            if ((Test-Path $log) -and (Select-String -Path $log -Pattern 'Fenster offen|Startfehler|Eigenes Fenster ging nicht|Absturz' -Quiet)) { break }
+          }
+          Start-Sleep 4
+          Get-Content $log -ErrorAction SilentlyContinue
+          $status = Invoke-RestMethod http://localhost:8777/__status -TimeoutSec 10
+          $status | ConvertTo-Json
+          $antwort = Invoke-RestMethod http://localhost:8777/__spiele -TimeoutSec 10
+          $spiele = @($antwort)
+          "Spiele: $($spiele.Count)"
+          $launcher = (Invoke-WebRequest http://localhost:8777/Launcher.html -UseBasicParsing -TimeoutSec 10).Content
+          $zeigen = (Invoke-WebRequest http://localhost:8777/__zeigen -UseBasicParsing -TimeoutSec 10).Content
+          $wv = @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like "*$d*" }).Count
+          "Fenster: $zeigen, WebView2-Prozesse: $wv"
+          try { Invoke-WebRequest http://localhost:8777/__beenden -UseBasicParsing -TimeoutSec 5 | Out-Null } catch {}
+          if (-not (Test-Path "$d\Spielhalle.exe")) { throw 'Nicht eingerichtet' }
+          if ($status.stand -ne '${{ github.sha }}'.Substring(0, 7)) { throw 'Spiele nicht vom richtigen Stand geladen' }
+          if ($spiele.Count -lt 40) { throw 'Spieleliste unvollständig' }
+          if ($launcher -notmatch 'id="spielhalle-launcher"') { throw 'Neuer Launcher nicht geladen' }
+          if (-not (Select-String -Path $log -Pattern 'Fenster offen' -Quiet) -or $zeigen -ne 'ok' -or $wv -lt 1) { throw 'Eigenes Fenster läuft nicht' }
+          'Test bestanden.'
+      - name: Veröffentlichen
+        if: github.ref == 'refs/heads/main' && steps.v.outputs.release == '1'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $v = '${{ steps.v.outputs.version }}'
+          gh release create "v$v" app\dist\Spielhalle.exe app\dist\Spielhalle.exe.sha256 --target "$env:GITHUB_SHA" --title "Spielhalle $v" --notes "Neue Version der Spielhalle-App. Herunterladen: Spielhalle.exe" --latest
+          if ($LASTEXITCODE) { throw 'Veröffentlichen fehlgeschlagen' }
+          "Veröffentlicht: Spielhalle $v"

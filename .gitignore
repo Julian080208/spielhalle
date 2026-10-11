@@ -1,7 +1,6 @@
 # Claude-Einstellungen und Build-Ergebnisse gehören nicht ins Repo
 .claude/
-installer/dist/
+app/dist/
+app/webview2-*.zip
 *.exe
-*.old.exe
 _*.html
-installer/webview2-*.zip
