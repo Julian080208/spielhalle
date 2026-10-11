@@ -11,7 +11,7 @@
   aus den <meta name="spielhalle-…">-Angaben im Spiel selbst.
 -->
 <style>
-  :root { --bg:#0c0d14; --panel:#151724; --line:#262a3d; --text:#f2f3fa; --muted:#9499b3; --accent:#7c6cff; --accent2:#c45cff; }
+  :root { --bg:#0c0d14; --panel:#151724; --line:#262a3d; --text:#f2f3fa; --muted:#9499b3; --accent:#7c6cff; --accent-2:#c45cff; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:'Segoe UI', system-ui, sans-serif; }
   body { overflow-y:auto; background:radial-gradient(1200px 600px at 10% -10%, rgba(124,108,255,.18), transparent 60%),
@@ -21,7 +21,7 @@
            background:linear-gradient(var(--bg) 70%, transparent); }
   .logo { display:flex; align-items:center; gap:12px; font-size:26px; font-weight:800; letter-spacing:.5px; white-space:nowrap; }
   .logo i { width:46px; height:46px; border-radius:14px; display:grid; place-items:center; font-style:normal; font-size:22px;
-            background:linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow:0 6px 20px rgba(124,108,255,.45); }
+            background:linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow:0 6px 20px rgba(124,108,255,.45); }
   .search { flex:1; max-width:560px; display:flex; align-items:center; gap:10px; height:50px; padding:0 18px; border-radius:999px;
             background:var(--panel); border:1px solid var(--line); }
   .search:focus-within { border-color:var(--accent); }
@@ -29,7 +29,7 @@
   .btn { height:50px; padding:0 20px; border-radius:999px; border:1px solid var(--line); background:var(--panel); font-weight:700; font-size:15px;
          display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
   .btn:hover, .btn:focus-visible { border-color:var(--accent); outline:0; }
-  .btn.primary { background:linear-gradient(135deg, var(--accent), var(--accent2)); border:0; }
+  .btn.primary { background:linear-gradient(135deg, var(--accent), var(--accent-2)); border:0; }
   .btn.sm { height:38px; padding:0 14px; font-size:14px; }
   .clock { margin-left:auto; text-align:right; font-weight:800; font-size:24px; white-space:nowrap; }
   .clock small { display:block; font-size:13px; font-weight:500; color:var(--muted); }
@@ -74,6 +74,31 @@
   .prow .av { width:44px; height:44px; border-radius:50%; border:0; font-size:22px; background:var(--pc); }
   .prow .col { width:30px; height:30px; border-radius:50%; border:2px solid #fff3; background:var(--pc); }
   .drow { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  /* Einstellungen */
+  html.tv body { zoom:var(--tvz, 1.3); }
+  #set { width:min(820px, 94vw); max-height:88vh; padding:0; }
+  #set .top { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:12px; padding:20px 24px; background:var(--panel); border-bottom:1px solid var(--line); }
+  #set .top h3 { margin:0; flex:1; }
+  #set .body { padding:6px 24px 24px; }
+  #set h4 { margin:22px 0 6px; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .srow { display:flex; align-items:center; gap:16px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .srow:last-child { border-bottom:0; }
+  .srow label { flex:1; font-weight:600; font-size:16px; }
+  .srow label small { display:block; font-weight:400; font-size:13px; color:var(--muted); margin-top:2px; }
+  .srow input[type=text] { width:240px; height:42px; padding:0 14px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; font-size:16px; }
+  .srow input[type=range] { width:220px; accent-color:var(--accent); }
+  .srow .val { width:60px; white-space:nowrap; text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .sw { width:30px; height:30px; border-radius:50%; border:3px solid transparent; padding:0; }
+  .sw.on { border-color:var(--text); }
+  .tog { width:54px; height:30px; border-radius:999px; border:0; background:var(--line); position:relative; flex:none; transition:background .15s; }
+  .tog::after { content:''; position:absolute; left:4px; top:4px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .15s; }
+  .tog.on { background:var(--accent); }
+  .tog.on::after { left:28px; }
+  .seg { display:flex; gap:4px; padding:4px; border-radius:999px; background:var(--bg); border:1px solid var(--line); }
+  .seg button { height:32px; padding:0 12px; border-radius:999px; border:0; background:none; color:var(--muted); font-weight:600; font-size:13px; }
+  .seg button.on { background:var(--text); color:var(--bg); }
+  .btn.danger { color:#ff8a95; border-color:#5a2630; }
+  @media (max-width:760px) { .srow { flex-wrap:wrap; } .srow input[type=text], .srow input[type=range] { width:100%; } }
   @media (max-width:760px) { .banner span { display:none; } header { flex-wrap:wrap; padding:14px 16px; } .clock { display:none; } main { padding:0 16px 30px; } }
 </style>
 </head>
@@ -83,6 +108,7 @@
   <label class="search"><span>🔍</span><input id="q" type="search" placeholder="Spiel suchen …" autocomplete="off"></label>
   <button class="btn" id="zufall" title="Ein zufälliges Spiel starten">🎲 Zufall</button>
   <button class="btn" id="voll" title="Vollbild (F11)">⛶</button>
+  <button class="btn" id="setBtn" title="Einstellungen">⚙️ Einstellungen</button>
   <div class="clock"><span id="uhr"></span><small id="datum"></small></div>
 </header>
 <main>
@@ -104,6 +130,42 @@
     <span class="hint" id="fHinweis"></span>
   </footer>
 </main>
+
+<dialog id="set">
+  <div class="top"><h3>⚙️ Einstellungen</h3><button class="btn sm primary" id="setOk">Fertig</button></div>
+  <div class="body">
+    <h4>Profil</h4>
+    <div class="srow"><label>Dein Name<small>Wird in den Spielen angezeigt</small></label><input type="text" id="sName" maxlength="20"></div>
+    <div class="srow"><label>Farbe<small>Für Knöpfe und Leuchteffekte</small></label><div id="sFarben" style="display:flex;gap:8px"></div></div>
+
+    <h4>Ton</h4>
+    <div class="srow"><label>Gesamtlautstärke</label><input type="range" id="sMaster" min="0" max="100"><span class="val" id="vMaster"></span></div>
+    <div class="srow"><label>Effekte</label><input type="range" id="sSfx" min="0" max="100"><span class="val" id="vSfx"></span></div>
+    <div class="srow"><label>Musik</label><input type="range" id="sMusic" min="0" max="100"><span class="val" id="vMusic"></span></div>
+
+    <h4>Anzeige</h4>
+    <div class="srow"><label>Fernseher-Modus<small>Größere Schrift und Knöpfe, damit man vom Sofa aus alles lesen kann</small></label>
+      <div class="seg" id="sTvGroesse"></div><button class="tog" id="sTv"></button></div>
+    <div class="srow"><label>Bewegungen reduzieren<small>Weniger Animationen in den Spielen</small></label><button class="tog" id="sRuhig"></button></div>
+
+    <div id="sAppTeil" hidden>
+      <h4>App</h4>
+      <div class="srow"><label>Beim Start im Vollbild<small>Die Spielhalle füllt gleich den ganzen Bildschirm (F11 schaltet um)</small></label><button class="tog" id="sVollbild"></button></div>
+      <div class="srow"><label>Mit Windows starten<small>Die Spielhalle geht automatisch auf, wenn der PC hochfährt</small></label><button class="tog" id="sAutostart"></button></div>
+    </div>
+
+    <div id="sUpdTeil" hidden>
+      <h4>Updates</h4>
+      <div class="srow"><label>Spielhalle-Version<small id="sVersion"></small></label></div>
+      <div class="srow"><label>Spiele<small id="sStand"></small></label><button class="btn sm" id="sSuchen">🔄 Nach neuen Spielen suchen</button></div>
+    </div>
+
+    <h4>Spielstände</h4>
+    <div class="srow"><label>Sichern<small>Alle Spielstände, Rekorde, Chips und Einstellungen in eine Datei speichern</small></label><button class="btn sm" id="sExport">⬇️ Sichern</button></div>
+    <div class="srow"><label>Wiederherstellen<small>Eine gesicherte Datei laden (überschreibt den jetzigen Stand)</small></label><button class="btn sm" id="sImport">⬆️ Laden</button><input type="file" id="sImportFile" accept=".json" hidden></div>
+    <div class="srow"><label>Alles zurücksetzen<small>Löscht alle Spielstände – endgültig</small></label><button class="btn sm danger" id="sReset">🗑️ Löschen</button></div>
+  </div>
+</dialog>
 
 <dialog id="dlg">
   <h3>Wer spielt mit?</h3>
@@ -283,6 +345,78 @@ if (APP){
   $('suchen').hidden = true;
   $('fHinweis').textContent = 'Tipp: Mit Spielhalle.exe startest du die Spielhalle als App – mit automatisch neuen Spielen.';
 }
+
+// ---------------------------------------------------------------- Einstellungen
+// Spiel-Einstellungen liegen in hub.js (gelten für alle Spiele), App-Einstellungen in der App selbst
+let appSet = null;
+function applyTv(){ if (window.Hub) Hub.applyTV(); }
+function renderSettings(){
+  if (!window.Hub) return;
+  const S = Hub.settings, P = Hub.party.data;
+  $('sName').value = S.name || '';
+  $('sName').oninput = e => { S.name = e.target.value.trim() || 'Spieler'; Hub.saveSettings(); };
+  $('sFarben').innerHTML = Object.entries(Hub.ACCENTS).map(([k, v]) => `<button class="sw ${S.accent === k ? 'on' : ''}" data-k="${k}" style="background:${v[0]}" title="${k}"></button>`).join('');
+  $('sFarben').querySelectorAll('.sw').forEach(b => b.onclick = () => { S.accent = b.dataset.k; Hub.saveSettings(); renderSettings(); });
+  [['sMaster', 'vMaster', 'master'], ['sSfx', 'vSfx', 'sfx'], ['sMusic', 'vMusic', 'music']].forEach(([i, v, k]) => {
+    $(i).value = Math.round((S[k] == null ? 1 : S[k]) * 100); $(v).textContent = $(i).value + ' %';
+    $(i).oninput = e => { S[k] = e.target.value / 100; $(v).textContent = e.target.value + ' %'; Hub.saveSettings(); };
+    $(i).onchange = () => { try { Hub.sfx('click'); } catch(e){} };
+  });
+  $('sTv').classList.toggle('on', !!P.tv);
+  $('sTv').onclick = () => { P.tv = !P.tv; Hub.party.save(); applyTv(); renderSettings(); };
+  $('sTvGroesse').innerHTML = [[1.15, 'Etwas größer'], [1.3, 'Groß'], [1.5, 'Riesig']].map(([v, l]) => `<button data-v="${v}" class="${P.tv && P.tvScale == v ? 'on' : ''}">${l}</button>`).join('');
+  $('sTvGroesse').querySelectorAll('button').forEach(b => b.onclick = () => { P.tvScale = +b.dataset.v; P.tv = true; Hub.party.save(); applyTv(); renderSettings(); });
+  $('sRuhig').classList.toggle('on', !!S.reduceMotion);
+  $('sRuhig').onclick = () => { S.reduceMotion = !S.reduceMotion; Hub.saveSettings(); renderSettings(); };
+  // App
+  $('sAppTeil').hidden = !appSet;
+  if (appSet){
+    $('sVollbild').classList.toggle('on', !!appSet.vollbild);
+    $('sAutostart').classList.toggle('on', !!appSet.autostart);
+    const setApp = (k, on) => fetch(`/__einstellungen?${k}=${on ? 1 : 0}`, {method:'POST'}).then(r => r.json()).then(j => { appSet = j; renderSettings(); }).catch(() => {});
+    $('sVollbild').onclick = () => setApp('vollbild', !appSet.vollbild);
+    $('sAutostart').onclick = () => setApp('autostart', !appSet.autostart);
+  }
+}
+async function openSettings(){
+  if (APP){
+    try { const r = await fetch('/__einstellungen', {cache:'no-store'}); appSet = r.ok ? await r.json() : null; } catch(e){ appSet = null; }
+    $('sUpdTeil').hidden = false;
+    status().then(s => {
+      $('sVersion').textContent = 'Version ' + s.version + (s.appUpdate ? ` – Version ${s.appUpdate} wird beim nächsten Start eingesetzt` : ' – aktuell');
+      $('sStand').textContent = (s.datum ? 'Stand vom ' + s.datum : '') + (s.hinweis ? ' · ' + s.hinweis : '');
+    }).catch(() => {});
+  }
+  renderSettings();
+  $('set').showModal();
+}
+$('setBtn').onclick = openSettings;
+$('setOk').onclick = () => $('set').close();
+$('set').onclose = () => { renderPlayers(); renderGrid(); };
+$('sSuchen').onclick = () => { $('suchen').click(); $('set').close(); };
+$('sExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(Hub.exportAll(), null, 1)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'Spielhalle-Spielstaende-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+};
+$('sImport').onclick = () => $('sImportFile').click();
+$('sImportFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try { Hub.importAll(JSON.parse(r.result)); alert('Spielstände geladen.'); location.reload(); }
+    catch(err){ alert('Diese Datei ist keine Spielhallen-Sicherung.'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+};
+$('sReset').onclick = () => {
+  if (!confirm('Wirklich ALLE Spielstände, Rekorde, Chips und Einstellungen löschen?')) return;
+  try { localStorage.clear(); } catch(e){}
+  location.reload();
+};
+if (!window.Hub) $('setBtn').hidden = true;
 
 renderPlayers();
 loadGames();

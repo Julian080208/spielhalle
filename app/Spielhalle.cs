@@ -286,11 +286,47 @@ static class App
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Spielhalle.lnk") })
             try { File.Delete(l); } catch { }
         try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false); } catch { }
+        try { using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) k.DeleteValue("Spielhalle", false); } catch { }
         // der Ordner mit dieser Datei wird kurz nach dem Beenden gelöscht
         var psi = new ProcessStartInfo("cmd.exe", "/c timeout /t 3 /nobreak >nul & rd /s /q \"" + Home + "\"");
         psi.WindowStyle = ProcessWindowStyle.Hidden; psi.CreateNoWindow = true;
         Process.Start(psi);
         MessageBox.Show("Die Spielhalle wurde entfernt.", "Spielhalle", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    // ================================================================ Einstellungen der App
+    // einstellungen.txt im App-Ordner (Zeilen "name=wert"); Autostart über den Run-Schlüssel von Windows
+    const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    public static bool Setting(string name)
+    {
+        try
+        {
+            foreach (string l in File.ReadAllLines(Path.Combine(Home, "einstellungen.txt")))
+                if (l.Trim() == name + "=1") return true;
+        }
+        catch { }
+        return false;
+    }
+    static void SetSetting(string name, bool on)
+    {
+        var lines = new List<string>();
+        try { foreach (string l in File.ReadAllLines(Path.Combine(Home, "einstellungen.txt"))) if (!l.StartsWith(name + "=")) lines.Add(l); } catch { }
+        lines.Add(name + "=" + (on ? 1 : 0));
+        File.WriteAllLines(Path.Combine(Home, "einstellungen.txt"), lines.ToArray());
+    }
+    static bool Autostart()
+    {
+        try { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k != null && k.GetValue("Spielhalle") != null; } catch { return false; }
+    }
+    static void SetAutostart(bool on)
+    {
+        if (Test) return;
+        using (var k = Registry.CurrentUser.CreateSubKey(RunKey))
+            if (on) k.SetValue("Spielhalle", "\"" + Exe + "\""); else k.DeleteValue("Spielhalle", false);
+    }
+    static object Settings()
+    {
+        return new Dictionary<string, object> { { "vollbild", Setting("vollbild") }, { "autostart", Autostart() } };
     }
 
     // ================================================================ GitHub
@@ -636,6 +672,15 @@ static class App
                     Text(ctx, "ok", "text/plain");
                     new Thread(delegate () { Thread.Sleep(300); Environment.Exit(0); }).Start();
                     return;
+                case "__einstellungen":
+                    if (post)
+                    {
+                        string v = ctx.Request.QueryString["vollbild"], a = ctx.Request.QueryString["autostart"];
+                        if (v != null) SetSetting("vollbild", v == "1");
+                        if (a != null) SetAutostart(a == "1");
+                    }
+                    Json(ctx, Settings());
+                    return;
                 case "__yt": YouTube(ctx); return;
             }
             if (path == "") path = "Launcher.html";
@@ -767,6 +812,7 @@ class AppWindow : Form
                     "addEventListener('keydown',function(e){if(e.key==='F11'){e.preventDefault();window.chrome.webview.postMessage('vollbild');}},true);" +
                     "window.spielhalleVollbild=function(){window.chrome.webview.postMessage('vollbild');};");
                 c.Navigate(start);
+                if (App.Setting("vollbild")) { fullWindow = true; ApplyFull(); }
                 App.Log("Fenster offen (WebView2 " + env.BrowserVersionString + ")");
             }
             catch (Exception ex) { Error = ex; Close(); }

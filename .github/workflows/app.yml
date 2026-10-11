@@ -77,8 +77,11 @@ jobs:
           $zeigen = (Invoke-WebRequest http://localhost:8777/__zeigen -UseBasicParsing -TimeoutSec 10).Content
           $wv = @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like "*$d*" }).Count
           "Fenster: $zeigen, WebView2-Prozesse: $wv"
+          $einst = Invoke-RestMethod -Method Post 'http://localhost:8777/__einstellungen?vollbild=1' -TimeoutSec 10
+          "Einstellungen: $($einst | ConvertTo-Json -Compress)"
           try { Invoke-WebRequest http://localhost:8777/__beenden -UseBasicParsing -TimeoutSec 5 | Out-Null } catch {}
           if (-not (Test-Path "$d\Spielhalle.exe")) { throw 'Nicht eingerichtet' }
+          if (-not $einst.vollbild -or -not (Select-String -Path "$d\einstellungen.txt" -Pattern 'vollbild=1' -Quiet)) { throw 'Einstellung wurde nicht gespeichert' }
           if (-not $altP.HasExited) { throw 'Alter Helfer wurde nicht beendet' }
           if ($status.stand -ne '${{ github.sha }}'.Substring(0, 7)) { throw 'Spiele nicht vom richtigen Stand geladen' }
           if ($spiele.Count -lt 40) { throw 'Spieleliste unvollständig' }
