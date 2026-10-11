@@ -112,6 +112,35 @@
   }
   const logoLeben = () => logoWrap([[0, '#8fd0ff'], [1, '#6ab85a']], `<circle cx="32" cy="32" r="20" fill="#fff" stroke="#1b2028" stroke-width="3"/><path d="M32 32 L32 14" stroke="#e8343a" stroke-width="4"/><circle cx="32" cy="32" r="4" fill="#1b2028"/><text x="32" y="54" text-anchor="middle" font-size="12" font-family="Segoe UI Emoji">🚗</text>`);
 
+  // ---------- Roulette ----------
+  const ROU = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+  const ROU_RED = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+  function rouWheel(cx, cy, r, rot){
+    let s = `<g transform="translate(${cx} ${cy}) rotate(${rot})"><circle r="${r * 1.12}" fill="#5a3214"/><circle r="${r * 1.04}" fill="#2a1608"/>`;
+    ROU.forEach((n, i) => {
+      const a0 = (i * 360 / 37 - 90 - 360 / 74) * Math.PI / 180, a1 = a0 + 2 * Math.PI / 37;
+      const p = (a, rr) => `${(Math.cos(a) * rr).toFixed(1)} ${(Math.sin(a) * rr).toFixed(1)}`;
+      s += `<path d="M0 0 L${p(a0, r)} A${r} ${r} 0 0 1 ${p(a1, r)} Z" fill="${n === 0 ? '#13874a' : ROU_RED.includes(n) ? '#c81d30' : '#15161b'}" stroke="#d9b36a" stroke-width="1"/>`;
+    });
+    return s + `<circle r="${r * .74}" fill="#6b4220"/><circle r="${r * .72}" fill="url(#rouCone)"/>
+      <path d="M0 ${-r * .5} L${r * .05} 0 L0 ${r * .5} L${-r * .05} 0Z M${-r * .5} 0 L0 ${r * .05} L${r * .5} 0 L0 ${-r * .05}Z" fill="#f5d77a"/><circle r="${r * .1}" fill="#fff3c4"/></g>`;
+  }
+  function coverRoulette(){
+    const u = uid();
+    return wrap(u, rg(u + 'bg', [[0, '#1a6b44'], [1, '#04140c']], '35%', '40%', '80%') +
+      `<radialGradient id="rouCone"><stop offset="0" stop-color="#c8955a"/><stop offset="1" stop-color="#4a2a10"/></radialGradient>` +
+      rg(u + 'gl', [[0, '#ffd76a', .45], [1, '#ffd76a', 0]]),
+      `<rect width="${W}" height="${H}" fill="url(#${u}bg)"/>
+      <circle cx="430" cy="185" r="210" fill="url(#${u}gl)"/>
+      ${rouWheel(430, 185, 150, 8)}
+      <circle cx="430" cy="52" r="10" fill="#fff" stroke="#bbb" stroke-width="2"/>
+      <g font-family="Bahnschrift" font-weight="800">
+        <text x="40" y="160" font-size="64" fill="#fff" style="paint-order:stroke" stroke="#0b3d24" stroke-width="10">ROULETTE</text>
+        <text x="44" y="200" font-size="20" fill="#ffd76a" letter-spacing="4">RIEN NE VA PLUS</text></g>
+      ${[[80, 290, '#d32f3a', '50'], [140, 300, '#2f6bff', '10'], [200, 286, '#d89a12', '1K']].map(([x, y, c, t]) => `<g transform="translate(${x} ${y})"><ellipse rx="34" ry="12" cy="10" fill="#000" opacity=".35"/><circle r="30" fill="${c}" stroke="#fff" stroke-width="5" stroke-dasharray="10 8"/><text y="7" text-anchor="middle" font-size="18" fill="#fff">${t}</text></g>`).join('')}`);
+  }
+  const logoRoulette = () => logoWrap([[0, '#1a6b44'], [1, '#0b3d24']], `<radialGradient id="rouCone"><stop offset="0" stop-color="#c8955a"/><stop offset="1" stop-color="#4a2a10"/></radialGradient>${rouWheel(32, 32, 22, 0)}`);
+
   const E = [
     [{id:'blackjack', file:'spiele/blackjack.html', title:'Blackjack', tagline:'Komm der 21 so nah wie möglich.', genres:['Casino', 'Karten'], accent:'#2fbf71', isNew:true,
       desc:'Blackjack am grünen Tisch: Karte ziehen, stehen, verdoppeln und teilen gegen die Bank. Blackjack zahlt 3 zu 2. Gespielt wird mit Spielgeld-Chips aus deinem Spielhallen-Konto.',
@@ -128,6 +157,9 @@
     [{id:'poker', file:'spiele/poker.html', title:'Poker', tagline:'Texas Hold’em gegen vier Profis.', genres:['Casino', 'Karten'], accent:'#c45cff', isNew:true,
       desc:'Texas Hold’em am Fünfertisch gegen Computer-Gegner mit eigenem Spielstil – vom vorsichtigen Rentner bis zum wilden Bluffer. Mit Side-Pots, All-in und Showdown. Nur Spielgeld.',
       controls:[['F / C / R', 'Passen / Mitgehen / Erhöhen'], ['Schieberegler', 'Einsatzhöhe']]}, coverPoker, logoPoker],
+    [{id:'roulette', file:'spiele/roulette.html', title:'Roulette', tagline:'Rien ne va plus – setz auf deine Glückszahl.', genres:['Casino', 'Party'], accent:'#13874a', isNew:true, featured:true,
+      desc:'Europäisches Roulette mit echtem Kessel und Spieltisch: Zahlen, Dutzende, Kolonnen, Rot/Schwarz, Gerade/Ungerade. Allein mit deinen Spielhallen-Chips oder als Partyrunde, in der jeder mit seiner Farbe setzt. Nur Spielgeld.',
+      controls:[['Klick', 'Chip setzen'], ['Rechtsklick', 'Chip wegnehmen'], ['Leertaste', 'Drehen']]}, coverRoulette, logoRoulette],
     [{id:'immo', file:'spiele/immobilien.html', title:'Immobilienkönig', tagline:'Kaufen. Bauen. Kassieren.', genres:['Brettspiel', 'Familie', 'Wirtschaft'], accent:'#e8343a', isNew:true, featured:true,
       desc:'Das große Grundstücks-Brettspiel auf einem 3D-Spielbrett: drei Editionen (Klassik, Deutschland, Weltreise), 2–6 Spieler (Mensch oder KI in drei Stärken), Versteigerungen, echter Handel, Häuser & Hotels, Hypotheken, Hausregeln wie Frei-Parken-Topf und eine Vermögensstatistik am Ende.',
       controls:[['Klick auf Feld', 'Details'], ['Buttons', 'Würfeln, Bauen, Handeln']]}, coverImmo, logoImmo],

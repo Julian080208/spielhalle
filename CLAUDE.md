@@ -10,3 +10,5 @@ Spiele-App für einen Partyraum (Windows, Fernseher). Alles auf Deutsch: Texte, 
 - Änderungen an `app/` werden über `.github/workflows/app.yml` gebaut, auf Windows getestet und als Release veröffentlicht.
 - Die App wird mit dem csc aus .NET Framework 4 gebaut (C# 5): keine neueren Sprachfeatures
   wie `$"..."`, `?.` oder `=>`-Methoden verwenden.
+- Pull Requests: selbst anlegen und selbst mergen, sobald der Windows-Test (`App`-Workflow) auf dem Branch grün ist –
+  so gewünscht vom Besitzer. Danach prüfen, dass das Release (bei Änderungen an `app/`) veröffentlicht wurde.
