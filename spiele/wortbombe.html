@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wortbombe</title>
+<meta name="spielhalle-beschreibung" content="Tick, tack … Wort rufen, weitergeben – bevor die Bombe platzt!">
+<meta name="spielhalle-text" content="Auf der Bombe steht eine Silbe oder ein Thema. Wer sie hat, ruft laut ein passendes Wort und gibt sie weiter. Die Zündschnur ist geheim – wer die Bombe beim Knall hält, verliert ein Leben. Der Letzte gewinnt. Für 3 bis 10 Leute.">
+<meta name="spielhalle-genre" content="Party, Wörter">
+<meta name="spielhalle-symbol" content="💣">
+<meta name="spielhalle-farbe" content="#ff6a1f">
+<meta name="spielhalle-steuerung" content="Leertaste/Enter = Weiter; Rücktaste = Zurück; P = Pause">
+<link rel="stylesheet" href="shared/hub.css">
+<style>
+  html, body { height:100%; }
+  body { --accent:#ff6a1f; --accent-2:#ffa057; --accent-rgb:255,106,31; --fire:#ff6a1f; --spark:#ffd23f;
+         display:flex; flex-direction:column; overflow:hidden; user-select:none;
+         background:radial-gradient(1200px 760px at 50% 52%, #3d1709 0%, #1d0a06 46%, #0a0505 100%); }
+  #app { position:relative; flex:1; min-height:0; }
+  .screen { position:absolute; inset:0; display:none; }
+  .screen.on { display:flex; }
+  .emo, .av { font-family:"Segoe UI Emoji","Noto Color Emoji",sans-serif; }
+  kbd { font-size:14px; padding:2px 7px; }
+
+  /* ------------------------------------------------------------ Lobby */
+  #lobby { flex-direction:column; align-items:center; gap:clamp(8px, 1.6vh, 18px); overflow:auto; padding:clamp(10px, 2vh, 24px) 24px 0; }
+  .lb-head { display:flex; align-items:center; gap:18px; animation:lbIn .6s var(--ease); }
+  .lb-head .mini { width:clamp(64px, 10vh, 110px); height:clamp(64px, 10vh, 110px); animation:wob 1.6s ease-in-out infinite; }
+  .lb-head .mini .spark { animation:spark .12s linear infinite alternate; }
+  .lb-title { margin:0; font:800 clamp(46px, 9vh, 104px)/1 var(--font-display); letter-spacing:3px;
+              background:linear-gradient(180deg, #fff4c9 0%, #ffc04a 45%, #ff5a1f 100%); -webkit-background-clip:text; background-clip:text; color:transparent;
+              filter:drop-shadow(0 5px 22px rgba(255,90,31,.45)); }
+  .lb-sub { margin:0; max-width:1120px; text-align:center; font-size:clamp(20px, 2.6vh, 24px); line-height:1.4; color:var(--text-2); }
+  .lb-sub b { color:#ffc27a; }
+  .lb-cols { display:grid; grid-template-columns:minmax(0, .9fr) minmax(0, 1.1fr); gap:22px; width:min(1500px, 100%); }
+  .card { background:rgba(24,11,8,.62); border:1px solid rgba(255,140,80,.2); border-radius:24px; padding:16px 20px 18px; box-shadow:0 20px 50px rgba(0,0,0,.35); min-width:0; }
+  .card h3 { margin:0 0 12px; font:800 18px var(--font); letter-spacing:2px; text-transform:uppercase; color:#ffb27a; }
+  .pchips { display:flex; flex-wrap:wrap; gap:10px; }
+  .pchip { position:relative; display:flex; align-items:center; gap:10px; height:60px; padding:0 16px 0 7px; border-radius:999px; border:3px solid var(--pc);
+           background:color-mix(in srgb, var(--pc) 26%, rgba(0,0,0,.3)); color:#fff; font:700 22px var(--font); cursor:pointer; transition:transform .15s, opacity .2s, filter .2s; }
+  .pchip:hover { transform:translateY(-2px); }
+  .pchip .av { width:44px; height:44px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:26px; box-shadow:inset 0 -3px 0 rgba(0,0,0,.25); }
+  .pchip kbd { margin-left:2px; }
+  .pchip .rm { display:grid; place-items:center; width:28px; height:28px; margin-left:2px; border-radius:50%; background:rgba(0,0,0,.4); font-size:20px; line-height:1; }
+  .pchip .rm:hover { background:var(--bad); }
+  .pchips.many { gap:8px; }
+  .pchips.many .pchip { height:50px; font-size:20px; padding-right:12px; gap:8px; }
+  .pchips.many .pchip .av { width:38px; height:38px; font-size:22px; }
+  .pchip.off { opacity:.4; border-style:dashed; background:transparent; filter:grayscale(.85); }
+  .pchip.off .nm { text-decoration:line-through; }
+  .pchip .gst { font-size:13px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,.7); }
+  .guest { display:flex; gap:10px; margin-top:14px; }
+  .guest .h-input { flex:1; min-width:0; height:54px; font-size:21px; border-radius:14px; background:rgba(0,0,0,.35); }
+  .guest .h-btn { height:54px; font-size:20px; }
+  .hint { margin:12px 2px 0; font-size:20px; line-height:1.4; color:var(--text-2); }
+  .hint.warn { color:#ffcf5a; font-weight:700; }
+  #sets { display:grid; grid-template-columns:max-content minmax(0, 1fr); align-items:center; gap:10px 16px; }
+  .set-row { display:contents; }
+  .set-row > label { font-size:20px; font-weight:700; color:var(--text-2); white-space:nowrap; }
+  .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg button { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:52px; padding:4px 15px; border-radius:13px;
+                border:2px solid rgba(255,255,255,.12); background:rgba(255,255,255,.045); color:var(--text); font:700 20px/1.1 var(--font); cursor:pointer; transition:.15s; }
+  .seg button small { font-size:15px; font-weight:600; opacity:.75; margin-top:2px; }
+  .seg button:hover:not(:disabled) { border-color:rgba(255,160,90,.6); }
+  .seg button.on { background:linear-gradient(180deg, #ffa057, #ff5a1f); border-color:transparent; color:#fff; box-shadow:0 5px 18px rgba(255,90,31,.38); }
+  .seg button:disabled { opacity:.3; cursor:not-allowed; }
+  .lb-foot { position:sticky; bottom:0; z-index:5; width:calc(100% + 48px); margin:0 -24px; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px 28px;
+             padding:12px 24px 16px; background:linear-gradient(0deg, rgba(16,7,5,.96) 55%, rgba(16,7,5,0)); }
+  .startbtn { display:flex; align-items:center; gap:16px; height:clamp(70px, 10vh, 92px); padding:0 56px; border:0; border-radius:999px; cursor:pointer;
+              font:800 clamp(30px, 4.6vh, 40px) var(--font-display); letter-spacing:1px; color:#fff;
+              background:linear-gradient(180deg, #ffb35c, #ff5a1f 55%, #d93a0c); box-shadow:0 8px 0 #8a2405, 0 18px 50px rgba(255,90,31,.5);
+              transition:transform .12s, filter .2s; }
+  .startbtn:hover { filter:brightness(1.08); transform:translateY(-2px); }
+  .startbtn:active { transform:translateY(4px); box-shadow:0 4px 0 #8a2405, 0 10px 30px rgba(255,90,31,.4); }
+  .startbtn.dim { filter:grayscale(.75) brightness(.7); }
+  .startbtn kbd { font-size:16px; }
+  .keys { font-size:20px; color:var(--muted); text-align:center; }
+
+  /* ------------------------------------------------------------ Spiel */
+  #game { flex-direction:column; }
+  #stage { position:relative; flex:1; min-height:0; --k:1; }
+  #stage::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity 1.2s;
+                   background:radial-gradient(ellipse at center, transparent 45%, rgba(255,40,10,.32) 100%); }
+  #stage[data-ph="2"]::before { opacity:.55; }
+  #stage[data-ph="3"]::before { opacity:1; animation:vig .32s ease-in-out infinite alternate; }
+  .seat { position:absolute; left:50%; top:50%; z-index:3; width:180px; display:flex; flex-direction:column; align-items:center; gap:5px;
+          transform:translate(-50%, -50%) scale(calc(var(--k) * var(--ss, 1))); transition:transform .35s var(--ease), opacity .4s, filter .4s; }
+  .seat .av { position:relative; width:80px; height:80px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:46px;
+              border:4px solid rgba(255,255,255,.16); box-shadow:inset 0 -6px 0 rgba(0,0,0,.25), 0 8px 20px rgba(0,0,0,.5); transition:box-shadow .3s, border-color .3s; }
+  .seat .nm { max-width:180px; padding:3px 14px; border-radius:999px; background:rgba(0,0,0,.5); font:700 23px var(--font); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:.3s; }
+  .seat .hearts { display:flex; gap:3px; }
+  .hearts svg { width:26px; height:26px; fill:#ff4d6a; filter:drop-shadow(0 0 5px rgba(255,77,106,.55)); }
+  .hearts svg.off { fill:#3b2a31; filter:none; }
+  .hearts svg.brk { animation:brk 1.1s ease forwards; }
+  .seat.cur { --ss:1.22; z-index:4; }
+  .seat.cur .av { border-color:#fff; box-shadow:0 0 0 6px var(--pc), 0 0 46px 10px var(--pc), inset 0 -6px 0 rgba(0,0,0,.25); }
+  .seat.cur .av::before { content:'💣'; position:absolute; right:-20px; top:-16px; font-size:36px; animation:bob .45s ease-in-out infinite alternate; filter:drop-shadow(0 3px 4px rgba(0,0,0,.6)); }
+  .seat.cur .nm { background:var(--pc); color:var(--ink); }
+  .seat.ready .av::before { content:'👉'; }
+  .seat.out { opacity:.42; filter:grayscale(1); }
+  .seat.out .av::after { content:'💀'; position:absolute; inset:0; display:grid; place-items:center; font-size:46px; background:rgba(0,0,0,.55); border-radius:50%; }
+  .seat.hit { animation:hit .6s ease; }
+  .seat.pop { animation:spop .35s var(--ease); }
+
+  #arrow { position:absolute; left:50%; top:50%; z-index:1; height:30px; margin-top:-15px; transform-origin:0 50%; pointer-events:none; opacity:0;
+           transition:transform .38s cubic-bezier(.3,1.3,.5,1), width .38s var(--ease), opacity .3s; }
+  #arrow.on { opacity:1; }
+  #arrow::before { content:''; position:absolute; left:0; right:30px; top:10px; height:10px; border-radius:6px;
+                   background:linear-gradient(90deg, rgba(255,255,255,0) 30%, var(--pc)); box-shadow:0 0 22px var(--pc); }
+  #arrow::after { content:''; position:absolute; right:0; top:0; width:40px; height:30px; background:var(--pc);
+                  clip-path:polygon(0 0, 100% 50%, 0 100%, 24% 50%); filter:drop-shadow(0 0 10px var(--pc)); }
+
+  #bomb { position:absolute; left:50%; top:50%; z-index:2; width:300px; height:300px; transform:translate(-50%, -50%); }
+  #bomb .shk { position:absolute; inset:0; transition:transform .45s var(--ease), opacity .3s; }
+  #bomb.gone .shk { transform:scale(.25); opacity:0; }
+  #bomb.enter .shk { animation:benter .6s cubic-bezier(.2,1.5,.4,1); }
+  #bomb[data-ph="1"] .shk { animation:wob 1.2s ease-in-out infinite; }
+  #bomb[data-ph="2"] .shk { animation:wob .6s ease-in-out infinite; }
+  #bomb[data-ph="3"] .shk { animation:jit .12s linear infinite; }
+  .bomb-svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; filter:drop-shadow(0 22px 34px rgba(0,0,0,.6)); }
+  .bomb-svg .hot { opacity:0; transition:opacity 1.6s; }
+  #bomb[data-ph="2"] .hot { opacity:.38; }
+  #bomb[data-ph="3"] .hot { opacity:.8; }
+  .bomb-svg .spark { transform-box:fill-box; transform-origin:center; opacity:0; transition:opacity .2s; }
+  #bomb.lit .spark { opacity:1; animation:spark .11s linear infinite alternate; }
+  /* width:max-content – sonst begrenzt die Bombenbreite den Themen-Kasten und lange Themen brechen Wort für Wort um */
+  #prompt { position:absolute; left:45.8%; top:57%; width:max-content; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:2px; pointer-events:none; text-align:center; }
+  #plabel { font:800 22px var(--font); letter-spacing:3px; text-transform:uppercase; color:#ffb27a; text-shadow:0 2px 6px #000; white-space:nowrap; }
+  #ptext { font:900 100px/1 var(--font-display); color:#fff; letter-spacing:2px; white-space:nowrap;
+           -webkit-text-stroke:3px rgba(0,0,0,.65); paint-order:stroke fill; text-shadow:0 4px 0 rgba(0,0,0,.55), 0 0 26px rgba(255,170,90,.55); }
+  #ptext i { font-style:normal; color:#ffb27a; opacity:.8; letter-spacing:-.06em; font-size:.42em; vertical-align:.4em; margin:0 .04em; -webkit-text-stroke:2px rgba(0,0,0,.5); }
+  #ptext.q { color:#ffcf8a; }
+  #ptext.theme { white-space:normal; overflow-wrap:normal; font:800 52px/1.08 var(--font-display); letter-spacing:.5px; max-width:640px; padding:.28em .48em .32em; border-radius:22px;
+                 -webkit-text-stroke:0; background:rgba(26,10,6,.9); border:3px solid #ff6a1f; box-shadow:0 0 0 6px rgba(255,106,31,.18), 0 18px 40px rgba(0,0,0,.6); text-shadow:none; }
+  #prompt.pop #ptext { animation:ppop .45s cubic-bezier(.2,1.6,.4,1); }
+  #stage.veil #prompt { filter:blur(22px); opacity:.5; }
+  #kaboom { position:absolute; left:50%; top:50%; z-index:5; width:420px; height:420px; transform:translate(-50%, -50%) scale(0); opacity:0; pointer-events:none; overflow:visible; }
+  #kaboom.go { animation:kab 1.5s cubic-bezier(.2,1.4,.4,1) forwards; }
+
+  #ctrl { display:grid; grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr); align-items:center; gap:18px; padding:10px 24px 16px;
+          background:linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0)); }
+  .turn { display:flex; align-items:center; gap:16px; min-width:0; }
+  .turn .av { flex:none; width:78px; height:78px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:48px;
+              box-shadow:0 0 0 4px rgba(255,255,255,.2), 0 0 34px var(--pc); }
+  .turn small { display:block; font-size:20px; font-weight:700; color:var(--text-2); }
+  .turn b { display:block; padding:12px 24px; margin:-12px -24px; font:800 clamp(34px, 4.4vw, 56px)/1.05 var(--font-display); color:var(--pc); text-shadow:0 0 26px color-mix(in srgb, var(--pc) 60%, transparent);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .turn.swap { animation:tswap .35s var(--ease); }
+  .big { display:inline-flex; align-items:center; justify-content:center; gap:16px; height:clamp(78px, 11vh, 100px); min-width:min(380px, 80vw); padding:0 44px;
+         border:0; border-radius:999px; cursor:pointer; font:800 clamp(30px, 4.4vh, 40px) var(--font-display); letter-spacing:.5px;
+         background:var(--pc, #ff6a1f); color:var(--ink, #fff); position:relative; overflow:hidden;
+         box-shadow:0 8px 0 rgba(0,0,0,.4), 0 0 46px color-mix(in srgb, var(--pc, #ff6a1f) 55%, transparent), inset 0 2px 0 rgba(255,255,255,.35);
+         transition:transform .1s, filter .15s, background .3s; }
+  .big:hover:not(:disabled) { filter:brightness(1.1); }
+  .big:active:not(:disabled) { transform:translateY(4px); }
+  .big:disabled { filter:grayscale(.8) brightness(.6); cursor:default; }
+  .big kbd { font-size:16px; color:#222; background:rgba(255,255,255,.85); border-color:rgba(0,0,0,.2); }
+  .big .arr { display:inline-block; animation:nudge .8s ease-in-out infinite; }
+  .big.lock::after { content:''; position:absolute; left:0; bottom:0; height:6px; width:100%; background:rgba(255,255,255,.75); transform-origin:left; animation:lockbar var(--lt, 1.3s) linear forwards; }
+  .side { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+  .side .h-btn { height:62px; padding:0 22px; font-size:21px; border-radius:16px; background:rgba(255,255,255,.07); }
+  .side .h-btn kbd { font-size:14px; }
+
+  /* ------------------------------------------------------------ Overlays */
+  .ov { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(10,3,2,.74); backdrop-filter:blur(6px);
+        opacity:0; pointer-events:none; transition:opacity .25s; }
+  .ov.on { opacity:1; pointer-events:auto; }
+  .ov-box { width:min(760px, 100%); max-height:96%; overflow:auto; text-align:center; padding:26px 34px 30px; border-radius:32px;
+            background:linear-gradient(180deg, #2c140c, #140806); border:2px solid rgba(255,120,60,.38);
+            box-shadow:0 30px 90px rgba(0,0,0,.7), 0 0 90px rgba(255,90,31,.2); transform:scale(.88); transition:transform .4s cubic-bezier(.2,1.4,.4,1); }
+  .ov.on .ov-box { transform:none; }
+  .ov-tag { font:800 18px var(--font); letter-spacing:4px; color:var(--spark); }
+  .ov-box h2 { margin:6px 0 8px; font:800 46px/1.1 var(--font-display); }
+  .ov-box p { margin:8px 0; font-size:22px; line-height:1.45; color:var(--text-2); }
+  .ov-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
+  .ov-row .h-btn { height:58px; padding:0 24px; font-size:20px; border-radius:16px; }
+  .bm-word { font:900 clamp(80px, 13vh, 140px)/1 var(--font-display); letter-spacing:6px; color:var(--spark); -webkit-text-stroke:4px #b8300c; paint-order:stroke fill;
+             text-shadow:0 8px 0 #6e1804, 0 0 60px rgba(255,120,30,.85); animation:bmIn .55s cubic-bezier(.2,1.7,.4,1); }
+  .bm-p { display:flex; align-items:center; justify-content:center; gap:22px; margin:16px 0 6px; max-width:100%; }
+  .bm-p > div { min-width:0; }
+  .av.xl { width:110px; height:110px; flex:none; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:66px;
+           box-shadow:0 0 0 6px rgba(255,255,255,.14), 0 0 50px var(--pc), inset 0 -6px 0 rgba(0,0,0,.25); }
+  .bm-p b { display:block; font:800 clamp(44px, 7vh, 64px)/1 var(--font-display); color:var(--pc); text-shadow:0 0 30px color-mix(in srgb, var(--pc) 55%, transparent); text-align:left;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px 6px 0; }
+  .bm-p span.t { display:block; font-size:28px; font-weight:700; text-align:left; margin-top:6px; }
+  .bm-p.out span.t { color:#ff8a95; }
+  .bm-hearts { display:flex; justify-content:center; gap:8px; margin:8px 0 6px; }
+  .bm-hearts svg { width:48px; height:48px; }
+  .bm-info { font-size:21px; color:var(--text-2); margin:10px 0 0; line-height:1.5; }
+  .bm-info b { color:#fff; }
+
+  /* ------------------------------------------------------------ Ende */
+  #end { overflow:auto; padding:20px 28px 28px; }
+  .end-grid { display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, .9fr); gap:30px; width:min(1500px, 100%); margin:auto; align-items:center; }
+  .end-l { text-align:center; }
+  .end-title { margin:6px 0 4px; font:800 clamp(34px, min(5.4vw, 8vh), 74px)/1.05 var(--font-display); overflow-wrap:anywhere; }
+  .end-title span { color:var(--pc, var(--spark)); text-shadow:0 0 34px color-mix(in srgb, var(--pc, #ffd23f) 55%, transparent); }
+  .end-sub { font-size:22px; color:var(--text-2); margin:0 0 6px; }
+  .podium { display:flex; align-items:flex-end; justify-content:center; gap:14px; margin:64px 0 6px; }
+  .pp { display:flex; flex-direction:column; align-items:center; gap:8px; width:clamp(130px, 13vw, 200px); animation:ppIn .7s var(--ease) backwards; }
+  .pp .av { width:92px; height:92px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:54px; box-shadow:0 0 0 5px rgba(255,255,255,.14), 0 0 40px var(--pc); position:relative; }
+  .pp.r1 .av { width:124px; height:124px; font-size:76px; }
+  .pp.r1 .av::before { content:'👑'; position:absolute; top:-46px; font-size:50px; animation:bob 1s ease-in-out infinite alternate; }
+  .pp b { font:800 26px var(--font-display); color:var(--pc); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pp .blk { width:100%; border-radius:16px 16px 0 0; background:linear-gradient(180deg, var(--pc), rgba(0,0,0,.25)); display:flex; justify-content:center; padding-top:10px;
+             font:900 46px var(--font-display); color:rgba(255,255,255,.92); text-shadow:0 3px 0 rgba(0,0,0,.3); }
+  .pp.r1 .blk { height:150px; } .pp.r2 .blk { height:108px; } .pp.r3 .blk { height:78px; }
+  .rank { display:flex; flex-direction:column; gap:8px; }
+  .rank h3 { margin:0 0 4px; font:800 18px var(--font); letter-spacing:2px; text-transform:uppercase; color:#ffb27a; }
+  .rk { display:grid; grid-template-columns:42px 54px minmax(0, 1fr) auto; align-items:center; gap:12px; padding:7px 16px 7px 12px; border-radius:16px;
+        background:rgba(255,255,255,.055); border-left:6px solid var(--pc); font-size:22px; animation:rkIn .5s var(--ease) backwards; }
+  .rk .n { font:800 26px var(--font-display); color:var(--muted); text-align:center; }
+  .rk .av { width:48px; height:48px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:28px; }
+  .rk .who { min-width:0; display:flex; flex-direction:column; line-height:1.2; }
+  .rk .who b { font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rk .who small { font-size:18px; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rk .st { display:flex; align-items:center; justify-content:flex-end; font-size:19px; color:var(--text-2); white-space:nowrap; }
+  .rk .hearts svg { width:22px; height:22px; }
+  .rk.w { background:color-mix(in srgb, var(--pc) 20%, rgba(255,255,255,.04)); }
+  .end-btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
+  .end-btns .h-btn { height:62px; padding:0 26px; font-size:21px; border-radius:16px; }
+
+  /* Anleitung (Hub-Dialog) – größer, damit sie vom Sofa lesbar ist */
+  /* (im Fernseher-Modus vergrößert hub.css den Dialog selbst per zoom – dann nur breiter machen) */
+  .h-dialog:has(.wb-help) { width:min(860px, 100%); }
+  html.tv .h-dialog:has(.wb-help) { width:min(760px, calc((100vw - 40px) / var(--tvz, 1.3))); }
+  html:not(.tv) .h-dialog:has(.wb-help) h2 { font-size:32px; }
+  html:not(.tv) .wb-help p { font-size:20px; line-height:1.5; margin:0 0 12px; }
+  html:not(.tv) .wb-help kbd { font-size:15px; }
+  html:not(.tv) .h-dialog:has(.wb-help) .h-btn { height:54px; padding:0 30px; font-size:20px; }
+  html.tv .wb-help p { margin:0 0 10px; }
+
+  #flash { position:fixed; inset:0; z-index:55; pointer-events:none; opacity:0;
+           background:radial-gradient(circle at var(--fx, 50%) var(--fy, 50%), #fff 0%, #ffe9a8 22%, #ff8a2a 52%, rgba(255,60,10,.6) 100%); }
+  #flash.go { animation:flash .9s ease-out; }
+  #fx { position:fixed; inset:0; z-index:58; width:100%; height:100%; pointer-events:none; }
+  #app.shake { animation:shake .7s cubic-bezier(.36,.07,.19,.97); }
+
+  @keyframes lbIn { from { transform:translateY(-14px); opacity:0; } }
+  @keyframes wob { 0%, 100% { transform:rotate(-2.5deg); } 50% { transform:rotate(2.5deg); } }
+  @keyframes jit { 0% { transform:translate(2px, -1px) rotate(1.5deg); } 25% { transform:translate(-3px, 2px) rotate(-2deg); } 50% { transform:translate(2px, 2px) rotate(1deg); } 75% { transform:translate(-2px, -2px) rotate(-1deg); } 100% { transform:translate(3px, 1px) rotate(2deg); } }
+  @keyframes spark { from { transform:scale(.8) rotate(0deg); } to { transform:scale(1.18) rotate(24deg); } }
+  @keyframes benter { from { transform:scale(.2) rotate(-25deg); opacity:0; } }
+  @keyframes ppop { from { transform:scale(.25); opacity:0; } }
+  @keyframes kab { 0% { transform:translate(-50%, -50%) scale(.1) rotate(-20deg); opacity:1; } 25% { transform:translate(-50%, -50%) scale(1.15) rotate(4deg); opacity:1; }
+                   70% { transform:translate(-50%, -50%) scale(1) rotate(0deg); opacity:1; } 100% { transform:translate(-50%, -50%) scale(1.4); opacity:0; } }
+  @keyframes vig { from { opacity:.6; } to { opacity:1; } }
+  @keyframes bob { from { transform:translateY(0) rotate(-8deg); } to { transform:translateY(-6px) rotate(8deg); } }
+  @keyframes hit { 0%, 100% { transform:translate(-50%, -50%) scale(calc(var(--k) * 1.22)); } 20% { transform:translate(calc(-50% - 10px), -50%) scale(calc(var(--k) * 1.3)); }
+                   40% { transform:translate(calc(-50% + 10px), -50%) scale(calc(var(--k) * 1.3)); } 60% { transform:translate(calc(-50% - 6px), -50%) scale(calc(var(--k) * 1.25)); } }
+  @keyframes spop { 50% { transform:translate(-50%, -50%) scale(calc(var(--k) * 1.4)); } }
+  @keyframes brk { 0% { transform:scale(1); fill:#ff4d6a; } 30% { transform:scale(1.5) rotate(-12deg); fill:#fff; } 100% { transform:scale(1); fill:#3b2a31; filter:none; } }
+  @keyframes tswap { from { transform:translateX(-24px); opacity:0; } }
+  @keyframes nudge { 50% { transform:translateX(7px); } }
+  @keyframes lockbar { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+  @keyframes bmIn { from { transform:scale(.2) rotate(-12deg); opacity:0; } }
+  @keyframes flash { 0% { opacity:1; } 100% { opacity:0; } }
+  @keyframes shake { 10%, 90% { transform:translate(-3px, 2px); } 20%, 80% { transform:translate(6px, -4px); } 30%, 50%, 70% { transform:translate(-10px, 6px); } 40%, 60% { transform:translate(10px, -6px); } }
+  @keyframes ppIn { from { transform:translateY(60px); opacity:0; } }
+  @keyframes rkIn { from { transform:translateX(30px); opacity:0; } }
+
+  @media (max-width:1050px) {
+    .lb-cols, .end-grid { grid-template-columns:1fr; }
+    #ctrl { grid-template-columns:1fr auto; }
+    #ctrl .side { grid-column:1 / -1; justify-content:center; }
+  }
+  @media (max-width:700px) {
+    #ctrl { grid-template-columns:1fr; justify-items:center; }
+    #sets { grid-template-columns:1fr; gap:6px; }
+    .set-row > label { margin-top:6px; }
+    .startbtn { padding:0 30px; }
+  }
+  @media (max-width:1400px) {
+    .seg button { padding-left:11px; padding-right:11px; font-size:19px; }
+  }
+  @media (max-height:800px) {
+    .podium { margin-top:50px; }
+    .pp .av { width:72px; height:72px; font-size:42px; }
+    .pp.r1 .av { width:96px; height:96px; font-size:58px; }
+    .pp.r1 .av::before { top:-40px; font-size:42px; }
+    .pp.r1 .blk { height:100px; } .pp.r2 .blk { height:72px; } .pp.r3 .blk { height:52px; }
+    .pp .blk { font-size:36px; padding-top:6px; }
+    .end-btns { margin-top:14px; }
+    .end-btns .h-btn { height:54px; }
+    .rk { padding-top:5px; padding-bottom:5px; }
+    .rk .av { width:42px; height:42px; font-size:24px; }
+    #end { padding:12px 24px 16px; }
+    .seg button { min-height:46px; padding-top:3px; padding-bottom:3px; }
+    .pchip { height:54px; }
+    #sets { row-gap:7px; }
+    .card { padding:12px 18px 14px; }
+  }
+  @media (max-height:900px) {
+    .rank.many { gap:5px; }
+    .rank.many .rk { padding:3px 14px 3px 10px; gap:10px; }
+    .rank.many .rk .av { width:38px; height:38px; font-size:22px; }
+    .rank.many .rk .n { font-size:22px; }
+    .rank.many .rk .who b { font-size:20px; }
+    .rank.many .rk .who small { font-size:16px; }
+  }
+  @media (max-height:760px) {
+    .podium { margin-top:46px; }
+    .pp .av { width:62px; height:62px; font-size:36px; }
+    .pp.r1 .av { width:84px; height:84px; font-size:50px; }
+    .pp.r1 .av::before { top:-38px; font-size:38px; }
+    .pp.r1 .blk { height:76px; } .pp.r2 .blk { height:56px; } .pp.r3 .blk { height:40px; }
+    .pp .blk { font-size:30px; padding-top:4px; }
+    .pp b { font-size:23px; }
+  }
+</style>
+</head>
+<body>
+<script src="shared/hub.js"></script>
+<script src="shared/catalog.js"></script>
+<script src="shared/catalog2.js"></script>
+<script src="shared/catalog3.js"></script>
+<script src="shared/catalog4.js"></script>
+<script src="shared/catalog5.js"></script>
+
+<div id="app">
+  <!-- Lobby -->
+  <section id="lobby" class="screen on">
+    <div class="lb-head"><div class="mini" id="miniBomb"></div><h1 class="lb-title">WORTBOMBE</h1></div>
+    <p class="lb-sub">Auf der Bombe steht eine Silbe oder ein Thema. Ruf laut ein passendes Wort und gib schnell weiter –
+      wer die Bombe hält, wenn sie <b>explodiert</b>, verliert ein Leben. Wann es knallt, weiß niemand.</p>
+    <div class="lb-cols">
+      <div class="card">
+        <h3>Wer spielt mit?</h3>
+        <div class="pchips" id="chips"></div>
+        <form class="guest" id="guestForm" autocomplete="off">
+          <input class="h-input" id="guestName" maxlength="14" placeholder="+ Gast – Name eintippen">
+          <button class="h-btn lg" type="submit">+ Gast</button>
+        </form>
+        <p class="hint" id="pHint"></p>
+      </div>
+      <div class="card">
+        <h3>Einstellungen</h3>
+        <div id="sets"></div>
+      </div>
+    </div>
+    <div class="lb-foot">
+      <button class="startbtn" id="startBtn"><span class="emo">💣</span> Los geht’s! <kbd>Enter</kbd></button>
+      <div class="keys" id="lobbyKeys"></div>
+    </div>
+  </section>
+
+  <!-- Spiel -->
+  <section id="game" class="screen">
+    <div id="stage">
+      <div id="arrow"></div>
+      <div id="bomb"><div class="shk"><div id="bombSvg"></div><div id="prompt"><small id="plabel"></small><div id="ptext"></div></div></div></div>
+      <svg id="kaboom" viewBox="-110 -110 220 220" aria-hidden="true"></svg>
+    </div>
+    <div id="ctrl">
+      <div class="turn" id="turn"></div>
+      <button class="big" id="mainBtn"></button>
+      <div class="side">
+        <button class="h-btn" id="undoBtn" title="Aus Versehen weitergegeben? Zurück zum vorherigen Spieler">↶ Zurück <kbd>⌫</kbd></button>
+        <button class="h-btn" id="pauseBtn" title="Zündschnur anhalten">❚❚ Pause <kbd>P</kbd></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Siegerehrung -->
+  <section id="end" class="screen"></section>
+</div>
+
+<div class="ov" id="boomOv"><div class="ov-box" id="boomBox"></div></div>
+<div class="ov" id="pauseOv"><div class="ov-box">
+  <div class="ov-tag">PAUSE</div>
+  <h2>Die Bombe wartet …</h2>
+  <p>Die Zündschnur ist angehalten. Die Silbe bleibt verdeckt, bis es weitergeht.</p>
+  <div class="ov-row"><button class="big" id="resumeBtn">▶ Weiter <kbd>Enter</kbd></button></div>
+  <div class="ov-row">
+    <button class="h-btn" id="pLobby">⚙ Zurück zur Lobby</button>
+    <button class="h-btn" id="pFinish">🏆 Spiel beenden &amp; Siegerehrung</button>
+  </div>
+</div></div>
+<div id="flash"></div>
+<canvas id="fx"></canvas>
+
+<script>
+'use strict';
+// =====================================================================
+//  Wortbombe – Partyspiel für 3–10 Leute an einer Tastatur
+// =====================================================================
+const ID = 'wortbombe';
+Hub.init(ID);
+const bar = Hub.bar({id:ID, title:'Wortbombe', stats:[['runde', 'Runde'], ['dabei', 'Im Spiel'], ['pass', 'Weitergaben']], actions:['help', 'sound', 'full']});
+bar.on('help', () => showHelp());
+function showHelp(){
+  if (state === 'burning' || state === 'ready') pauseGame();
+  Hub.dialog({title:'Wortbombe – so geht’s', buttons:[{label:'Verstanden <kbd>Enter</kbd>', primary:true}], html:`<div class="wb-help">
+    <p>Auf der Bombe steht eine <b>Silbe</b> (z. B. <b>SCH</b>) oder ein <b>Thema</b> (z. B. „Nenne ein Tier“). Wer die Bombe hat, ruft laut ein passendes Wort –
+      etwa <i>Tisch, Schule, Waschbär</i> – und gibt dann mit <kbd>Leertaste</kbd> oder <kbd>Enter</kbd> an den Nächsten im Kreis weiter.</p>
+    <p>Die Zündschnur ist jedes Mal unterschiedlich lang. Gegen Ende tickt die Bombe schneller – aber wann genau es knallt, weiß niemand.
+      Wer die Bombe beim Knall hält, verliert ein Leben. Ohne Leben ist man raus – der Letzte gewinnt.</p>
+    <p><b>Am Sofa gilt:</b> Kein Wort doppelt pro Runde, keine erfundenen Wörter. Die Runde entscheidet, ob ein Wort zählt – erst dann weitergeben.
+      Aus Versehen weitergegeben? <kbd>⌫</kbd> = Zurück (die Zündschnur brennt trotzdem weiter).</p>
+    <p><b>Silbe am Anfang/Ende:</b> Dann muss das Wort mit der Silbe beginnen bzw. enden.</p>
+    <p><b>Tasten:</b> <kbd>Leertaste</kbd>/<kbd>Enter</kbd> Zünden &amp; Weiter · <kbd>⌫</kbd> Zurück · <kbd>P</kbd> Pause · <kbd>H</kbd> diese Hilfe</p></div>`});
+}
+
+const $ = s => document.querySelector(s);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'})[c]);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const reduced = () => document.documentElement.classList.contains('reduce-motion');
+// Schriftfarbe passend zur Spielerfarbe (dunkel auf hellen Farben)
+function ink(hex){
+  const n = parseInt(String(hex).slice(1), 16);
+  const c = [n >> 16 & 255, n >> 8 & 255, n & 255].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
+  return .2126 * c[0] + .7152 * c[1] + .0722 * c[2] > .3 ? '#1a0f0c' : '#fff';
+}
+// Großbuchstaben, aber „ß“ bleibt ein Buchstabe
+const up = w => w.split('ß').map(s => s.toUpperCase()).join('ẞ');
+const HEART = 'M12 21s-7.5-4.6-9.6-9.3A5.4 5.4 0 0 1 12 5.9a5.4 5.4 0 0 1 9.6 5.8C19.5 16.4 12 21 12 21z';
+
+// =====================================================================
+//  Inhalte
+//  Silben: "silbe:flags" – a = passt an den Wortanfang, e = passt ans Wortende.
+//  „Irgendwo im Wort“ geht immer.
+// =====================================================================
+const SILBEN_ROH = {
+  leicht:`ei:ae au:ae an:ae en:ae er:ae in:ae el:ae ar:ae or:ae sch:ae st:ae ch:ae ma:ae pa:ae la:a ra:ae na:a ka:ae ba:a ta:a mo:a ho:a
+    bu:a ku:a wa:a su:a fa:ae mi:ae li:ae ti:ae ro:ae lo:ae ri:a be:ae ge:ae le:ae ke:ae te:ae re:ae ne:ae de:ae se:ae ie:e eu:ae ach:ae ich:e
+    eck:ae ock:e ack:e uch:e ein:ae ing:ae ell:ae eis:ae ung:e ball:ae haus:ae tag:ae mann:ae baum:ae see:ae tisch:ae buch:ae zeit:ae land:ae
+    licht:ae hand:ae kopf:ae feuer:ae wasser:ae sonne:ae spiel:ae bär:ae maus:ae hund:ae tier:ae brot:ae rad:ae auto:ae bett:ae stuhl:ae tür:ae
+    fuß:ae schuh:ae berg:ae`,
+  mittel:`aus:ae ig:ae ent:ae ver:ae ber:ae ter:ae ster:ae ast:ae ost:ae ist:e ust:e and:e ind:e und:e end:ae ank:e ink:e olz:e alt:ae orn:e
+    arm:ae eld:e uhr:ae gel:ae ker:ae ger:ae mer:e ner:e ler:e sel:ae lich:e keit:e heit:e schaft:e chen:e tung:e rung:e ion:e pf:ae tz:e ck:e
+    ss:e ll:e mm:e nn:e tt:e kl:a br:a fl:a gr:a tr:a dr:a bl:a pl:a kr:a gl:a sp:a schw:a rot:ae gras:ae stein:ae garten:ae fisch:ae vogel:ae
+    ring:ae stadt:ae zug:ae post:ae nacht:ae milch:ae kind:ae`,
+  schwer:`x:e y:ae qu:a ph:a chs:e tsch:ae rk:e lf:e mpf:e nz:e rz:e ff:e äu ö:a ü:a ä:a ß:e pfl:a spr:a str:a schl:a schm:a schn:a zw:a
+    kn:a ps:e ks:e chts:e ng:e nk:e rn:e rm:e lm:e ld:e ieb:e iel:e oo:e aa:ae ee:e oh:ae uh:ae ex:ae ix:e ox:e chr:a nis:e tum:e ling:e
+    bar:ae los:ae voll:ae ik:e ühl:e ott:ae ipp:e upp erz:ae orf:e irn:e urst:e anz:e ief:e eiß:e äh ah:a`,
+};
+const SILBEN = {};
+for (const d in SILBEN_ROH) SILBEN[d] = SILBEN_ROH[d].trim().split(/\s+/).map(t => { const [w, f = ''] = t.split(':'); return {w, a:f.includes('a'), e:f.includes('e')}; });
+
+// Themen – werden als „Nenne …“ angezeigt
+const THEMEN = {
+  leicht:['ein Tier', 'etwas zum Essen', 'ein Obst', 'ein Gemüse', 'etwas in der Küche', 'ein Kleidungsstück', 'einen Körperteil', 'einen Beruf',
+    'ein Spielzeug', 'etwas im Badezimmer', 'ein Fahrzeug', 'einen Vornamen', 'ein Land', 'eine Stadt', 'etwas Rundes', 'etwas Rotes', 'etwas Kaltes',
+    'ein Möbelstück', 'etwas im Schulranzen', 'eine Süßigkeit', 'etwas am Strand', 'eine Sportart', 'etwas im Garten', 'etwas, das fliegt',
+    'etwas im Kühlschrank', 'etwas im Kinderzimmer'],
+  mittel:['ein Musikinstrument', 'ein Werkzeug', 'etwas aus Holz', 'etwas Weiches', 'etwas, das Lärm macht', 'eine Märchenfigur', 'etwas im Weltraum',
+    'ein Tier im Zoo', 'ein Gewürz', 'ein Insekt', 'etwas aus Metall', 'ein Tier im Wasser', 'etwas mit Rädern', 'ein Hobby', 'etwas im Büro',
+    'etwas auf dem Bauernhof', 'eine Pizza-Zutat', 'etwas für den Urlaubskoffer', 'ein Brett- oder Kartenspiel', 'etwas Gelbes',
+    'etwas, das man öffnen kann', 'ein Wort zum Wetter', 'etwas mit Knöpfen', 'etwas im Auto', 'einen Baum oder eine Pflanze',
+    'etwas für den Winter', 'ein Gericht zum Mittagessen', 'etwas Elektrisches'],
+  schwer:['einen Fluss oder See', 'eine Hauptstadt', 'einen Berg oder ein Gebirge', 'einen Vogel', 'einen Fisch', 'eine berühmte Person', 'einen Kinofilm',
+    'einen Liedtitel', 'eine Automarke', 'einen Kuchen oder ein Gebäck', 'eine Käsesorte', 'einen Tanz', 'einen Planeten oder ein Sternbild',
+    'einen Dinosaurier', 'ein Teil vom Fahrrad', 'eine Blume', 'eine Zeichentrickfigur', 'ein Videospiel', 'ein Gericht aus einem anderen Land',
+    'etwas Durchsichtiges', 'etwas, das man sammeln kann', 'ein Tier mit mehr als vier Beinen', 'ein englisches Wort', 'einen Reim auf „Haus“',
+    'einen Reim auf „Hand“', 'einen Reim auf „Tag“', 'einen Superhelden', 'ein Fantasiewesen', 'ein Wort mit drei Silben', 'ein Wort mit Z'],
+};
+
+// =====================================================================
+//  Einstellungen
+// =====================================================================
+const SKEY = 'wortbombe_v1';
+const cfg = Object.assign({}, Hub.read(SKEY, {}));
+const OPTS = {
+  mode:{label:'Spielart', items:[['silben', '🔤 Silben'], ['themen', '🗂️ Themen'], ['mix', '🎲 Gemischt']]},
+  pos:{label:'Silbe steht', items:[['irgendwo', 'irgendwo'], ['anfang', 'am Anfang'], ['ende', 'am Ende'], ['zufall', 'Zufall']]},
+  diff:{label:'Schwierigkeit', items:[['leicht', 'Leicht'], ['mittel', 'Mittel'], ['schwer', 'Schwer']]},
+  fuse:{label:'Zündschnur', items:[['kurz', 'Kurz', '10–30 s'], ['normal', 'Normal', '15–45 s'], ['lang', 'Lang', '20–60 s']]},
+  lives:{label:'Leben', items:[[1, '1 ♥'], [2, '2 ♥'], [3, '3 ♥'], [5, '5 ♥']]},
+  swap:{label:'Neue Aufgabe', items:[['runde', 'nach jedem Knall'], ['zug', 'bei jedem Zug']]},
+};
+const FUSE = {kurz:[10, 30], normal:[15, 45], lang:[20, 60]};
+const CFG_DEF = {mode:'silben', pos:'irgendwo', diff:'leicht', fuse:'normal', lives:3, swap:'runde'};
+for (const k in CFG_DEF) if (!OPTS[k].items.some(([v]) => String(v) === String(cfg[k]))) cfg[k] = CFG_DEF[k];
+cfg.lives = +cfg.lives;
+const MIN_P = 3, MAX_P = 10;
+const POSTXT = {irgendwo:'irgendwo im Wort', anfang:'am Wortanfang', ende:'am Wortende'};
+
+// =====================================================================
+//  Aufgaben ziehen (gemischter Stapel, keine Wiederholung bis alles dran war)
+// =====================================================================
+const bags = {};
+function draw(key, list){
+  let b = bags[key];
+  if (!b || !b.length){ b = bags[key] = shuffle(list.slice()); }
+  return b.pop();
+}
+function newPrompt(){
+  const theme = cfg.mode === 'themen' || (cfg.mode === 'mix' && Math.random() < .38);
+  if (theme) return {type:'thema', text:draw('t-' + cfg.diff, THEMEN[cfg.diff])};
+  let pos = cfg.pos, list = SILBEN[cfg.diff];
+  if (pos === 'anfang') list = list.filter(s => s.a);
+  if (pos === 'ende') list = list.filter(s => s.e);
+  const s = draw('s-' + cfg.diff + '-' + (pos === 'zufall' ? 'irgendwo' : pos), list);
+  if (pos === 'zufall'){
+    const opts = ['irgendwo', 'irgendwo'];
+    if (s.a) opts.push('anfang'); if (s.e) opts.push('ende');
+    pos = opts[Math.floor(Math.random() * opts.length)];
+  }
+  return {type:'silbe', text:s.w, pos};
+}
+const promptShort = p => p.type === 'thema' ? `Nenne ${esc(p.text)}` :
+  `${p.pos !== 'anfang' ? '…' : ''}${esc(up(p.text))}${p.pos !== 'ende' ? '…' : ''}`;
+
+// =====================================================================
+//  Bombe (SVG)
+// =====================================================================
+function bombSVG(u){
+  return `<svg class="bomb-svg" viewBox="0 0 240 240" aria-hidden="true">
+  <defs>
+    <radialGradient id="${u}b" cx="36%" cy="30%" r="78%"><stop offset="0" stop-color="#7d8397"/><stop offset=".33" stop-color="#2f3341"/><stop offset="1" stop-color="#06070a"/></radialGradient>
+    <radialGradient id="${u}h" cx="50%" cy="58%" r="62%"><stop offset="0" stop-color="#ffb347" stop-opacity=".95"/><stop offset=".55" stop-color="#ff3b12" stop-opacity=".75"/><stop offset="1" stop-color="#7a0a00" stop-opacity="0"/></radialGradient>
+    <linearGradient id="${u}c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a3a9ba"/><stop offset="1" stop-color="#30343f"/></linearGradient>
+    <radialGradient id="${u}s"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#fff2a8"/><stop offset=".55" stop-color="#ff9a1f" stop-opacity=".75"/><stop offset="1" stop-color="#ff4d00" stop-opacity="0"/></radialGradient>
+  </defs>
+  <ellipse cx="112" cy="229" rx="76" ry="9" fill="#000" opacity=".45"/>
+  <circle cx="110" cy="137" r="88" fill="url(#${u}b)"/>
+  <circle class="hot" cx="110" cy="137" r="88" fill="url(#${u}h)"/>
+  <circle cx="110" cy="137" r="87" fill="none" stroke="#fff" stroke-opacity=".09" stroke-width="2"/>
+  <ellipse cx="76" cy="96" rx="30" ry="15" fill="#fff" opacity=".17" transform="rotate(-38 76 96)"/>
+  <ellipse cx="60" cy="122" rx="6" ry="11" fill="#fff" opacity=".07" transform="rotate(-18 60 122)"/>
+  <g transform="rotate(40 170 66)"><rect x="150" y="52" width="40" height="28" rx="6" fill="url(#${u}c)" stroke="#0b0c10" stroke-width="2.5"/><rect x="150" y="60" width="40" height="4" fill="#000" opacity=".25"/></g>
+  <path d="M178 54C192 34 218 42 214 20" fill="none" stroke="#e2c48c" stroke-width="7" stroke-linecap="round"/>
+  <path d="M178 54C192 34 218 42 214 20" fill="none" stroke="#8a6630" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 7"/>
+  <g transform="translate(214 18)"><g class="spark"><circle r="26" fill="url(#${u}s)"/><path d="M0-18V18M-18 0H18M-12-12 12 12M-12 12 12-12" stroke="#fff6c0" stroke-width="2.6" stroke-linecap="round"/><circle r="5" fill="#fff"/></g></g>
+</svg>`;
+}
+$('#miniBomb').innerHTML = bombSVG('mb');
+$('#bombSvg').innerHTML = bombSVG('gb');
+(function kaboom(){
+  let pts = [];
+  for (let i = 0; i < 28; i++){ const a = i / 28 * Math.PI * 2, r = i % 2 ? rnd(52, 62) : rnd(88, 104); pts.push((Math.cos(a) * r).toFixed(1) + ',' + (Math.sin(a) * r).toFixed(1)); }
+  let inner = [];
+  for (let i = 0; i < 22; i++){ const a = i / 22 * Math.PI * 2 + .1, r = i % 2 ? rnd(34, 40) : rnd(56, 66); inner.push((Math.cos(a) * r).toFixed(1) + ',' + (Math.sin(a) * r).toFixed(1)); }
+  $('#kaboom').innerHTML = `<polygon points="${pts.join(' ')}" fill="#ffcf3a" stroke="#ff4d12" stroke-width="7" stroke-linejoin="round"/>
+    <polygon points="${inner.join(' ')}" fill="#fff4b8"/>
+    <text x="0" y="14" text-anchor="middle" font-family="Bahnschrift,Segoe UI,sans-serif" font-weight="900" font-size="42" fill="#c8260a" stroke="#fff4b8" stroke-width="2" paint-order="stroke" transform="rotate(-8)">BUMM!</text>`;
+})();
+
+// =====================================================================
+//  Sound
+// =====================================================================
+let noiseBuf = null;
+function getNoise(a){
+  if (noiseBuf && noiseBuf.sampleRate === a.sampleRate) return noiseBuf;
+  const n = a.sampleRate * 2, b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  return (noiseBuf = b);
+}
+function noise(dur, f1, f2, v, type = 'lowpass', delay = 0){
+  const a = Hub.audio(); if (!a) return;
+  const V = v * Hub.vol(); if (V <= .0001) return;
+  try {
+    const t = a.currentTime + delay, src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = getNoise(a);
+    f.type = type; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(V, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    src.connect(f).connect(g).connect(a.destination); src.start(t); src.stop(t + dur + .05);
+  } catch(e){}
+}
+let hiss = null;
+function hissStart(){
+  hissStop();
+  const a = Hub.audio(); if (!a) return;
+  try {
+    const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = getNoise(a); src.loop = true;
+    f.type = 'bandpass'; f.frequency.value = 3400; f.Q.value = .9; g.gain.value = 0;
+    src.connect(f).connect(g).connect(a.destination); src.start();
+    hiss = {src, g};
+  } catch(e){ hiss = null; }
+}
+function hissSet(level){ if (hiss) try { hiss.g.gain.value = level * Hub.vol(); } catch(e){} }
+function hissStop(){ if (hiss){ try { hiss.src.stop(); } catch(e){} hiss = null; } }
+const snd = {
+  tick(ph, alt){ Hub.tone(alt ? 1500 : 2100, .03, 'square', .02 + ph * .008); Hub.tone(alt ? 700 : 900, .05, 'triangle', .035 + ph * .008); },
+  ignite(){ noise(.6, 1500, 6000, .18, 'bandpass'); Hub.tone(200, .4, 'sawtooth', .03, 0, 900); },
+  pass(){ noise(.16, 1200, 4000, .12, 'bandpass'); Hub.tone(620, .07, 'triangle', .05); Hub.tone(930, .09, 'triangle', .045, .055); },
+  undo(){ Hub.tone(760, .09, 'triangle', .05, 0, 420); Hub.tone(420, .1, 'triangle', .04, .08); },
+  boom(){
+    noise(2.2, 4200, 90, 1.0);
+    noise(.4, 9000, 1800, .4, 'highpass');
+    noise(1.2, 900, 60, .6, 'lowpass', .08);
+    Hub.tone(120, 1, 'sine', .45, 0, 26);
+    Hub.tone(70, 1.3, 'triangle', .35, .03, 22);
+    Hub.tone(260, .5, 'sawtooth', .09, 0, 40);
+  },
+  heart(){ Hub.tone(520, .16, 'triangle', .06, 0, 300); Hub.tone(300, .3, 'triangle', .06, .14, 140); },
+  out(){ [392, 330, 262, 196].forEach((f, i) => Hub.tone(f, .3, 'sawtooth', .04, i * .16)); },
+  round(){ Hub.tone(440, .12, 'triangle', .05); Hub.tone(660, .16, 'triangle', .05, .1); },
+  win(){ [523, 659, 784, 1047, 784, 1047].forEach((f, i) => Hub.tone(f, i > 3 ? .5 : .2, 'triangle', .06, i * .13)); },
+};
+
+// =====================================================================
+//  Effekte: Glut, Explosion, Konfetti (eine Leinwand für alles)
+// =====================================================================
+const fx = $('#fx'), g2 = fx.getContext('2d');
+let parts = [], embers = [], fxW = 0, fxH = 0;
+function fxSize(){
+  const d = Math.min(1.5, window.devicePixelRatio || 1);
+  fxW = innerWidth; fxH = innerHeight;
+  fx.width = Math.round(fxW * d); fx.height = Math.round(fxH * d);
+  g2.setTransform(d, 0, 0, d, 0, 0);
+}
+function mkEmber(init){ return {x:Math.random() * fxW, y:init ? Math.random() * fxH : fxH + 10, vy:rnd(.25, .9), vx:rnd(-.2, .2), r:rnd(.8, 2.4), ph:Math.random() * 6}; }
+function burst(x, y){
+  const n = reduced() ? 40 : 150;
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, s = rnd(3, 17);
+    parts.push({t:'fire', x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s - 1.5, life:0, max:rnd(30, 70), r:rnd(5, 16), c:['#fff1a8', '#ffd23f', '#ff9a1f', '#ff5a1f', '#ff3010'][i % 5]});
+  }
+  for (let i = 0; i < (reduced() ? 10 : 34); i++){
+    const a = Math.random() * Math.PI * 2, s = rnd(1, 5);
+    parts.push({t:'smoke', x:x + rnd(-30, 30), y:y + rnd(-30, 30), vx:Math.cos(a) * s, vy:Math.sin(a) * s - 1, life:0, max:rnd(70, 120), r:rnd(20, 40)});
+  }
+  for (let i = 0; i < (reduced() ? 20 : 70); i++){
+    const a = Math.random() * Math.PI * 2, s = rnd(10, 26);
+    parts.push({t:'spark', x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s, life:0, max:rnd(20, 45)});
+  }
+  parts.push({t:'ring', x, y, life:0, max:40, r:20});
+  parts.push({t:'ring', x, y, life:-6, max:46, r:10});
+}
+function confetti(cols){
+  const n = reduced() ? 60 : 220;
+  for (let i = 0; i < n; i++){
+    parts.push({t:'conf', x:Math.random() * fxW, y:-20 - Math.random() * fxH * .7, vx:rnd(-1.6, 1.6), vy:rnd(2.2, 5), rot:Math.random() * 6, vr:rnd(-.22, .22),
+                w:rnd(9, 15), h:rnd(5, 9), c:cols[i % cols.length], life:0, max:520, sw:Math.random() * 6});
+  }
+}
+function fxLoop(){
+  g2.clearRect(0, 0, fxW, fxH);
+  // Glut steigt auf (Stimmung)
+  if (!reduced() && state !== 'end'){
+    while (embers.length < 30) embers.push(mkEmber(embers.length < 30 && !fxLoop.started));
+    fxLoop.started = true;
+    g2.globalCompositeOperation = 'lighter';
+    for (const e of embers){
+      e.y -= e.vy; e.x += e.vx + Math.sin((e.ph += .03)) * .25;
+      const al = .25 + .25 * Math.sin(e.ph * 3);
+      g2.fillStyle = `rgba(255,${120 + (e.r * 30 | 0)},40,${al})`;
+      g2.beginPath(); g2.arc(e.x, e.y, e.r, 0, 7); g2.fill();
+      if (e.y < -10) Object.assign(e, mkEmber(false));
+    }
+    g2.globalCompositeOperation = 'source-over';
+  }
+  if (parts.length){
+    const keep = [];
+    for (const p of parts){
+      p.life++;
+      if (p.life < 0){ keep.push(p); continue; }
+      const k = p.life / p.max;
+      if (k >= 1) continue;
+      keep.push(p);
+      if (p.t === 'fire'){
+        p.x += p.vx; p.y += p.vy; p.vx *= .93; p.vy = p.vy * .93 - .08;
+        g2.globalCompositeOperation = 'lighter'; g2.globalAlpha = 1 - k; g2.fillStyle = p.c;
+        g2.beginPath(); g2.arc(p.x, p.y, p.r * (1 - k * .6), 0, 7); g2.fill();
+      } else if (p.t === 'smoke'){
+        p.x += p.vx; p.y += p.vy; p.vx *= .96; p.vy = p.vy * .96 - .05;
+        const rr = p.r * (1 + k * 2.4), gr = g2.createRadialGradient(p.x, p.y, 0, p.x, p.y, rr);
+        gr.addColorStop(0, 'rgba(70,52,46,.5)'); gr.addColorStop(1, 'rgba(70,52,46,0)');
+        g2.globalCompositeOperation = 'source-over'; g2.globalAlpha = 1 - k; g2.fillStyle = gr;
+        g2.beginPath(); g2.arc(p.x, p.y, rr, 0, 7); g2.fill();
+      } else if (p.t === 'spark'){
+        p.x += p.vx; p.y += p.vy; p.vx *= .95; p.vy = p.vy * .95 + .35;
+        g2.globalCompositeOperation = 'lighter'; g2.globalAlpha = 1 - k; g2.strokeStyle = '#ffe9a0'; g2.lineWidth = 2.5;
+        g2.beginPath(); g2.moveTo(p.x, p.y); g2.lineTo(p.x - p.vx * 2, p.y - p.vy * 2); g2.stroke();
+      } else if (p.t === 'ring'){
+        g2.globalCompositeOperation = 'lighter'; g2.globalAlpha = (1 - k) * .8; g2.strokeStyle = '#ffb24a'; g2.lineWidth = 14 * (1 - k) + 1;
+        g2.beginPath(); g2.arc(p.x, p.y, p.r + k * Math.max(fxW, fxH) * .5, 0, 7); g2.stroke();
+      } else if (p.t === 'conf'){
+        p.x += p.vx + Math.sin(p.sw += .05) * .9; p.y += p.vy; p.rot += p.vr;
+        if (p.y > fxH + 20){ p.life = p.max; continue; }
+        g2.globalCompositeOperation = 'source-over'; g2.globalAlpha = Math.min(1, (1 - k) * 4);
+        g2.save(); g2.translate(p.x, p.y); g2.rotate(p.rot); g2.fillStyle = p.c;
+        g2.fillRect(-p.w / 2, -p.h / 2 * Math.abs(Math.cos(p.rot * 1.7)), p.w, p.h * Math.abs(Math.cos(p.rot * 1.7)) + 1); g2.restore();
+      }
+    }
+    parts = keep;
+    g2.globalAlpha = 1; g2.globalCompositeOperation = 'source-over';
+  }
+  requestAnimationFrame(fxLoop);
+}
+addEventListener('resize', () => { fxSize(); layout(); });
+fxSize(); requestAnimationFrame(fxLoop);
+
+// =====================================================================
+//  Lobby
+// =====================================================================
+let state = 'lobby';
+const EXTRA_COLORS = ['#8bd450', '#ff7849', '#9b8cff', '#f2f2f2'];
+let roster = Hub.party.active().map((p, i) => ({name:p.name.trim().slice(0, 16), color:p.color, avatar:p.avatar, on:i < MAX_P, guest:false}));
+
+function renderLobby(){
+  const on = roster.filter(p => p.on).length;
+  $('#chips').classList.toggle('many', roster.length > 8);
+  $('#chips').innerHTML = roster.map((p, i) => `<button class="pchip ${p.on ? '' : 'off'}" data-i="${i}" style="--pc:${p.color}" title="${p.on ? 'Für dieses Spiel ausschließen' : 'Mitspielen lassen'}">
+      <span class="av">${p.avatar}</span><span class="nm">${esc(p.name)}</span>${p.guest ? '<span class="gst">Gast</span>' : ''}${i < 10 ? `<kbd>${(i + 1) % 10}</kbd>` : ''}
+      ${p.guest ? `<span class="rm" data-rm="${i}" title="Gast entfernen">×</span>` : ''}</button>`).join('') ||
+    '<p class="hint">Noch niemand da – füge unten Gäste hinzu oder lege im Launcher unter „Wer spielt mit?“ die Runde fest.</p>';
+  const h = $('#pHint');
+  if (on < MIN_P){
+    h.className = 'hint warn';
+    const f = MIN_P - on;
+    h.textContent = `Wortbombe braucht mindestens ${MIN_P} Leute – es ${f === 1 ? 'fehlt noch eine Person' : `fehlen noch ${f}`}. Tippe auf einen Namen oder füge einen Gast hinzu.`;
+  } else {
+    h.className = 'hint';
+    h.textContent = `${on} Leute sitzen im Kreis. Namen antippen schließt jemanden für dieses Spiel aus oder wieder ein.`;
+  }
+  $('#startBtn').classList.toggle('dim', on < MIN_P);
+  const nKeys = Math.min(roster.length, 10);
+  const numKeys = nKeys === 1 ? '<kbd>1</kbd>' : nKeys === 10 ? '<kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>' : `<kbd>1</kbd>–<kbd>${nKeys}</kbd>`;
+  $('#lobbyKeys').innerHTML = (nKeys ? numKeys + ' Mitspieler an/aus · ' : '') + '<kbd>G</kbd> Gast · <kbd>H</kbd> Hilfe · <kbd>Enter</kbd> Start';
+  renderSettings();
+  bar.set('runde', '–'); bar.set('dabei', on); bar.set('pass', '–');
+}
+function renderSettings(){
+  $('#sets').innerHTML = Object.entries(OPTS).map(([k, o]) => `<div class="set-row"><label>${o.label}</label><div class="seg" data-k="${k}">${
+    o.items.map(([v, l, s]) => `<button data-v="${v}" class="${String(cfg[k]) === String(v) ? 'on' : ''}" ${k === 'pos' && cfg.mode === 'themen' ? 'disabled title="Nur bei Silben"' : ''}>${l}${s ? `<small>${s}</small>` : ''}</button>`).join('')
+  }</div></div>`).join('');
+}
+function toggle(i){
+  const p = roster[i]; if (!p) return;
+  if (!p.on && roster.filter(x => x.on).length >= MAX_P){ Hub.toast('Der Kreis ist voll', `Höchstens ${MAX_P} Leute können mitspielen.`, 'user'); Hub.sfx('bad'); return; }
+  p.on = !p.on; Hub.sfx('click'); renderLobby();
+}
+$('#chips').addEventListener('click', e => {
+  const rm = e.target.closest('[data-rm]');
+  if (rm){ roster.splice(+rm.dataset.rm, 1); Hub.sfx('click'); renderLobby(); return; }
+  const b = e.target.closest('.pchip'); if (b) toggle(+b.dataset.i);
+});
+$('#sets').addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]'); if (!b || b.disabled) return;
+  const k = b.parentNode.dataset.k; let v = b.dataset.v;
+  if (k === 'lives') v = +v;
+  cfg[k] = v; Hub.write(SKEY, cfg); Hub.sfx('click'); renderSettings();
+});
+$('#guestForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const inp = $('#guestName'), name = inp.value.trim().replace(/\s+/g, ' ').slice(0, 14);
+  if (!name){ inp.value = ''; inp.blur(); return; }                    // leer + Enter: Feld verlassen, nächstes Enter startet
+  if (roster.filter(x => x.on).length >= MAX_P){ Hub.toast('Der Kreis ist voll', `Höchstens ${MAX_P} Leute können mitspielen.`, 'user'); Hub.sfx('bad'); return; }
+  const pool = Hub.party.COLORS.concat(EXTRA_COLORS), act = roster.filter(p => p.on);
+  const usedC = new Set(roster.map(p => p.color)), onC = new Set(act.map(p => p.color));
+  const usedA = new Set(roster.map(p => p.avatar)), onA = new Set(act.map(p => p.avatar));
+  const color = pool.find(c => !usedC.has(c)) || pool.find(c => !onC.has(c)) || pool[roster.length % pool.length];
+  const avatar = Hub.party.AVATARS.find(a => !usedA.has(a)) || Hub.party.AVATARS.find(a => !onA.has(a)) || '🙂';
+  roster.push({name, color, avatar, on:true, guest:true});
+  inp.value = ''; Hub.sfx('ok'); renderLobby();
+});
+$('#startBtn').onclick = () => startGame();
+
+// =====================================================================
+//  Spiel
+// =====================================================================
+const stage = $('#stage'), bombEl = $('#bomb'), arrow = $('#arrow'), mainBtn = $('#mainBtn'), undoBtn = $('#undoBtn'), pauseBtn = $('#pauseBtn');
+let G = null, R = null, paused = false, raf = 0, arrowAng = null, lockUntil = 0;
+const IV = [560, 400, 260, 150];      // Tick-Abstand je Phase (ms) – wird gegen Ende schneller
+
+function show(id){ document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+
+function startGame(){
+  const ps = roster.filter(p => p.on);
+  if (ps.length < MIN_P){
+    Hub.toast('Zu wenige Leute', `Wortbombe braucht mindestens ${MIN_P} Mitspieler – füge einfach Gäste hinzu.`, 'user'); Hub.sfx('bad');
+    $('#guestName').focus(); return;
+  }
+  G = {players:ps.map(p => ({name:p.name, color:p.color, avatar:p.avatar, lives:cfg.lives, out:false, passes:0, booms:0, outRound:0})),
+       lives:cfg.lives, round:1, holder:Math.floor(Math.random() * ps.length), elim:[], passesTotal:0, geo:null, normal:false};
+  paused = false; arrowAng = null;
+  show('game'); buildSeats();
+  Hub.sfx('launch');
+  if (ps.length >= 8) Hub.achieve(ID, 'sofa', 'Volles Sofa', 'Spielt Wortbombe mit mindestens 8 Leuten');
+  newRound(true);
+}
+function buildSeats(){
+  stage.querySelectorAll('.seat').forEach(s => s.remove());
+  G.players.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'seat';
+    el.style.setProperty('--pc', p.color); el.style.setProperty('--ink', ink(p.color));
+    el.innerHTML = `<div class="av">${p.avatar}</div><div class="nm"></div><div class="hearts"></div>`;
+    el.querySelector('.nm').textContent = p.name;
+    stage.appendChild(el); p.el = el;
+  });
+  layout();
+}
+function heartsHTML(p, breaking){
+  let s = '';
+  for (let i = 0; i < G.lives; i++) s += `<svg viewBox="0 0 24 24" class="${i < p.lives ? '' : 'off'}${breaking && i === p.lives ? ' brk' : ''}"><path d="${HEART}"/></svg>`;
+  return s;
+}
+function updateSeats(breakIdx){
+  G.players.forEach((p, i) => {
+    const cur = i === G.holder && (state === 'burning' || state === 'ready' || state === 'boom');
+    p.el.classList.toggle('cur', cur);
+    p.el.classList.toggle('ready', cur && state === 'ready');
+    p.el.classList.toggle('out', p.out);
+    p.el.querySelector('.hearts').innerHTML = heartsHTML(p, i === breakIdx);
+  });
+}
+// Sitzkreis (Ellipse) um die Bombe berechnen
+function layout(){
+  if (!G || state === 'lobby' || state === 'end') return;
+  const W = stage.clientWidth, H = stage.clientHeight, n = G.players.length;
+  if (!W || !H) return;
+  const k = clamp(Math.min(W / 1150, H / 640), .5, 1.2);
+  stage.style.setProperty('--k', k);
+  const sw = 180 * k, sh = 150 * k;
+  const rx = Math.max(80, W / 2 - sw * .64 - 6), ry = Math.max(70, H / 2 - sh * .6 - 4);
+  const cx = W / 2, cy = H / 2;
+  const B = clamp(Math.min(H - sh * 2.05, W * .32, 400), 150, 400);
+  bombEl.style.width = bombEl.style.height = B + 'px';
+  $('#kaboom').style.width = $('#kaboom').style.height = B * 1.5 + 'px';
+  G.geo = {cx, cy, B, k, W, H, seats:[]};
+  const off = n % 2 === 0 ? 180 / n : 0;
+  G.players.forEach((p, i) => {
+    const a = (-90 + off + 360 * i / n) * Math.PI / 180;
+    const x = cx + rx * Math.cos(a), y = cy + ry * Math.sin(a);
+    p.el.style.left = x + 'px'; p.el.style.top = y + 'px';
+    G.geo.seats[i] = {x, y};
+  });
+  sizePrompt(); pointArrow();
+}
+// Mittelpunkt des Bombenkörpers (für Pfeil und Explosion)
+const bombCenter = () => ({x:G.geo.cx - G.geo.B * .042, y:G.geo.cy + G.geo.B * .07});
+function pointArrow(){
+  if (!G || !G.geo) return;
+  const s = G.geo.seats[G.holder]; if (!s) return;
+  const o = bombCenter(), dx = s.x - o.x, dy = s.y - (o.y);
+  let a = Math.atan2(dy, dx) * 180 / Math.PI;
+  if (arrowAng == null) arrowAng = a;
+  while (a - arrowAng > 180) a -= 360;
+  while (a - arrowAng < -180) a += 360;
+  arrowAng = a;
+  arrow.style.left = o.x + 'px'; arrow.style.top = o.y + 'px';
+  arrow.style.width = Math.max(40, Math.hypot(dx, dy) - 66 * G.geo.k * 1.22) + 'px';
+  arrow.style.transform = `rotate(${a}deg)`;
+  arrow.style.setProperty('--pc', G.players[G.holder].color);
+}
+function sizePrompt(){
+  if (!G || !G.geo) return;
+  const B = G.geo.B, el = $('#ptext');
+  $('#plabel').style.fontSize = clamp(B * .068, 20, 28) + 'px';
+  if (el.classList.contains('theme')) fitTheme();
+  else {
+    const len = +el.dataset.len || 1, dots = +el.dataset.dots || 0;
+    el.style.fontSize = Math.min(B * .34, B * 1.02 / (len * .66 + dots * .26)) + 'px';
+  }
+}
+// Themen-Kasten so groß wie möglich machen, ohne die Sitzplätze zu verdecken:
+// für mehrere Kastenbreiten die freie Höhe zwischen den Sitzen bestimmen und die größte passende Schrift suchen.
+function fitTheme(){
+  const g = G.geo, el = $('#ptext'), pr = $('#prompt'), c = bombCenter();
+  const hw = 90 * g.k * 1.22 + 8, hh = 75 * g.k * 1.22 + 6;            // halbe Sitzgröße (mit Puffer, auch für den vergrößerten Sitz)
+  const maxA = Math.min(c.x, g.W - c.x, 620) - 10;
+  const freeB = a => {
+    let b = Math.min(c.y, g.H - c.y) - 8;
+    for (const s of g.seats) if (Math.abs(s.x - c.x) < a + hw) b = Math.min(b, Math.abs(s.y - c.y) - hh);
+    return b;
+  };
+  const fits = (a, b) => pr.offsetWidth <= 2 * a + 1 && pr.offsetHeight <= 2 * b + 1 && el.scrollWidth <= el.clientWidth + 1;
+  const fsMax = Math.round(clamp(g.B * .2, 34, 68)), fsMin = 22;
+  let best = null;
+  for (let a = Math.max(110, maxA); a >= 110; a -= 36){
+    const b = freeB(a); if (b < 40) continue;
+    el.style.maxWidth = 2 * a + 'px';
+    let lo = fsMin - 1, hi = fsMax + 1;                                  // lo passt (oder Startwert), hi passt nicht
+    while (hi - lo > 1){
+      const m = (lo + hi) >> 1;
+      el.style.fontSize = m + 'px';
+      if (fits(a, b)) lo = m; else hi = m;
+    }
+    if (lo >= fsMin && (!best || lo > best.fs)) best = {a, fs:lo};
+    if (best && best.fs === fsMax) break;
+  }
+  if (!best) best = {a:Math.max(110, maxA), fs:fsMin};                  // sehr kleines Fenster: kleinste Schrift
+  el.style.maxWidth = 2 * best.a + 'px';
+  el.style.fontSize = best.fs + 'px';
+}
+function renderPrompt(hidden){
+  const el = $('#ptext'), lb = $('#plabel'), p = R.prompt;
+  el.className = ''; el.removeAttribute('style');
+  if (hidden || !p){
+    lb.textContent = 'Runde ' + G.round; el.textContent = '?'; el.classList.add('q'); el.dataset.len = 1; el.dataset.dots = 0;
+  } else if (p.type === 'thema'){
+    lb.textContent = 'Nenne …'; el.textContent = p.text; el.classList.add('theme');
+  } else {
+    lb.textContent = POSTXT[p.pos];
+    const a = p.pos !== 'anfang', b = p.pos !== 'ende';
+    el.innerHTML = (a ? '<i>…</i>' : '') + esc(up(p.text)) + (b ? '<i>…</i>' : '');
+    el.dataset.len = p.text.length; el.dataset.dots = (a ? 1 : 0) + (b ? 1 : 0);
+  }
+  sizePrompt();
+  const pr = $('#prompt'); pr.classList.remove('pop'); void pr.offsetWidth; pr.classList.add('pop');
+}
+function renderCtrl(swap){
+  const p = G.players[G.holder], t = $('#turn');
+  t.style.setProperty('--pc', p.color);
+  t.innerHTML = `<span class="av">${p.avatar}</span><div style="min-width:0"><small>${state === 'ready' ? 'Fängt an – Tastatur nehmen!' : 'Jetzt dran'}</small><b></b></div>`;
+  t.querySelector('b').textContent = p.name;
+  if (swap){ t.classList.remove('swap'); void t.offsetWidth; t.classList.add('swap'); }
+  mainBtn.style.setProperty('--pc', p.color); mainBtn.style.setProperty('--ink', ink(p.color));
+  mainBtn.innerHTML = state === 'ready' ? '<span class="emo">🔥</span> Zünden <kbd>Leertaste</kbd>' : 'Weiter <span class="arr">➜</span> <kbd>Leertaste</kbd>';
+  mainBtn.disabled = !(state === 'ready' || state === 'burning');
+  undoBtn.disabled = !(state === 'burning' && R.hist.length);
+  pauseBtn.disabled = !(state === 'ready' || state === 'burning');
+}
+function stats(){
+  if (!G) return;
+  bar.set('runde', G.round);
+  bar.set('dabei', `${G.players.filter(p => !p.out).length}/${G.players.length}`);
+  bar.set('pass', R ? R.passes : 0);
+}
+
+function newRound(first){
+  state = 'ready';
+  R = {passes:0, hist:[], prompt:null, D:0, t0:0, next:0, tk:0, ph:0, th:[.5, .72, .88], lastPass:0};
+  R.prompt = newPrompt();
+  bombEl.className = ''; bombEl.dataset.ph = 0; stage.dataset.ph = 0;
+  void bombEl.offsetWidth; bombEl.classList.add('enter');
+  $('#kaboom').classList.remove('go');
+  arrow.classList.add('on');
+  lockUntil = performance.now() + (first ? 500 : 650);
+  renderPrompt(true); updateSeats(); layout(); renderCtrl(true); stats();
+  if (!first) snd.round();
+}
+function ignite(){
+  if (state !== 'ready' || paused || performance.now() < lockUntil) return;
+  state = 'burning';
+  const [a, b] = FUSE[cfg.fuse];
+  R.D = rnd(a, b) * 1000;
+  // Phasengrenzen zufällig verschoben – das schnellere Ticken verrät die Restzeit nicht genau
+  R.th = [rnd(.38, .56), rnd(.64, .78), rnd(.84, .93)];
+  R.t0 = performance.now(); R.next = R.t0 + 250;
+  R.lastPass = R.t0 + 350;                       // erst ein Wort rufen: Weitergeben frühestens nach ~0,65 s
+  bombEl.classList.remove('enter'); bombEl.classList.add('lit');
+  renderPrompt(false); updateSeats(); renderCtrl(false);
+  snd.ignite(); hissStart();
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+}
+const phaseAt = f => f < R.th[0] ? 0 : f < R.th[1] ? 1 : f < R.th[2] ? 2 : 3;
+function loop(now){
+  raf = 0;
+  if (state !== 'burning' || paused) return;
+  const el = now - R.t0;
+  if (el >= R.D) return explode();
+  const ph = phaseAt(el / R.D);
+  if (ph !== R.ph){ R.ph = ph; bombEl.dataset.ph = ph; stage.dataset.ph = ph; }
+  if (now >= R.next){
+    R.tk++; snd.tick(ph, R.tk % 2);
+    const svg = bombEl.querySelector('.bomb-svg');
+    if (svg.animate) svg.animate([{transform:'scale(1)'}, {transform:`scale(${1.03 + ph * .012})`}, {transform:'scale(1)'}], {duration:Math.min(170, IV[ph] * .8), easing:'ease-out'});
+    R.next = now + IV[ph] * rnd(.88, 1.12);
+  }
+  hissSet(.016 + ph * .008);
+  raf = requestAnimationFrame(loop);
+}
+function nextAlive(i){
+  const n = G.players.length;
+  for (let k = 1; k <= n; k++){ const j = (i + k) % n; if (!G.players[j].out) return j; }
+  return i;
+}
+function pass(){
+  if (state !== 'burning' || paused) return;
+  const now = performance.now();
+  if (now - R.lastPass < 300) return;            // Doppeltipper abfangen
+  R.lastPass = now;
+  const from = G.holder;
+  R.hist.push({holder:from, prompt:R.prompt});
+  G.players[from].passes++; R.passes++; G.passesTotal++;
+  G.holder = nextAlive(from);
+  if (cfg.swap === 'zug') { R.prompt = newPrompt(); renderPrompt(false); }
+  snd.pass();
+  // Bombe hüpft kurz Richtung nächster Person
+  const s = G.geo.seats[G.holder], o = bombCenter(), d = Math.hypot(s.x - o.x, s.y - o.y) || 1;
+  const sh = bombEl.querySelector('.shk');
+  if (sh.animate) sh.animate([{translate:'0 0'}, {translate:`${(s.x - o.x) / d * 16}px ${(s.y - o.y) / d * 16}px`}, {translate:'0 0'}], {duration:240, easing:'ease-out'});
+  const el = G.players[G.holder].el; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  updateSeats(); pointArrow(); renderCtrl(true); stats();
+  if (R.passes === 30) Hub.achieve(ID, 'heiss', 'Heiße Kartoffel', 'Die Bombe wurde in einer Runde 30-mal weitergegeben');
+}
+function undo(){
+  if (state !== 'burning' || paused || !R.hist.length) return;
+  const h = R.hist.pop();
+  G.players[h.holder].passes = Math.max(0, G.players[h.holder].passes - 1);
+  R.passes = Math.max(0, R.passes - 1); G.passesTotal = Math.max(0, G.passesTotal - 1);
+  G.holder = h.holder;
+  if (R.prompt !== h.prompt){ R.prompt = h.prompt; renderPrompt(false); }
+  R.lastPass = performance.now() - 150;
+  snd.undo();
+  updateSeats(); pointArrow(); renderCtrl(true); stats();
+}
+function explode(){
+  state = 'boom';
+  cancelAnimationFrame(raf); raf = 0; hissStop();
+  const i = G.holder, p = G.players[i];
+  p.lives = Math.max(0, p.lives - 1); p.booms++;
+  const out = p.lives <= 0;
+  if (out){ p.out = true; p.outRound = G.round; G.elim.push(i); }
+  // Knall!
+  snd.boom();
+  const r = stage.getBoundingClientRect(), c = bombCenter(), x = r.left + c.x, y = r.top + c.y;
+  const fl = $('#flash'); fl.style.setProperty('--fx', x + 'px'); fl.style.setProperty('--fy', y + 'px');
+  fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+  const app = $('#app'); app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
+  burst(x, y);
+  bombEl.classList.remove('lit', 'enter'); bombEl.classList.add('gone'); bombEl.dataset.ph = 0; stage.dataset.ph = 0;
+  arrow.classList.remove('on');
+  const kb = $('#kaboom'); kb.style.left = c.x + 'px'; kb.style.top = c.y + 'px'; kb.classList.remove('go'); void kb.getBoundingClientRect(); kb.classList.add('go');
+  updateSeats(i); renderCtrl(false);
+  p.el.classList.remove('hit'); void p.el.offsetWidth; p.el.classList.add('hit');
+  setTimeout(() => snd.heart(), 450);
+  setTimeout(() => showBoom(i, out), 1150);
+}
+function showBoom(i, out){
+  if (state !== 'boom') return;
+  const p = G.players[i], alive = G.players.filter(q => !q.out).length, last = alive <= 1;
+  if (out) snd.out();
+  const box = $('#boomBox');
+  box.innerHTML = `<div class="bm-word">BUMM!</div>
+    <div class="bm-p ${out ? 'out' : ''}" style="--pc:${p.color}"><span class="av xl">${p.avatar}</span><div><b></b><span class="t">${out ? 'ist raus! <span class="emo">💀</span>' : 'verliert ein Leben'}</span></div></div>
+    <div class="bm-hearts hearts">${heartsHTML(p, true)}</div>
+    <p class="bm-info">${R.prompt.type === 'thema' ? 'Thema' : 'Silbe'}: <b>${promptShort(R.prompt)}</b> · ${R.passes}× weitergegeben · die Zündschnur brannte <b>${Math.round(R.D / 1000)} s</b>
+      ${out && !last ? `<br>Noch <b>${alive}</b> im Spiel.` : ''}</p>
+    <div class="ov-row"><button class="big lock" id="bmNext" style="--pc:#ff6a1f;--ink:#fff;--lt:1.1s">${last ? '<span class="emo">🏆</span> Zur Siegerehrung' : 'Nächste Runde ➜'} <kbd>Enter</kbd></button></div>`;
+  box.querySelector('.bm-p b').textContent = p.name;
+  lockUntil = performance.now() + 1100;
+  $('#bmNext').onclick = boomNext;
+  $('#boomOv').classList.add('on');
+}
+function boomNext(){
+  if (state !== 'boom' || performance.now() < lockUntil || !$('#boomOv').classList.contains('on')) return;
+  $('#boomOv').classList.remove('on');
+  Hub.sfx('click');
+  const alive = G.players.filter(q => !q.out).length;
+  if (alive <= 1) return endGame(true);
+  const lo = G.holder;
+  if (G.players[lo].out) G.holder = nextAlive(lo);   // sonst fängt die Person an, bei der es geknallt hat
+  G.round++;
+  newRound(false);
+}
+
+// ---------------------------------------------------------------- Pause
+function pauseGame(){
+  if (paused || !(state === 'burning' || state === 'ready')) return;
+  paused = true;
+  if (R) R.pausedAt = performance.now();
+  hissSet(0);
+  stage.classList.add('veil');
+  $('#pauseOv').classList.add('on');
+}
+function resume(){
+  if (!paused) return;
+  paused = false;
+  const d = performance.now() - (R.pausedAt || performance.now());
+  R.t0 += d; R.next += d; R.lastPass += d;
+  stage.classList.remove('veil');
+  $('#pauseOv').classList.remove('on');
+  lockUntil = performance.now() + 250;
+  if (state === 'burning'){ cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); }
+}
+pauseBtn.onclick = pauseGame;
+$('#resumeBtn').onclick = resume;
+$('#pLobby').onclick = () => { leaveGame(); toLobby(); };
+$('#pFinish').onclick = () => { leaveGame(); endGame(false); };
+function leaveGame(){
+  paused = false; stage.classList.remove('veil'); $('#pauseOv').classList.remove('on');
+  cancelAnimationFrame(raf); raf = 0; hissStop();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'burning') pauseGame(); });
+
+mainBtn.onclick = () => { if (state === 'ready') ignite(); else if (state === 'burning') pass(); };
+undoBtn.onclick = undo;
+
+// =====================================================================
+//  Siegerehrung
+// =====================================================================
+function endGame(normal){
+  state = 'end'; hissStop(); paused = false;
+  $('#boomOv').classList.remove('on'); $('#pauseOv').classList.remove('on');
+  arrow.classList.remove('on');
+  const alive = G.players.map((p, i) => ({p, i})).filter(x => !x.p.out).sort((a, b) => b.p.lives - a.p.lives);
+  const order = alive.concat(G.elim.slice().reverse().map(i => ({p:G.players[i], i})));
+  // Ränge (Gleichstand nur bei Überlebenden mit gleich vielen Leben möglich)
+  order.forEach((x, k) => {
+    const prev = order[k - 1];
+    x.rank = prev && !x.p.out && !prev.p.out && prev.p.lives === x.p.lives ? prev.rank : k + 1;
+  });
+  const winners = order.filter(x => x.rank === 1);
+  const played = Math.max(0, G.round - (R && !R.D ? 1 : 0));          // vorzeitig beendet vor dem Zünden: Runde nicht mitzählen
+  const wTitle = winners.length === 1 ? `<span style="--pc:${winners[0].p.color}">${esc(winners[0].p.name)}</span> gewinnt!` : 'Gleichstand!';
+  const tieNames = winners.length <= 3 ? winners.map(w => w.p.name).join(winners.length === 2 ? ' & ' : ', ').replace(/, ([^,]*)$/, ' & $1') : `${winners.length} Leute`;
+  const sub = normal ? `Niemand hat die Bombe länger überlebt als ${winners[0].p.name}.`
+    : (winners.length > 1 ? `${tieNames} teilen sich Platz 1. ` : '') + 'Spiel vorzeitig beendet – gewertet nach den übrigen Leben.';
+  const podium = order.slice(0, 3).map((x, k) => `<div class="pp r${Math.min(3, x.rank)}" style="--pc:${x.p.color};order:${[2, 1, 3][k]};animation-delay:${[.25, .1, .4][k]}s">
+      <span class="av">${x.p.avatar}</span><b>${esc(x.p.name)}</b><div class="blk">${x.rank}</div></div>`).join('');
+  const rows = order.map((x, k) => `<div class="rk ${x.rank === 1 ? 'w' : ''}" style="--pc:${x.p.color};animation-delay:${.3 + k * .06}s">
+      <span class="n">${x.rank}.</span><span class="av">${x.p.avatar}</span>
+      <div class="who"><b>${esc(x.p.name)}</b><small>${x.p.passes}× weitergegeben · ${x.p.booms}× geknallt</small></div>
+      <span class="st">${x.p.out ? `💀 Runde ${x.p.outRound}` : `<span class="hearts">${heartsHTML(x.p)}</span>`}</span></div>`).join('');
+  $('#end').innerHTML = `<div class="end-grid">
+      <div class="end-l">
+        <div class="ov-tag">🏆 SIEGEREHRUNG</div>
+        <h1 class="end-title">${wTitle}</h1>
+        <p class="end-sub">${esc(sub)}</p>
+        <div class="podium">${podium}</div>
+        <div class="end-btns">
+          <button class="big lock" id="againBtn" style="--pc:#ff6a1f;--ink:#fff;--lt:1.5s">↻ Nochmal <kbd>Enter</kbd></button>
+        </div>
+        <div class="end-btns">
+          <button class="h-btn" id="lobbyBtn">⚙ Einstellungen &amp; Mitspieler <kbd>L</kbd></button>
+          <button class="h-btn" id="homeBtn">⌂ Zur Spielhalle</button>
+        </div>
+      </div>
+      <div class="rank ${order.length > 6 ? 'many' : ''}"><h3>Rangliste · ${played} ${played === 1 ? 'Runde' : 'Runden'} · ${G.passesTotal} ${G.passesTotal === 1 ? 'Weitergabe' : 'Weitergaben'}</h3>${rows}</div>
+    </div>`;
+  show('end');
+  lockUntil = performance.now() + 1500;
+  $('#againBtn').onclick = again;
+  $('#lobbyBtn').onclick = toLobby;
+  $('#homeBtn').onclick = () => { location.href = '../Launcher.html'; };
+  bar.set('dabei', `${alive.length}/${G.players.length}`); bar.set('runde', played); bar.set('pass', G.passesTotal);
+  snd.win(); Hub.sfx('ach');
+  const cols = G.players.map(p => p.color).concat(['#ffd23f', '#ffffff', '#ff6a1f']);
+  confetti(cols); setTimeout(() => state === 'end' && confetti(cols), 1400);
+  if (normal){
+    Hub.achieve(ID, 'sieg', 'Letzter Überlebender', 'Spielt eine Partie Wortbombe bis zum Schluss');
+    if (G.lives >= 2 && winners[0].p.lives === G.lives) Hub.achieve(ID, 'unversehrt', 'Ohne Kratzer', 'Gewinne Wortbombe, ohne ein einziges Leben zu verlieren');
+    Hub.score(ID, G.passesTotal, {label:'Weitergaben', silent:true});
+  }
+}
+function again(){ if (state !== 'end' || performance.now() < lockUntil) return; parts = parts.filter(p => p.t !== 'conf'); startGame(); }
+function toLobby(){
+  state = 'lobby'; G = null; R = null;
+  parts = parts.filter(p => p.t !== 'conf');
+  show('lobby'); renderLobby();
+}
+
+// =====================================================================
+//  Tastatur
+// =====================================================================
+// Knöpfe nicht per Maus fokussieren – sonst löst die Leertaste den zuletzt geklickten Knopf erneut aus
+document.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+addEventListener('keydown', e => {
+  const t = e.target, k = e.key;
+  const ho = document.querySelector('.h-overlay');
+  if (ho){                                                        // Hilfe-Dialog offen: Enter/Leertaste/Esc schließt ihn
+    if (ho.classList.contains('on') && (k === 'Enter' || k === ' ' || k === 'Escape') && !e.repeat){
+      e.preventDefault(); const b = ho.querySelector('.h-btn.primary') || ho.querySelector('.h-btn'); if (b) b.click();
+    }
+    return;
+  }
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){ if (k === 'Escape') t.blur(); return; }
+  const ae = document.activeElement;
+  if (ae && ae.tagName === 'BUTTON' && (k === 'Enter' || k === ' ')) return;   // per Tab gewählter Knopf
+  const go = k === ' ' || k === 'Enter' || k === 'ArrowRight';
+  const back = k === 'Backspace' || k === 'ArrowLeft' || k === 'z' || k === 'Z';
+  const pk = k === 'p' || k === 'P' || k === 'Escape';
+  if ((k === 'h' || k === 'H') && !e.repeat){ e.preventDefault(); showHelp(); return; }
+  if (state === 'lobby'){
+    if (k === 'Enter'){ e.preventDefault(); startGame(); }
+    else if (/^[0-9]$/.test(k)){ const i = k === '0' ? 9 : +k - 1; if (roster[i]) toggle(i); }
+    else if (k === 'g' || k === 'G'){ e.preventDefault(); $('#guestName').focus(); }
+    return;
+  }
+  if (state === 'end'){
+    if (k === 'Enter' || k === ' '){ e.preventDefault(); if (!e.repeat) again(); }
+    else if (k === 'l' || k === 'L') toLobby();
+    return;
+  }
+  if (paused){ if (go || pk){ e.preventDefault(); if (!e.repeat) resume(); } return; }
+  if (state === 'boom'){ if (go){ e.preventDefault(); if (!e.repeat) boomNext(); } return; }
+  if (pk){ e.preventDefault(); pauseGame(); return; }
+  if (state === 'ready'){ if (go){ e.preventDefault(); if (!e.repeat) ignite(); } return; }
+  if (state === 'burning'){
+    if (go){ e.preventDefault(); if (!e.repeat) pass(); }
+    else if (back){ e.preventDefault(); undo(); }
+  }
+});
+
+renderLobby();
+</script>
+</body>
+</html>
