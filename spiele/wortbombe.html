@@ -34,7 +34,7 @@
   .lb-sub b { color:#ffc27a; }
   .lb-cols { display:grid; grid-template-columns:minmax(0, .9fr) minmax(0, 1.1fr); gap:22px; width:min(1500px, 100%); }
   .card { background:rgba(24,11,8,.62); border:1px solid rgba(255,140,80,.2); border-radius:24px; padding:16px 20px 18px; box-shadow:0 20px 50px rgba(0,0,0,.35); min-width:0; }
-  .card h3 { margin:0 0 12px; font:800 16px var(--font); letter-spacing:2px; text-transform:uppercase; color:#ffb27a; }
+  .card h3 { margin:0 0 12px; font:800 18px var(--font); letter-spacing:2px; text-transform:uppercase; color:#ffb27a; }
   .pchips { display:flex; flex-wrap:wrap; gap:10px; }
   .pchip { position:relative; display:flex; align-items:center; gap:10px; height:60px; padding:0 16px 0 7px; border-radius:999px; border:3px solid var(--pc);
            background:color-mix(in srgb, var(--pc) 26%, rgba(0,0,0,.3)); color:#fff; font:700 22px var(--font); cursor:pointer; transition:transform .15s, opacity .2s, filter .2s; }
@@ -48,7 +48,7 @@
   .pchips.many .pchip .av { width:38px; height:38px; font-size:22px; }
   .pchip.off { opacity:.4; border-style:dashed; background:transparent; filter:grayscale(.85); }
   .pchip.off .nm { text-decoration:line-through; }
-  .pchip .gst { font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,.7); }
+  .pchip .gst { font-size:13px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,.7); }
   .guest { display:flex; gap:10px; margin-top:14px; }
   .guest .h-input { flex:1; min-width:0; height:54px; font-size:21px; border-radius:14px; background:rgba(0,0,0,.35); }
   .guest .h-btn { height:54px; font-size:20px; }
@@ -60,7 +60,7 @@
   .seg { display:flex; flex-wrap:wrap; gap:6px; }
   .seg button { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:52px; padding:4px 15px; border-radius:13px;
                 border:2px solid rgba(255,255,255,.12); background:rgba(255,255,255,.045); color:var(--text); font:700 20px/1.1 var(--font); cursor:pointer; transition:.15s; }
-  .seg button small { font-size:14px; font-weight:600; opacity:.75; margin-top:2px; }
+  .seg button small { font-size:15px; font-weight:600; opacity:.75; margin-top:2px; }
   .seg button:hover:not(:disabled) { border-color:rgba(255,160,90,.6); }
   .seg button.on { background:linear-gradient(180deg, #ffa057, #ff5a1f); border-color:transparent; color:#fff; box-shadow:0 5px 18px rgba(255,90,31,.38); }
   .seg button:disabled { opacity:.3; cursor:not-allowed; }
@@ -74,7 +74,7 @@
   .startbtn:active { transform:translateY(4px); box-shadow:0 4px 0 #8a2405, 0 10px 30px rgba(255,90,31,.4); }
   .startbtn.dim { filter:grayscale(.75) brightness(.7); }
   .startbtn kbd { font-size:16px; }
-  .keys { font-size:18px; color:var(--muted); text-align:center; }
+  .keys { font-size:20px; color:var(--muted); text-align:center; }
 
   /* ------------------------------------------------------------ Spiel */
   #game { flex-direction:column; }
@@ -123,13 +123,14 @@
   #bomb[data-ph="3"] .hot { opacity:.8; }
   .bomb-svg .spark { transform-box:fill-box; transform-origin:center; opacity:0; transition:opacity .2s; }
   #bomb.lit .spark { opacity:1; animation:spark .11s linear infinite alternate; }
-  #prompt { position:absolute; left:45.8%; top:57%; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:2px; pointer-events:none; text-align:center; }
+  /* width:max-content – sonst begrenzt die Bombenbreite den Themen-Kasten und lange Themen brechen Wort für Wort um */
+  #prompt { position:absolute; left:45.8%; top:57%; width:max-content; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:2px; pointer-events:none; text-align:center; }
   #plabel { font:800 22px var(--font); letter-spacing:3px; text-transform:uppercase; color:#ffb27a; text-shadow:0 2px 6px #000; white-space:nowrap; }
   #ptext { font:900 100px/1 var(--font-display); color:#fff; letter-spacing:2px; white-space:nowrap;
            -webkit-text-stroke:3px rgba(0,0,0,.65); paint-order:stroke fill; text-shadow:0 4px 0 rgba(0,0,0,.55), 0 0 26px rgba(255,170,90,.55); }
   #ptext i { font-style:normal; color:#ffb27a; opacity:.8; letter-spacing:-.06em; font-size:.42em; vertical-align:.4em; margin:0 .04em; -webkit-text-stroke:2px rgba(0,0,0,.5); }
   #ptext.q { color:#ffcf8a; }
-  #ptext.theme { white-space:normal; font:800 52px/1.08 var(--font-display); letter-spacing:.5px; max-width:640px; padding:16px 26px 18px; border-radius:22px;
+  #ptext.theme { white-space:normal; overflow-wrap:normal; font:800 52px/1.08 var(--font-display); letter-spacing:.5px; max-width:640px; padding:.28em .48em .32em; border-radius:22px;
                  -webkit-text-stroke:0; background:rgba(26,10,6,.9); border:3px solid #ff6a1f; box-shadow:0 0 0 6px rgba(255,106,31,.18), 0 18px 40px rgba(0,0,0,.6); text-shadow:none; }
   #prompt.pop #ptext { animation:ppop .45s cubic-bezier(.2,1.6,.4,1); }
   #stage.veil #prompt { filter:blur(22px); opacity:.5; }
@@ -175,10 +176,12 @@
   .ov-row .h-btn { height:58px; padding:0 24px; font-size:20px; border-radius:16px; }
   .bm-word { font:900 clamp(80px, 13vh, 140px)/1 var(--font-display); letter-spacing:6px; color:var(--spark); -webkit-text-stroke:4px #b8300c; paint-order:stroke fill;
              text-shadow:0 8px 0 #6e1804, 0 0 60px rgba(255,120,30,.85); animation:bmIn .55s cubic-bezier(.2,1.7,.4,1); }
-  .bm-p { display:flex; align-items:center; justify-content:center; gap:22px; margin:16px 0 6px; }
+  .bm-p { display:flex; align-items:center; justify-content:center; gap:22px; margin:16px 0 6px; max-width:100%; }
+  .bm-p > div { min-width:0; }
   .av.xl { width:110px; height:110px; flex:none; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:66px;
            box-shadow:0 0 0 6px rgba(255,255,255,.14), 0 0 50px var(--pc), inset 0 -6px 0 rgba(0,0,0,.25); }
-  .bm-p b { display:block; font:800 clamp(44px, 7vh, 64px)/1 var(--font-display); color:var(--pc); text-shadow:0 0 30px color-mix(in srgb, var(--pc) 55%, transparent); text-align:left; }
+  .bm-p b { display:block; font:800 clamp(44px, 7vh, 64px)/1 var(--font-display); color:var(--pc); text-shadow:0 0 30px color-mix(in srgb, var(--pc) 55%, transparent); text-align:left;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px 6px 0; }
   .bm-p span.t { display:block; font-size:28px; font-weight:700; text-align:left; margin-top:6px; }
   .bm-p.out span.t { color:#ff8a95; }
   .bm-hearts { display:flex; justify-content:center; gap:8px; margin:8px 0 6px; }
@@ -190,7 +193,7 @@
   #end { overflow:auto; padding:20px 28px 28px; }
   .end-grid { display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, .9fr); gap:30px; width:min(1500px, 100%); margin:auto; align-items:center; }
   .end-l { text-align:center; }
-  .end-title { margin:6px 0 4px; font:800 clamp(40px, 5.4vw, 74px)/1.05 var(--font-display); }
+  .end-title { margin:6px 0 4px; font:800 clamp(34px, min(5.4vw, 8vh), 74px)/1.05 var(--font-display); overflow-wrap:anywhere; }
   .end-title span { color:var(--pc, var(--spark)); text-shadow:0 0 34px color-mix(in srgb, var(--pc, #ffd23f) 55%, transparent); }
   .end-sub { font-size:22px; color:var(--text-2); margin:0 0 6px; }
   .podium { display:flex; align-items:flex-end; justify-content:center; gap:14px; margin:64px 0 6px; }
@@ -203,17 +206,29 @@
              font:900 46px var(--font-display); color:rgba(255,255,255,.92); text-shadow:0 3px 0 rgba(0,0,0,.3); }
   .pp.r1 .blk { height:150px; } .pp.r2 .blk { height:108px; } .pp.r3 .blk { height:78px; }
   .rank { display:flex; flex-direction:column; gap:8px; }
-  .rank h3 { margin:0 0 4px; font:800 16px var(--font); letter-spacing:2px; text-transform:uppercase; color:#ffb27a; }
+  .rank h3 { margin:0 0 4px; font:800 18px var(--font); letter-spacing:2px; text-transform:uppercase; color:#ffb27a; }
   .rk { display:grid; grid-template-columns:42px 54px minmax(0, 1fr) auto; align-items:center; gap:12px; padding:7px 16px 7px 12px; border-radius:16px;
         background:rgba(255,255,255,.055); border-left:6px solid var(--pc); font-size:22px; animation:rkIn .5s var(--ease) backwards; }
   .rk .n { font:800 26px var(--font-display); color:var(--muted); text-align:center; }
   .rk .av { width:48px; height:48px; border-radius:50%; background:var(--pc); display:grid; place-items:center; font-size:28px; }
-  .rk b { font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .rk .st { display:flex; flex-direction:column; align-items:flex-end; font-size:17px; color:var(--text-2); line-height:1.25; }
+  .rk .who { min-width:0; display:flex; flex-direction:column; line-height:1.2; }
+  .rk .who b { font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rk .who small { font-size:18px; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rk .st { display:flex; align-items:center; justify-content:flex-end; font-size:19px; color:var(--text-2); white-space:nowrap; }
   .rk .hearts svg { width:22px; height:22px; }
   .rk.w { background:color-mix(in srgb, var(--pc) 20%, rgba(255,255,255,.04)); }
   .end-btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
   .end-btns .h-btn { height:62px; padding:0 26px; font-size:21px; border-radius:16px; }
+
+  /* Anleitung (Hub-Dialog) – größer, damit sie vom Sofa lesbar ist */
+  /* (im Fernseher-Modus vergrößert hub.css den Dialog selbst per zoom – dann nur breiter machen) */
+  .h-dialog:has(.wb-help) { width:min(860px, 100%); }
+  html.tv .h-dialog:has(.wb-help) { width:min(760px, calc((100vw - 40px) / var(--tvz, 1.3))); }
+  html:not(.tv) .h-dialog:has(.wb-help) h2 { font-size:32px; }
+  html:not(.tv) .wb-help p { font-size:20px; line-height:1.5; margin:0 0 12px; }
+  html:not(.tv) .wb-help kbd { font-size:15px; }
+  html:not(.tv) .h-dialog:has(.wb-help) .h-btn { height:54px; padding:0 30px; font-size:20px; }
+  html.tv .wb-help p { margin:0 0 10px; }
 
   #flash { position:fixed; inset:0; z-index:55; pointer-events:none; opacity:0;
            background:radial-gradient(circle at var(--fx, 50%) var(--fy, 50%), #fff 0%, #ffe9a8 22%, #ff8a2a 52%, rgba(255,60,10,.6) 100%); }
@@ -269,10 +284,28 @@
     .end-btns .h-btn { height:54px; }
     .rk { padding-top:5px; padding-bottom:5px; }
     .rk .av { width:42px; height:42px; font-size:24px; }
+    #end { padding:12px 24px 16px; }
     .seg button { min-height:46px; padding-top:3px; padding-bottom:3px; }
     .pchip { height:54px; }
     #sets { row-gap:7px; }
     .card { padding:12px 18px 14px; }
+  }
+  @media (max-height:900px) {
+    .rank.many { gap:5px; }
+    .rank.many .rk { padding:3px 14px 3px 10px; gap:10px; }
+    .rank.many .rk .av { width:38px; height:38px; font-size:22px; }
+    .rank.many .rk .n { font-size:22px; }
+    .rank.many .rk .who b { font-size:20px; }
+    .rank.many .rk .who small { font-size:16px; }
+  }
+  @media (max-height:760px) {
+    .podium { margin-top:46px; }
+    .pp .av { width:62px; height:62px; font-size:36px; }
+    .pp.r1 .av { width:84px; height:84px; font-size:50px; }
+    .pp.r1 .av::before { top:-38px; font-size:38px; }
+    .pp.r1 .blk { height:76px; } .pp.r2 .blk { height:56px; } .pp.r3 .blk { height:40px; }
+    .pp .blk { font-size:30px; padding-top:4px; }
+    .pp b { font-size:23px; }
   }
 </style>
 </head>
@@ -354,9 +387,10 @@
 const ID = 'wortbombe';
 Hub.init(ID);
 const bar = Hub.bar({id:ID, title:'Wortbombe', stats:[['runde', 'Runde'], ['dabei', 'Im Spiel'], ['pass', 'Weitergaben']], actions:['help', 'sound', 'full']});
-bar.on('help', () => {
+bar.on('help', () => showHelp());
+function showHelp(){
   if (state === 'burning' || state === 'ready') pauseGame();
-  Hub.dialog({title:'Wortbombe – so geht’s', html:`
+  Hub.dialog({title:'Wortbombe – so geht’s', buttons:[{label:'Verstanden <kbd>Enter</kbd>', primary:true}], html:`<div class="wb-help">
     <p>Auf der Bombe steht eine <b>Silbe</b> (z. B. <b>SCH</b>) oder ein <b>Thema</b> (z. B. „Nenne ein Tier“). Wer die Bombe hat, ruft laut ein passendes Wort –
       etwa <i>Tisch, Schule, Waschbär</i> – und gibt dann mit <kbd>Leertaste</kbd> oder <kbd>Enter</kbd> an den Nächsten im Kreis weiter.</p>
     <p>Die Zündschnur ist jedes Mal unterschiedlich lang. Gegen Ende tickt die Bombe schneller – aber wann genau es knallt, weiß niemand.
@@ -364,8 +398,8 @@ bar.on('help', () => {
     <p><b>Am Sofa gilt:</b> Kein Wort doppelt pro Runde, keine erfundenen Wörter. Die Runde entscheidet, ob ein Wort zählt – erst dann weitergeben.
       Aus Versehen weitergegeben? <kbd>⌫</kbd> = Zurück (die Zündschnur brennt trotzdem weiter).</p>
     <p><b>Silbe am Anfang/Ende:</b> Dann muss das Wort mit der Silbe beginnen bzw. enden.</p>
-    <p><b>Tasten:</b> <kbd>Leertaste</kbd>/<kbd>Enter</kbd> Zünden &amp; Weiter · <kbd>⌫</kbd> Zurück · <kbd>P</kbd> Pause</p>`});
-});
+    <p><b>Tasten:</b> <kbd>Leertaste</kbd>/<kbd>Enter</kbd> Zünden &amp; Weiter · <kbd>⌫</kbd> Zurück · <kbd>P</kbd> Pause · <kbd>H</kbd> diese Hilfe</p></div>`});
+}
 
 const $ = s => document.querySelector(s);
 const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'})[c]);
@@ -427,7 +461,7 @@ const THEMEN = {
 //  Einstellungen
 // =====================================================================
 const SKEY = 'wortbombe_v1';
-const cfg = Object.assign({mode:'silben', pos:'irgendwo', diff:'leicht', fuse:'normal', lives:3, swap:'runde'}, Hub.read(SKEY, {}));
+const cfg = Object.assign({}, Hub.read(SKEY, {}));
 const OPTS = {
   mode:{label:'Spielart', items:[['silben', '🔤 Silben'], ['themen', '🗂️ Themen'], ['mix', '🎲 Gemischt']]},
   pos:{label:'Silbe steht', items:[['irgendwo', 'irgendwo'], ['anfang', 'am Anfang'], ['ende', 'am Ende'], ['zufall', 'Zufall']]},
@@ -437,6 +471,9 @@ const OPTS = {
   swap:{label:'Neue Aufgabe', items:[['runde', 'nach jedem Knall'], ['zug', 'bei jedem Zug']]},
 };
 const FUSE = {kurz:[10, 30], normal:[15, 45], lang:[20, 60]};
+const CFG_DEF = {mode:'silben', pos:'irgendwo', diff:'leicht', fuse:'normal', lives:3, swap:'runde'};
+for (const k in CFG_DEF) if (!OPTS[k].items.some(([v]) => String(v) === String(cfg[k]))) cfg[k] = CFG_DEF[k];
+cfg.lives = +cfg.lives;
 const MIN_P = 3, MAX_P = 10;
 const POSTXT = {irgendwo:'irgendwo im Wort', anfang:'am Wortanfang', ende:'am Wortende'};
 
@@ -673,7 +710,8 @@ function renderLobby(){
   }
   $('#startBtn').classList.toggle('dim', on < MIN_P);
   const nKeys = Math.min(roster.length, 10);
-  $('#lobbyKeys').innerHTML = (nKeys ? `<kbd>1</kbd>–<kbd>${nKeys % 10}</kbd> Mitspieler an/aus · ` : '') + '<kbd>G</kbd> Gast hinzufügen · <kbd>Enter</kbd> Start';
+  const numKeys = nKeys === 1 ? '<kbd>1</kbd>' : nKeys === 10 ? '<kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>' : `<kbd>1</kbd>–<kbd>${nKeys}</kbd>`;
+  $('#lobbyKeys').innerHTML = (nKeys ? numKeys + ' Mitspieler an/aus · ' : '') + '<kbd>G</kbd> Gast · <kbd>H</kbd> Hilfe · <kbd>Enter</kbd> Start';
   renderSettings();
   bar.set('runde', '–'); bar.set('dabei', on); bar.set('pass', '–');
 }
@@ -701,11 +739,13 @@ $('#sets').addEventListener('click', e => {
 $('#guestForm').addEventListener('submit', e => {
   e.preventDefault();
   const inp = $('#guestName'), name = inp.value.trim().replace(/\s+/g, ' ').slice(0, 14);
-  if (!name){ inp.focus(); return; }
+  if (!name){ inp.value = ''; inp.blur(); return; }                    // leer + Enter: Feld verlassen, nächstes Enter startet
   if (roster.filter(x => x.on).length >= MAX_P){ Hub.toast('Der Kreis ist voll', `Höchstens ${MAX_P} Leute können mitspielen.`, 'user'); Hub.sfx('bad'); return; }
-  const usedC = new Set(roster.map(p => p.color)), usedA = new Set(roster.map(p => p.avatar));
-  const color = Hub.party.COLORS.concat(EXTRA_COLORS).find(c => !usedC.has(c)) || Hub.party.COLORS[roster.length % 8];
-  const avatar = Hub.party.AVATARS.find(a => !usedA.has(a)) || '🙂';
+  const pool = Hub.party.COLORS.concat(EXTRA_COLORS), act = roster.filter(p => p.on);
+  const usedC = new Set(roster.map(p => p.color)), onC = new Set(act.map(p => p.color));
+  const usedA = new Set(roster.map(p => p.avatar)), onA = new Set(act.map(p => p.avatar));
+  const color = pool.find(c => !usedC.has(c)) || pool.find(c => !onC.has(c)) || pool[roster.length % pool.length];
+  const avatar = Hub.party.AVATARS.find(a => !usedA.has(a)) || Hub.party.AVATARS.find(a => !onA.has(a)) || '🙂';
   roster.push({name, color, avatar, on:true, guest:true});
   inp.value = ''; Hub.sfx('ok'); renderLobby();
 });
@@ -802,15 +842,42 @@ function pointArrow(){
 function sizePrompt(){
   if (!G || !G.geo) return;
   const B = G.geo.B, el = $('#ptext');
-  if (el.classList.contains('theme')){
-    const len = el.textContent.length, W = G.geo.W;
-    el.style.fontSize = clamp(Math.min(W / 22, B * .19) * (len > 24 ? .8 : len > 15 ? .9 : 1), 26, 62) + 'px';
-    el.style.maxWidth = Math.min(W * .56, 700) + 'px';
-  } else {
+  $('#plabel').style.fontSize = clamp(B * .068, 20, 28) + 'px';
+  if (el.classList.contains('theme')) fitTheme();
+  else {
     const len = +el.dataset.len || 1, dots = +el.dataset.dots || 0;
     el.style.fontSize = Math.min(B * .34, B * 1.02 / (len * .66 + dots * .26)) + 'px';
   }
-  $('#plabel').style.fontSize = clamp(B * .068, 20, 28) + 'px';
+}
+// Themen-Kasten so groß wie möglich machen, ohne die Sitzplätze zu verdecken:
+// für mehrere Kastenbreiten die freie Höhe zwischen den Sitzen bestimmen und die größte passende Schrift suchen.
+function fitTheme(){
+  const g = G.geo, el = $('#ptext'), pr = $('#prompt'), c = bombCenter();
+  const hw = 90 * g.k * 1.22 + 8, hh = 75 * g.k * 1.22 + 6;            // halbe Sitzgröße (mit Puffer, auch für den vergrößerten Sitz)
+  const maxA = Math.min(c.x, g.W - c.x, 620) - 10;
+  const freeB = a => {
+    let b = Math.min(c.y, g.H - c.y) - 8;
+    for (const s of g.seats) if (Math.abs(s.x - c.x) < a + hw) b = Math.min(b, Math.abs(s.y - c.y) - hh);
+    return b;
+  };
+  const fits = (a, b) => pr.offsetWidth <= 2 * a + 1 && pr.offsetHeight <= 2 * b + 1 && el.scrollWidth <= el.clientWidth + 1;
+  const fsMax = Math.round(clamp(g.B * .2, 34, 68)), fsMin = 22;
+  let best = null;
+  for (let a = Math.max(110, maxA); a >= 110; a -= 36){
+    const b = freeB(a); if (b < 40) continue;
+    el.style.maxWidth = 2 * a + 'px';
+    let lo = fsMin - 1, hi = fsMax + 1;                                  // lo passt (oder Startwert), hi passt nicht
+    while (hi - lo > 1){
+      const m = (lo + hi) >> 1;
+      el.style.fontSize = m + 'px';
+      if (fits(a, b)) lo = m; else hi = m;
+    }
+    if (lo >= fsMin && (!best || lo > best.fs)) best = {a, fs:lo};
+    if (best && best.fs === fsMax) break;
+  }
+  if (!best) best = {a:Math.max(110, maxA), fs:fsMin};                  // sehr kleines Fenster: kleinste Schrift
+  el.style.maxWidth = 2 * best.a + 'px';
+  el.style.fontSize = best.fs + 'px';
 }
 function renderPrompt(hidden){
   const el = $('#ptext'), lb = $('#plabel'), p = R.prompt;
@@ -866,7 +933,8 @@ function ignite(){
   R.D = rnd(a, b) * 1000;
   // Phasengrenzen zufällig verschoben – das schnellere Ticken verrät die Restzeit nicht genau
   R.th = [rnd(.38, .56), rnd(.64, .78), rnd(.84, .93)];
-  R.t0 = performance.now(); R.next = R.t0 + 250; R.lastPass = R.t0;
+  R.t0 = performance.now(); R.next = R.t0 + 250;
+  R.lastPass = R.t0 + 350;                       // erst ein Wort rufen: Weitergeben frühestens nach ~0,65 s
   bombEl.classList.remove('enter'); bombEl.classList.add('lit');
   renderPrompt(false); updateSeats(); renderCtrl(false);
   snd.ignite(); hissStart();
@@ -1021,17 +1089,17 @@ function endGame(normal){
     x.rank = prev && !x.p.out && !prev.p.out && prev.p.lives === x.p.lives ? prev.rank : k + 1;
   });
   const winners = order.filter(x => x.rank === 1);
-  const wTitle = winners.length === 1 ? `<span style="--pc:${winners[0].p.color}">${esc(winners[0].p.name)}</span> gewinnt!`
-    : winners.length === 2 ? `Gleichstand! ${winners.map(w => `<span style="--pc:${w.p.color}">${esc(w.p.name)}</span>`).join(' &amp; ')}`
-    : 'Gleichstand!';
+  const played = Math.max(0, G.round - (R && !R.D ? 1 : 0));          // vorzeitig beendet vor dem Zünden: Runde nicht mitzählen
+  const wTitle = winners.length === 1 ? `<span style="--pc:${winners[0].p.color}">${esc(winners[0].p.name)}</span> gewinnt!` : 'Gleichstand!';
+  const tieNames = winners.length <= 3 ? winners.map(w => w.p.name).join(winners.length === 2 ? ' & ' : ', ').replace(/, ([^,]*)$/, ' & $1') : `${winners.length} Leute`;
   const sub = normal ? `Niemand hat die Bombe länger überlebt als ${winners[0].p.name}.`
-    : (winners.length > 2 ? `${winners.length} Leute teilen sich Platz 1. ` : '') + 'Spiel vorzeitig beendet – gewertet nach den übrigen Leben.';
+    : (winners.length > 1 ? `${tieNames} teilen sich Platz 1. ` : '') + 'Spiel vorzeitig beendet – gewertet nach den übrigen Leben.';
   const podium = order.slice(0, 3).map((x, k) => `<div class="pp r${Math.min(3, x.rank)}" style="--pc:${x.p.color};order:${[2, 1, 3][k]};animation-delay:${[.25, .1, .4][k]}s">
       <span class="av">${x.p.avatar}</span><b>${esc(x.p.name)}</b><div class="blk">${x.rank}</div></div>`).join('');
   const rows = order.map((x, k) => `<div class="rk ${x.rank === 1 ? 'w' : ''}" style="--pc:${x.p.color};animation-delay:${.3 + k * .06}s">
-      <span class="n">${x.rank}.</span><span class="av">${x.p.avatar}</span><b>${esc(x.p.name)}</b>
-      <span class="st">${x.p.out ? `<span>💀 raus in Runde ${x.p.outRound}</span>` : `<span class="hearts">${heartsHTML(x.p)}</span>`}
-      <span>${x.p.passes}× weitergegeben · ${x.p.booms}× geknallt</span></span></div>`).join('');
+      <span class="n">${x.rank}.</span><span class="av">${x.p.avatar}</span>
+      <div class="who"><b>${esc(x.p.name)}</b><small>${x.p.passes}× weitergegeben · ${x.p.booms}× geknallt</small></div>
+      <span class="st">${x.p.out ? `💀 Runde ${x.p.outRound}` : `<span class="hearts">${heartsHTML(x.p)}</span>`}</span></div>`).join('');
   $('#end').innerHTML = `<div class="end-grid">
       <div class="end-l">
         <div class="ov-tag">🏆 SIEGEREHRUNG</div>
@@ -1046,20 +1114,20 @@ function endGame(normal){
           <button class="h-btn" id="homeBtn">⌂ Zur Spielhalle</button>
         </div>
       </div>
-      <div class="rank"><h3>Rangliste · ${G.round} Runden · ${G.passesTotal} Weitergaben</h3>${rows}</div>
+      <div class="rank ${order.length > 6 ? 'many' : ''}"><h3>Rangliste · ${played} ${played === 1 ? 'Runde' : 'Runden'} · ${G.passesTotal} ${G.passesTotal === 1 ? 'Weitergabe' : 'Weitergaben'}</h3>${rows}</div>
     </div>`;
   show('end');
   lockUntil = performance.now() + 1500;
   $('#againBtn').onclick = again;
   $('#lobbyBtn').onclick = toLobby;
   $('#homeBtn').onclick = () => { location.href = '../Launcher.html'; };
-  bar.set('dabei', `${alive.length}/${G.players.length}`);
+  bar.set('dabei', `${alive.length}/${G.players.length}`); bar.set('runde', played); bar.set('pass', G.passesTotal);
   snd.win(); Hub.sfx('ach');
   const cols = G.players.map(p => p.color).concat(['#ffd23f', '#ffffff', '#ff6a1f']);
   confetti(cols); setTimeout(() => state === 'end' && confetti(cols), 1400);
   if (normal){
     Hub.achieve(ID, 'sieg', 'Letzter Überlebender', 'Spielt eine Partie Wortbombe bis zum Schluss');
-    if (winners[0].p.lives === G.lives) Hub.achieve(ID, 'unversehrt', 'Ohne Kratzer', 'Gewinne Wortbombe, ohne ein einziges Leben zu verlieren');
+    if (G.lives >= 2 && winners[0].p.lives === G.lives) Hub.achieve(ID, 'unversehrt', 'Ohne Kratzer', 'Gewinne Wortbombe, ohne ein einziges Leben zu verlieren');
     Hub.score(ID, G.passesTotal, {label:'Weitergaben', silent:true});
   }
 }
@@ -1076,14 +1144,21 @@ function toLobby(){
 // Knöpfe nicht per Maus fokussieren – sonst löst die Leertaste den zuletzt geklickten Knopf erneut aus
 document.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
 addEventListener('keydown', e => {
-  if (document.querySelector('.h-overlay')) return;             // Hilfe-Dialog offen
   const t = e.target, k = e.key;
+  const ho = document.querySelector('.h-overlay');
+  if (ho){                                                        // Hilfe-Dialog offen: Enter/Leertaste/Esc schließt ihn
+    if (ho.classList.contains('on') && (k === 'Enter' || k === ' ' || k === 'Escape') && !e.repeat){
+      e.preventDefault(); const b = ho.querySelector('.h-btn.primary') || ho.querySelector('.h-btn'); if (b) b.click();
+    }
+    return;
+  }
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){ if (k === 'Escape') t.blur(); return; }
   const ae = document.activeElement;
   if (ae && ae.tagName === 'BUTTON' && (k === 'Enter' || k === ' ')) return;   // per Tab gewählter Knopf
   const go = k === ' ' || k === 'Enter' || k === 'ArrowRight';
   const back = k === 'Backspace' || k === 'ArrowLeft' || k === 'z' || k === 'Z';
   const pk = k === 'p' || k === 'P' || k === 'Escape';
+  if ((k === 'h' || k === 'H') && !e.repeat){ e.preventDefault(); showHelp(); return; }
   if (state === 'lobby'){
     if (k === 'Enter'){ e.preventDefault(); startGame(); }
     else if (/^[0-9]$/.test(k)){ const i = k === '0' ? 9 : +k - 1; if (roster[i]) toggle(i); }
